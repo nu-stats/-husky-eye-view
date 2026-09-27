@@ -1,0 +1,879 @@
+// Build the nationwide context layers from the source files in data/source/
+// (streamed line by line; the tract files are ~2 GB each):
+//   - holc_nation.geojson              -> HOLC "redlining" areas, every city
+//   - nation_tracts_le.geojson         -> census tracts with life expectancy
+//                                         at birth (life_exp_8, USALEEP)
+//   - nation_county_le.geojson         -> county life expectancy 2000-2019,
+//                                         total and by race/ethnicity
+//   - nation_county_le_cluster.geojson -> Local Moran's I clusters of county
+//                                         life expectancy (2015)
+//   - nation_tracts_le_cluster.geojson -> Local Moran's I clusters of tract
+//                                         life expectancy (life_exp_8)
+// Output is chunked (tracts and HOLC by county, counties by state) so the app
+// loads only the chunks in view:
+//   public/context/<layer>/index.json        [{ id, bbox:[w,s,e,n], count }]
+//   public/context/<layer>/<chunk>.geojsonl  one Feature per line
+// The tract files are projected in ESRI:102003 (USA Contiguous Albers Equal
+// Area Conic, NAD83) and converted to WGS84 lon/lat here; the county files
+// are NAD83 lon/lat. Outlines are simplified so a chunk loads quickly.
+// The cluster files carry no GEOID: their SOURCE_ID is the feature's position
+// in the matching life expectancy file, which is verified before use.
+// Usage: node scripts/build-context-layers.mjs [layer ...]
+//   layers: holc, tract-le, county-le, county-clusters, tract-clusters, coarse
+//   (default: all layers; each also writes its coarse/ copy. `coarse` alone
+//   rebuilds just the coarse copies from the existing chunks.)
+import {
+  createReadStream,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createInterface } from 'node:readline';
+
+// Raw nationwide sources live outside public/ so a production build does not
+// copy gigabytes into the output; only the chunks below are served.
+const HOLC_INPUT = 'data/source/holc_nation.geojson';
+const TRACTS_INPUT = 'data/source/nation_tracts_le.geojson';
+const COUNTY_INPUT = 'data/source/nation_county_le.geojson';
+const COUNTY_CLUSTER_INPUT = 'data/source/nation_county_le_cluster.geojson';
+const TRACT_CLUSTER_INPUT = 'data/source/nation_tracts_le_cluster.geojson';
+const OUT_ROOT = 'public/context';
+/** Douglas-Peucker tolerance in degrees (~10 m at mid latitudes). */
+const SIMPLIFY_DEG = 0.0001;
+/** Coarser tolerance for county outlines, drawn nationwide (~300 m). */
+const COUNTY_SIMPLIFY_DEG = 0.003;
+
+const HOLC_GRADE_LABELS = {
+  A: 'Best',
+  B: 'Still Desirable',
+  C: 'Definitely Declining',
+  D: 'Hazardous',
+};
+
+// ---- ESRI:102003 inverse (Snyder, Map Projections: A Working Manual, §14) --
+const A = 6378137; // GRS80
+const F = 1 / 298.257222101;
+const E2 = F * (2 - F);
+const E = Math.sqrt(E2);
+const RAD = Math.PI / 180;
+const LON0 = -96 * RAD;
+
+function q(phi) {
+  const s = Math.sin(phi);
+  return (
+    (1 - E2) *
+    (s / (1 - E2 * s * s) - (1 / (2 * E)) * Math.log((1 - E * s) / (1 + E * s)))
+  );
+}
+function m(phi) {
+  const s = Math.sin(phi);
+  return Math.cos(phi) / Math.sqrt(1 - E2 * s * s);
+}
+const M1 = m(29.5 * RAD);
+const M2 = m(45.5 * RAD);
+const Q1 = q(29.5 * RAD);
+const Q2 = q(45.5 * RAD);
+const N = (M1 * M1 - M2 * M2) / (Q2 - Q1);
+const C = M1 * M1 + N * Q1;
+const RHO0 = (A * Math.sqrt(C - N * q(37.5 * RAD))) / N;
+
+/** ESRI:102003 metres -> [lon, lat] degrees. */
+function albersToLonLat([x, y]) {
+  const rho = Math.hypot(x, RHO0 - y);
+  const theta = Math.atan2(x, RHO0 - y);
+  const qv = (C - (rho * rho * N * N) / (A * A)) / N;
+  let phi = Math.asin(Math.max(-1, Math.min(1, qv / 2)));
+  for (let i = 0; i < 10; i++) {
+    const s = Math.sin(phi);
+    const one = 1 - E2 * s * s;
+    const delta =
+      ((one * one) / (2 * Math.cos(phi))) *
+      (qv / (1 - E2) -
+        s / one +
+        (1 / (2 * E)) * Math.log((1 - E * s) / (1 + E * s)));
+    phi += delta;
+    if (Math.abs(delta) < 1e-12) break;
+  }
+  return [(LON0 + theta / N) / RAD, phi / RAD];
+}
+
+// ---- geometry helpers ------------------------------------------------------
+const round6 = (v) => Math.round(v * 1e6) / 1e6;
+
+/** Iterative Douglas-Peucker on an open polyline of [lon, lat]. */
+function simplifyLine(points, tolerance) {
+  if (points.length <= 2) return points;
+  const keep = new Uint8Array(points.length);
+  keep[0] = 1;
+  keep[points.length - 1] = 1;
+  const stack = [[0, points.length - 1]];
+  const tol2 = tolerance * tolerance;
+  while (stack.length) {
+    const [first, last] = stack.pop();
+    const [ax, ay] = points[first];
+    const [bx, by] = points[last];
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    let maxDist = -1;
+    let index = -1;
+    for (let i = first + 1; i < last; i++) {
+      const [px, py] = points[i];
+      let t = len2 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      const ex = ax + t * dx - px;
+      const ey = ay + t * dy - py;
+      const d = ex * ex + ey * ey;
+      if (d > maxDist) {
+        maxDist = d;
+        index = i;
+      }
+    }
+    if (maxDist > tol2) {
+      keep[index] = 1;
+      stack.push([first, index], [index, last]);
+    }
+  }
+  return points.filter((_, i) => keep[i]);
+}
+
+/** Project, simplify and round one ring; null when it degenerates. */
+function cleanRing(points, project, tolerance) {
+  const projected = points.map(project);
+  // Simplify as an open line (first point repeated at the end is kept).
+  let ring = simplifyLine(projected, tolerance);
+  if (ring.length < 4) ring = projected; // too small to simplify safely
+  const out = [];
+  for (const point of ring) {
+    const lon = round6(point[0]);
+    const lat = round6(point[1]);
+    const last = out[out.length - 1];
+    if (!last || last[0] !== lon || last[1] !== lat) out.push([lon, lat]);
+  }
+  if (out.length < 3) return null;
+  const [fx, fy] = out[0];
+  const [lx, ly] = out[out.length - 1];
+  if (fx !== lx || fy !== ly) out.push([fx, fy]);
+  return out.length >= 4 ? out : null;
+}
+
+/** Clean a (Multi)Polygon; null when nothing drawable is left. */
+function cleanGeometry(geometry, project = (p) => p, tolerance = SIMPLIFY_DEG) {
+  const polygon = (rings) => {
+    const outer = cleanRing(rings[0], project, tolerance);
+    if (!outer) return null;
+    const holes = rings
+      .slice(1)
+      .map((r) => cleanRing(r, project, tolerance))
+      .filter(Boolean);
+    return [outer, ...holes];
+  };
+  const polygons = (
+    geometry?.type === 'Polygon'
+      ? [geometry.coordinates]
+      : geometry?.type === 'MultiPolygon'
+        ? geometry.coordinates
+        : []
+  )
+    .map(polygon)
+    .filter(Boolean);
+  if (!polygons.length) return null;
+  return polygons.length === 1
+    ? { type: 'Polygon', coordinates: polygons[0] }
+    : { type: 'MultiPolygon', coordinates: polygons };
+}
+
+function bboxOf(geometry) {
+  const bbox = [Infinity, Infinity, -Infinity, -Infinity];
+  const rings =
+    geometry.type === 'Polygon'
+      ? geometry.coordinates
+      : geometry.coordinates.flat();
+  for (const ring of rings) {
+    for (const [lon, lat] of ring) {
+      if (lon < bbox[0]) bbox[0] = lon;
+      if (lat < bbox[1]) bbox[1] = lat;
+      if (lon > bbox[2]) bbox[2] = lon;
+      if (lat > bbox[3]) bbox[3] = lat;
+    }
+  }
+  return bbox;
+}
+
+async function* features(path, prefilter = () => true) {
+  const lines = createInterface({
+    input: createReadStream(path),
+    crlfDelay: Infinity,
+  });
+  for await (const raw of lines) {
+    if (!raw.startsWith('{"type":"Feature"') || !prefilter(raw)) continue;
+    yield JSON.parse(raw.replace(/,\s*$/, ''));
+  }
+}
+
+/** Collects features into per-chunk files plus a bbox index. */
+function createChunkWriter(layerDir) {
+  const chunks = new Map();
+  return {
+    add(chunkId, feature) {
+      let chunk = chunks.get(chunkId);
+      if (!chunk) {
+        chunk = { lines: [], bbox: [Infinity, Infinity, -Infinity, -Infinity] };
+        chunks.set(chunkId, chunk);
+      }
+      const [w, s, e, n] = bboxOf(feature.geometry);
+      chunk.bbox = [
+        Math.min(chunk.bbox[0], w),
+        Math.min(chunk.bbox[1], s),
+        Math.max(chunk.bbox[2], e),
+        Math.max(chunk.bbox[3], n),
+      ];
+      chunk.lines.push(JSON.stringify(feature));
+    },
+    finish() {
+      const dir = `${OUT_ROOT}/${layerDir}`;
+      rmSync(dir, { recursive: true, force: true });
+      mkdirSync(dir, { recursive: true });
+      const index = [];
+      let bytes = 0;
+      for (const [id, chunk] of [...chunks].sort(([a], [b]) =>
+        a.localeCompare(b),
+      )) {
+        const text = `${chunk.lines.join('\n')}\n`;
+        bytes += Buffer.byteLength(text);
+        writeFileSync(`${dir}/${id}.geojsonl`, text);
+        index.push({
+          id,
+          bbox: chunk.bbox.map(round6),
+          count: chunk.lines.length,
+        });
+      }
+      writeFileSync(`${dir}/index.json`, JSON.stringify(index));
+      const features = index.reduce((sum, c) => sum + c.count, 0);
+      console.log(
+        `${layerDir}: ${features} features in ${index.length} files, ${(bytes / 1e6).toFixed(1)} MB`,
+      );
+      buildCoarseCopy(layerDir);
+    },
+  };
+}
+
+// ---- Coarse copies for zoomed-out views -----------------------------------------
+// Every chunked layer also gets <layer>/coarse/<chunk>.geojsonl: the same
+// features and properties with outlines simplified for distant views. The app
+// draws them above the layer's coarseHeightM (src/data/infrastructure.js).
+const COARSE_TOLERANCE_DEG = {
+  holc: 0.0015, // ~150 m
+  'life-expectancy': 0.0015,
+  'tract-clusters': 0.0015,
+  'county-life-expectancy': 0.02, // ~2 km, for the nationwide view
+  'county-clusters': 0.02,
+};
+
+/** Write <layer>/coarse/ from the layer's full-detail chunk files. */
+function buildCoarseCopy(layerDir) {
+  const tolerance = COARSE_TOLERANCE_DEG[layerDir];
+  if (!tolerance) return;
+  const dir = `${OUT_ROOT}/${layerDir}`;
+  const coarseDir = `${dir}/coarse`;
+  rmSync(coarseDir, { recursive: true, force: true });
+  mkdirSync(coarseDir, { recursive: true });
+  const index = JSON.parse(readFileSync(`${dir}/index.json`, 'utf8'));
+  let before = 0;
+  let after = 0;
+  for (const { id } of index) {
+    const text = readFileSync(`${dir}/${id}.geojsonl`, 'utf8');
+    before += Buffer.byteLength(text);
+    const lines = text
+      .split('\n')
+      .filter((line) => line.trim())
+      .map((line) => {
+        const feature = JSON.parse(line);
+        // Tiny areas that would collapse keep their full outline.
+        const geometry =
+          cleanGeometry(feature.geometry, (p) => p, tolerance) ||
+          feature.geometry;
+        return JSON.stringify({ ...feature, geometry });
+      });
+    const coarse = `${lines.join('\n')}\n`;
+    after += Buffer.byteLength(coarse);
+    writeFileSync(`${coarseDir}/${id}.geojsonl`, coarse);
+  }
+  console.log(
+    `  ${layerDir}/coarse: ${(after / 1e6).toFixed(1)} MB (full detail ${(before / 1e6).toFixed(1)} MB)`,
+  );
+}
+
+// ---- HOLC redlining, nationwide ----------------------------------------------
+// The source splits every HOLC area along 2010 census-tract lines (~40k
+// pieces for ~8.4k areas). Pieces of one area share exact boundary points, so
+// they are merged back by cancelling the edges they share: 4-5x fewer shapes
+// to download and drape. An area whose edges do not close up keeps its pieces.
+
+const edgeKey = (pt) => `${pt[0].toFixed(7)},${pt[1].toFixed(7)}`;
+
+/** Outer boundary rings of the union of `pieces`, or null if they don't close. */
+function mergeRings(pieces) {
+  const edges = new Map(); // "a|b" -> [a, b]
+  for (const piece of pieces) {
+    const polygons =
+      piece.geometry.type === 'Polygon'
+        ? [piece.geometry.coordinates]
+        : piece.geometry.coordinates;
+    for (const rings of polygons) {
+      for (const ring of rings) {
+        for (let i = 0; i < ring.length - 1; i++) {
+          const ka = edgeKey(ring[i]);
+          const kb = edgeKey(ring[i + 1]);
+          if (ka === kb) continue;
+          // A shared edge is walked once in each direction and cancels.
+          if (edges.has(`${kb}|${ka}`)) edges.delete(`${kb}|${ka}`);
+          else edges.set(`${ka}|${kb}`, [ring[i], ring[i + 1]]);
+        }
+      }
+    }
+  }
+  const outgoing = new Map();
+  for (const [key, [a]] of edges) {
+    const ka = edgeKey(a);
+    if (!outgoing.has(ka)) outgoing.set(ka, []);
+    outgoing.get(ka).push(key);
+  }
+  const used = new Set();
+  const rings = [];
+  for (const [startKey, [start]] of edges) {
+    if (used.has(startKey)) continue;
+    const ring = [start];
+    const first = edgeKey(start);
+    let key = startKey;
+    for (;;) {
+      used.add(key);
+      const end = edges.get(key)[1];
+      ring.push(end);
+      const ke = edgeKey(end);
+      if (ke === first) break;
+      key = (outgoing.get(ke) || []).find((candidate) => !used.has(candidate));
+      if (!key) return null; // an open chain: the pieces don't meet exactly
+    }
+    if (ring.length >= 4) rings.push(ring);
+  }
+  return rings.length ? rings : null;
+}
+
+const ringArea = (ring) => {
+  let sum = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    sum += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+  }
+  return Math.abs(sum / 2);
+};
+
+function pointInRing([x, y], ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** Group merged rings into polygons: a ring inside an odd number of larger
+ * rings is a hole of the innermost one. */
+function ringsToGeometry(rings) {
+  const sorted = [...rings].sort((a, b) => ringArea(b) - ringArea(a));
+  const polygons = []; // [outer, ...holes]
+  const placed = []; // { ring, polygon, depth }
+  for (const ring of sorted) {
+    const containers = placed.filter((p) => pointInRing(ring[0], p.ring));
+    const depth = containers.length;
+    if (depth % 2 === 0) {
+      const polygon = [ring];
+      polygons.push(polygon);
+      placed.push({ ring, polygon, depth });
+    } else {
+      const parent = containers[containers.length - 1];
+      parent.polygon.push(ring);
+      placed.push({ ring, polygon: parent.polygon, depth });
+    }
+  }
+  return polygons.length === 1
+    ? { type: 'Polygon', coordinates: polygons[0] }
+    : { type: 'MultiPolygon', coordinates: polygons };
+}
+
+async function buildHolc() {
+  const areas = new Map();
+  for await (const f of features(HOLC_INPUT)) {
+    const p = f.properties;
+    const key = `${p.map_id}|${p.polygon_id}`;
+    if (!areas.has(key)) areas.set(key, []);
+    areas.get(key).push(f);
+  }
+  const writer = createChunkWriter('holc');
+  let merged = 0;
+  let kept = 0;
+  let dropped = 0;
+  for (const [key, pieces] of areas) {
+    // The area is filed under the county holding most of its pieces.
+    const counties = new Map();
+    for (const { properties: q } of pieces) {
+      const county =
+        q.state_code && q.county_cod
+          ? `${q.state_code}${q.county_cod}`
+          : `map-${q.map_id ?? 'unknown'}`;
+      counties.set(county, (counties.get(county) || 0) + 1);
+    }
+    const chunkId = [...counties].sort((a, b) => b[1] - a[1])[0][0];
+    const p = pieces[0].properties;
+    const grade = String(p.holc_grade || '').toUpperCase();
+    const label = HOLC_GRADE_LABELS[grade];
+    const city = p.st_name ? `${p.st_name}, ${p.state}` : p.state || '';
+    const properties = {
+      name: p.name ? `${p.holc_id} · ${p.name}` : `HOLC area ${p.holc_id}`,
+      holc_id: p.holc_id,
+      holc_grade: grade,
+      city,
+      summary: label
+        ? `Graded ${grade} ("${label}") on the 1930s Home Owners' Loan Corporation map of ${city}.`
+        : `Ungraded area on the 1930s HOLC map of ${city}.`,
+    };
+    const rings = pieces.length > 1 ? mergeRings(pieces) : null;
+    const shapes = rings
+      ? [
+          {
+            id: `holc-${key.replace('|', '-')}`,
+            geometry: ringsToGeometry(rings),
+          },
+        ]
+      : pieces.map((piece) => ({
+          id: `holc-${key.replace('|', '-')}-${piece.properties.geoid ?? 'na'}`,
+          geometry: piece.geometry,
+        }));
+    if (rings) merged += 1;
+    else if (pieces.length > 1) kept += 1;
+    for (const shape of shapes) {
+      const geometry = cleanGeometry(shape.geometry);
+      if (!geometry) {
+        dropped += 1;
+        continue;
+      }
+      writer.add(chunkId, {
+        type: 'Feature',
+        id: shape.id,
+        properties,
+        geometry,
+      });
+    }
+  }
+  writer.finish();
+  console.log(
+    `  holc: ${areas.size} areas; ${merged} merged from tract pieces, ${kept} kept as pieces; dropped ${dropped} slivers`,
+  );
+}
+
+// ---- Life expectancy, every census tract -------------------------------------
+async function buildTractLifeExpectancy() {
+  const writer = createChunkWriter('life-expectancy');
+  let dropped = 0;
+  let checked = 0;
+  let offCenter = 0;
+  for await (const f of features(TRACTS_INPUT)) {
+    const p = f.properties;
+    const geometry = cleanGeometry(f.geometry, albersToLonLat);
+    if (!geometry) {
+      dropped += 1;
+      continue;
+    }
+    // Projection sanity check: the published interior point must fall inside
+    // the converted tract's bounding box.
+    const [w, s, e, n] = bboxOf(geometry);
+    const lat = Number(p.INTPTLAT);
+    const lon = Number(p.INTPTLON);
+    checked += 1;
+    if (lon < w || lon > e || lat < s || lat > n) offCenter += 1;
+    const years =
+      Number(p.life_exp_8) > 0 ? Math.round(p.life_exp_8 * 10) / 10 : null;
+    const place = p.life_exp_4 || `${p.STATEFP}${p.COUNTYFP}`;
+    writer.add(`${p.STATEFP}${p.COUNTYFP}`, {
+      type: 'Feature',
+      id: `tract-${p.GEOID}`,
+      properties: {
+        name: `${p.NAMELSAD}, ${place}`,
+        geoid: p.GEOID,
+        life_exp_8: years,
+        summary:
+          years === null
+            ? 'No life expectancy estimate for this tract.'
+            : `Life expectancy at birth: ${years.toFixed(1)} years.`,
+        source_note: 'USALEEP census-tract life expectancy (life_exp_8).',
+      },
+      geometry,
+    });
+  }
+  writer.finish();
+  console.log(
+    `  life-expectancy: ${offCenter} of ${checked} tracts failed the interior-point check; dropped ${dropped} empty geometries`,
+  );
+}
+
+// ---- Shared helpers for the county and cluster layers ------------------------
+const STATE_NAMES = {
+  '01': 'AL',
+  '02': 'AK',
+  '04': 'AZ',
+  '05': 'AR',
+  '06': 'CA',
+  '08': 'CO',
+  '09': 'CT',
+  10: 'DE',
+  11: 'DC',
+  12: 'FL',
+  13: 'GA',
+  15: 'HI',
+  16: 'ID',
+  17: 'IL',
+  18: 'IN',
+  19: 'IA',
+  20: 'KS',
+  21: 'KY',
+  22: 'LA',
+  23: 'ME',
+  24: 'MD',
+  25: 'MA',
+  26: 'MI',
+  27: 'MN',
+  28: 'MS',
+  29: 'MO',
+  30: 'MT',
+  31: 'NE',
+  32: 'NV',
+  33: 'NH',
+  34: 'NJ',
+  35: 'NM',
+  36: 'NY',
+  37: 'NC',
+  38: 'ND',
+  39: 'OH',
+  40: 'OK',
+  41: 'OR',
+  42: 'PA',
+  44: 'RI',
+  45: 'SC',
+  46: 'SD',
+  47: 'TN',
+  48: 'TX',
+  49: 'UT',
+  50: 'VT',
+  51: 'VA',
+  53: 'WA',
+  54: 'WV',
+  55: 'WI',
+  56: 'WY',
+  72: 'PR',
+};
+
+/**
+ * NAD83 lon/lat for county outlines. The Aleutians cross the antimeridian, so
+ * eastern-hemisphere longitudes are written as < -180 to keep each polygon
+ * continuous (no U.S. county otherwise has a positive longitude).
+ */
+const countyLonLat = ([lon, lat]) => [lon > 0 ? lon - 360 : lon, lat];
+
+const years1 = (value) =>
+  Number(value) > 0 ? Math.round(Number(value) * 10) / 10 : null;
+const signed = (value) =>
+  `${value >= 0 ? '+' : '−'}${Math.abs(value).toFixed(1)}`;
+
+/** Parse only the properties of a one-line Feature (skips the geometry). */
+function propertiesOnly(raw) {
+  const start = raw.indexOf('"properties":');
+  const end = raw.indexOf(',"geometry"');
+  if (start < 0 || end < 0) return null;
+  return JSON.parse(raw.slice(start + '"properties":'.length, end));
+}
+
+async function* featureProperties(path) {
+  const lines = createInterface({
+    input: createReadStream(path),
+    crlfDelay: Infinity,
+  });
+  for await (const raw of lines) {
+    if (!raw.startsWith('{"type":"Feature"')) continue;
+    yield propertiesOnly(raw);
+  }
+}
+
+// Local Moran's I cluster types (COType), named for life expectancy and
+// colored to match the life expectancy layers (red = shorter, blue = longer).
+const CLUSTER_TYPES = {
+  HH: {
+    label: 'long-life cluster (high–high)',
+    detail: 'high, and so are its neighbors',
+  },
+  LL: {
+    label: 'short-life cluster (low–low)',
+    detail: 'low, and so are its neighbors',
+  },
+  HL: {
+    label: 'high outlier (high–low)',
+    detail: 'high while its neighbors are low',
+  },
+  LH: {
+    label: 'low outlier (low–high)',
+    detail: 'low while its neighbors are high',
+  },
+};
+
+function clusterSummary(type, unit, years, yearLabel, pValue) {
+  const info = CLUSTER_TYPES[type];
+  const value = years === null ? 'n/a' : `${years.toFixed(1)} years`;
+  return `Local Moran's I ${info.label}: this ${unit}'s life expectancy${yearLabel} (${value}) is ${info.detail} (p = ${Number(pValue).toFixed(3)}).`;
+}
+
+// ---- County life expectancy, 2000-2019 ---------------------------------------
+const RACE_GROUPS = [
+  ['Black', 'blktot'],
+  ['White', 'whttot'],
+  ['Latino', 'lattot'],
+  ['Asian/Pacific Islander', 'apitot'],
+  ['American Indian/Alaska Native', 'nattot'],
+];
+
+async function buildCountyLifeExpectancy() {
+  const writer = createChunkWriter('county-life-expectancy');
+  let dropped = 0;
+  for await (const f of features(COUNTY_INPUT)) {
+    const p = f.properties;
+    const geometry = cleanGeometry(
+      f.geometry,
+      countyLonLat,
+      COUNTY_SIMPLIFY_DEG,
+    );
+    if (!geometry) {
+      dropped += 1;
+      continue;
+    }
+    const state = STATE_NAMES[p.STATEFP10] || p.STATEFP10;
+    const le19 = years1(p.total_19);
+    const le00 = years1(p.total_00);
+    const low = years1(p.totlow_19);
+    const high = years1(p.totup_19);
+    const race = RACE_GROUPS.map(([label, key]) => [
+      label,
+      years1(p[`${key}_19`]),
+    ])
+      .filter(([, value]) => value !== null)
+      .map(([label, value]) => `${label} ${value.toFixed(1)}`);
+    const summary =
+      le19 === null
+        ? 'No life expectancy estimate for this county.'
+        : [
+            `Life expectancy at birth, 2019: ${le19.toFixed(1)} years` +
+              (low !== null && high !== null
+                ? ` (uncertainty ${low.toFixed(1)}–${high.toFixed(1)}).`
+                : '.'),
+            le00 !== null
+              ? `2000: ${le00.toFixed(1)} years (${signed(le19 - le00)} since).`
+              : '',
+            race.length ? `2019 by race/ethnicity: ${race.join(' · ')}.` : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
+    writer.add(p.STATEFP10, {
+      type: 'Feature',
+      id: `county-${p.GEOID10}`,
+      properties: {
+        name: `${p.NAMELSAD10}, ${state}`,
+        geoid: p.GEOID10,
+        life_exp: le19,
+        life_exp_2000: le00,
+        summary,
+        source_note:
+          'County life expectancy 2000–2019, total and by race/ethnicity (nation_county_le).',
+      },
+      geometry,
+    });
+  }
+  writer.finish();
+  if (dropped)
+    console.log(
+      `  county-life-expectancy: dropped ${dropped} empty geometries`,
+    );
+}
+
+// ---- County clusters (Local Moran's I on 2015 life expectancy) ---------------
+async function buildCountyClusters() {
+  // SOURCE_ID indexes the county file: either every county or only those the
+  // analysis kept (the counties with an abs_change value). Pick whichever
+  // reproduces every cluster row's total_15.
+  const all = [];
+  const kept = [];
+  for await (const p of featureProperties(COUNTY_INPUT)) {
+    const county = {
+      name: `${p.NAMELSAD10}, ${STATE_NAMES[p.STATEFP10] || p.STATEFP10}`,
+      geoid: p.GEOID10,
+      state: p.STATEFP10,
+      total15: p.total_15,
+    };
+    all.push(county);
+    if (p.abs_change != null) kept.push(county);
+  }
+  const clusterRows = [];
+  for await (const p of featureProperties(COUNTY_CLUSTER_INPUT))
+    clusterRows.push(p);
+  const matches = (list) =>
+    clusterRows.filter(
+      (p) => Math.abs((list[p.SOURCE_ID]?.total15 ?? NaN) - p.total_15) < 1e-6,
+    ).length;
+  const [lookup, lookupName] =
+    matches(kept) >= matches(all)
+      ? [kept, 'kept counties']
+      : [all, 'all counties'];
+  console.log(
+    `  county-clusters: SOURCE_ID matches ${matches(lookup)} of ${clusterRows.length} rows (${lookupName})`,
+  );
+
+  const writer = createChunkWriter('county-clusters');
+  const counts = {};
+  let unmatched = 0;
+  for await (const f of features(COUNTY_CLUSTER_INPUT)) {
+    const p = f.properties;
+    const type = CLUSTER_TYPES[p.COType] ? p.COType : null;
+    counts[type ?? 'not significant'] =
+      (counts[type ?? 'not significant'] || 0) + 1;
+    if (!type) continue; // only significant clusters and outliers are drawn
+    const county = lookup[p.SOURCE_ID];
+    if (!county || Math.abs(county.total15 - p.total_15) >= 1e-6) {
+      unmatched += 1;
+      continue;
+    }
+    const geometry = cleanGeometry(
+      f.geometry,
+      countyLonLat,
+      COUNTY_SIMPLIFY_DEG,
+    );
+    if (!geometry) continue;
+    writer.add(county.state, {
+      type: 'Feature',
+      id: `county-cluster-${county.geoid}`,
+      properties: {
+        name: county.name,
+        geoid: county.geoid,
+        cluster: type,
+        life_exp: years1(p.total_15),
+        p_value: p.LMiPValue,
+        summary: clusterSummary(
+          type,
+          'county',
+          years1(p.total_15),
+          ' in 2015',
+          p.LMiPValue,
+        ),
+        source_note:
+          "Local Moran's I (Anselin) on county life expectancy, 2015 (nation_county_le_cluster).",
+      },
+      geometry,
+    });
+  }
+  writer.finish();
+  console.log(
+    `  county-clusters: ${JSON.stringify(counts)}; ${unmatched} significant rows could not be matched`,
+  );
+}
+
+// ---- Tract clusters (Local Moran's I on life_exp_8) -------------------------
+async function buildTractClusters() {
+  // SOURCE_ID indexes the tract file; each match is confirmed by the tract's
+  // outline length, which both files carry.
+  // Rows whose SOURCE_ID does not line up fall back to a unique outline
+  // length + area match.
+  const tracts = [];
+  const byShape = new Map();
+  const shapeKey = (length, area) =>
+    `${Number(length).toFixed(2)}|${Math.round(Number(area))}`;
+  for await (const p of featureProperties(TRACTS_INPUT)) {
+    const tract = {
+      geoid: p.GEOID,
+      county: `${p.STATEFP}${p.COUNTYFP}`,
+      name: `${p.NAMELSAD}, ${p.life_exp_4 || `${p.STATEFP}${p.COUNTYFP}`}`,
+      length: p.Shape_Leng,
+    };
+    tracts.push(tract);
+    const key = shapeKey(p.Shape_Leng, p.Shape_Area);
+    byShape.set(key, byShape.has(key) ? null : tract);
+  }
+  let byIndex = 0;
+  let byOutline = 0;
+  const writer = createChunkWriter('tract-clusters');
+  const counts = {};
+  let unmatched = 0;
+  for await (const f of features(TRACT_CLUSTER_INPUT)) {
+    const p = f.properties;
+    const type = CLUSTER_TYPES[p.COType] ? p.COType : null;
+    counts[type ?? 'not significant'] =
+      (counts[type ?? 'not significant'] || 0) + 1;
+    if (!type) continue; // only significant clusters and outliers are drawn
+    let tract = tracts[p.SOURCE_ID];
+    if (tract && Math.abs(tract.length - p.Shape_Leng) <= 1e-3) {
+      byIndex += 1;
+    } else {
+      tract = byShape.get(shapeKey(p.Shape_Leng, p.Shape_Area));
+      if (!tract) {
+        unmatched += 1;
+        continue;
+      }
+      byOutline += 1;
+    }
+    const geometry = cleanGeometry(f.geometry, albersToLonLat);
+    if (!geometry) continue;
+    writer.add(tract.county, {
+      type: 'Feature',
+      id: `tract-cluster-${tract.geoid}`,
+      properties: {
+        name: tract.name,
+        geoid: tract.geoid,
+        cluster: type,
+        life_exp: years1(p.life_exp_8),
+        p_value: p.LMiPValue,
+        summary: clusterSummary(
+          type,
+          'tract',
+          years1(p.life_exp_8),
+          '',
+          p.LMiPValue,
+        ),
+        source_note:
+          "Local Moran's I (Anselin) on USALEEP tract life expectancy (nation_tracts_le_cluster).",
+      },
+      geometry,
+    });
+  }
+  writer.finish();
+  console.log(
+    `  tract-clusters: ${JSON.stringify(counts)}; matched ${byIndex} by SOURCE_ID, ${byOutline} by outline, ${unmatched} unmatched`,
+  );
+}
+
+const BUILDERS = {
+  holc: buildHolc,
+  'tract-le': buildTractLifeExpectancy,
+  'county-le': buildCountyLifeExpectancy,
+  'county-clusters': buildCountyClusters,
+  'tract-clusters': buildTractClusters,
+  // Rebuild only the coarse copies from the existing full-detail chunks.
+  coarse: async () => {
+    for (const layerDir of Object.keys(COARSE_TOLERANCE_DEG))
+      buildCoarseCopy(layerDir);
+  },
+};
+const requested = process.argv.slice(2);
+// A full build writes each coarse copy as its layer finishes.
+const defaults = Object.keys(BUILDERS).filter((name) => name !== 'coarse');
+for (const name of requested.length ? requested : defaults) {
+  if (!BUILDERS[name]) throw new Error(`Unknown layer "${name}"`);
+  await BUILDERS[name]();
+}

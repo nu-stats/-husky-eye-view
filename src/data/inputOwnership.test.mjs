@@ -115,7 +115,10 @@ test('every scene click handler consults ownership before it picks', () => {
   // appear here too.
   const guarded = [
     ['src/data/trackingClickGesture.js', 'onClick(click, gesture);'],
-    ['src/data/localGeojsonCore.js', 'viewer.scene.pick(click.position)'],
+    [
+      'src/data/localGeojsonCore.js',
+      'pickLocalEntity(viewer.scene, click.position)',
+    ],
     ['src/data/cctvGizmo.js', 'pickGizmoPart(event.position)'],
     ['src/layers/alpr/presentation.js', 'viewer.scene.pick(click.position)'],
     ['src/layers/bikeshare/selection.js', 'viewer.scene.pick(click.position)'],

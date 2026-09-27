@@ -49,8 +49,8 @@ export function calculateLogoGaze(
 
 /**
  * Make every same-origin logo object marked with `data-logo-gaze` follow the
- * pointer. Only the globe and its latitude/longitude cage move; the eye shell
- * remains fixed. Returns a cleanup callback.
+ * pointer. Only the globe, its latitude/longitude cage and the husky pupil
+ * move; the eye shell remains fixed. Returns a cleanup callback.
  *
  * @param {Document|Element} [root=document] - DOM root to search.
  * @returns {() => void}
@@ -135,6 +135,7 @@ export function initLogoGaze(root = document) {
         state.parts = [
           svg.querySelector('#globe'),
           svg.querySelector('#globe_cage'),
+          svg.querySelector('#husky'),
         ].filter(Boolean);
         applyTransform(state);
       }

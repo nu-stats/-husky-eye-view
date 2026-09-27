@@ -19,3 +19,6 @@ output/
 3d-models/
 pinokio/ENVIRONMENT
 pinokio/.installed
+# Raw nationwide datasets (~2 GB) read by scripts/build-context-layers.mjs;
+# only the per-county chunks it writes to public/context/ are served.
+data/source/

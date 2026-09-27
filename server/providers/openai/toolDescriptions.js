@@ -82,7 +82,7 @@ export const ACTION_DESCRIPTIONS = {
       properties: {
         layerId: {
           description:
-            'Common-name mapping for the non-obvious ids: space mission(s) → rocket-launches; fires/wildfires/active fires → local-firms (NASA FIRMS); ships/vessels/boats → ais-live-vessels; undersea/submarine cables → telegeography-submarine-cables; datacenters → local-datacenters; dams → local-dams; bikes/bike share → bikeshare; street traffic/congestion → traffic; traffic cameras → cctv; internet radio/stations → radio; ALPR/license plate readers/Flock cameras → alpr-cameras.',
+            'Every layer in the Data Layers panel is listed; a local-* id names its panel row (local-chicago-events = Chicago Events, local-gang-map = gang territories, local-gang-map-labels = gang names, local-famous-shootings = Famous Shootings, local-miami-homicides-1980s = Miami homicides of the 1980s, and so on). Common-name mapping for the non-obvious ids: space mission(s) → rocket-launches; fires/wildfires/active fires → local-firms (NASA FIRMS); ships/vessels/boats → ais-live-vessels; undersea/submarine cables → telegeography-submarine-cables; datacenters → local-datacenters; dams → local-dams; bikes/bike share → bikeshare; street traffic/congestion → traffic; traffic cameras → cctv; internet radio/stations → radio; ALPR/license plate readers/Flock cameras → alpr-cameras; life expectancy (census tracts) → local-life-expectancy; county life expectancy → local-county-life-expectancy; life expectancy clusters/hot spots (tracts) → local-tract-le-clusters; county life expectancy clusters → local-county-le-clusters; HOLC/redlining map (1930s) → local-holc-redlining; Miami homicide hotspots/homicide density → local-miami-homicide-hotspots; public housing/housing projects → local-public-housing; trauma centers/trauma units → local-trauma-centers; 2015 gun deaths/Gun Violence Archive → local-gva-2015; mass killings/MKDB/Mass Killing Database → local-mkdb.',
           $position: 1,
         },
       },
@@ -148,7 +148,7 @@ export const ACTION_DESCRIPTIONS = {
   },
   get_entity_context: {
     description:
-      'Get current GEV scene context, including basemap/3D-tile target context, selected entity metadata if active, and entities currently visible in the camera view.',
+      'Get current GEV scene context, including basemap/3D-tile target context, selected entity metadata if active, and entities currently visible in the camera view. Area and site layers (life expectancy, life expectancy clusters, HOLC redlining, Miami homicide hotspots, public housing, trauma centers, 2015 gun deaths) are reported under areas: the area under the screen center (atPoint) or the nearest sites (nearby, with distanceKm; countWithin within withinKm), and legend counts; a zoom-in status means fly closer first.',
     $position: 1,
     parameters: {
       properties: {
@@ -158,7 +158,8 @@ export const ACTION_DESCRIPTIONS = {
           $position: 2,
         },
         layerId: {
-          description: 'Optional layer filter for visible entity context.',
+          description:
+            'Optional layer filter for visible entity context; any Data Layers panel layer.',
           $position: 2,
         },
       },

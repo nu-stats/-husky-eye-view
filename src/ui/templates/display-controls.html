@@ -121,6 +121,28 @@
         <span class="pp-label">Celestial</span>
       </button>
     </div>
+    <div class="pp-toggle-group">
+      <button class="pp-toggle-btn active" id="map-labels-toggle" aria-pressed="true" title="Labels and cards from added map layers (Chicago Events, Famous Shootings, gang hood names)">
+        <span class="pp-icon" aria-hidden="true">Aa</span>
+        <span class="pp-label">Labels</span>
+      </button>
+      <div class="pp-slider-row visible" id="map-labels-slider-row">
+        <label class="pp-slider-mini-label" for="map-labels-size-slider">Size</label>
+        <input type="range" class="pp-slider" id="map-labels-size-slider" min="40" max="150" step="5" value="100" aria-label="Map label size" />
+        <span class="pp-slider-value" id="map-labels-size-value">100%</span>
+      </div>
+    </div>
+    <div class="pp-toggle-group">
+      <button class="pp-toggle-btn" id="render-speed-toggle" aria-pressed="false" title="Speed: smoother map on large screens or modest graphics cards (no anti-aliasing, lower render resolution)">
+        <span class="pp-icon" aria-hidden="true">&#x26A1;</span>
+        <span class="pp-label">Speed</span>
+      </button>
+      <div class="pp-slider-row" id="render-speed-row">
+        <label class="pp-slider-mini-label" for="render-speed-slider">Resolution</label>
+        <input type="range" class="pp-slider" id="render-speed-slider" min="50" max="100" step="5" value="75" aria-label="Map render resolution" />
+        <span class="pp-slider-value" id="render-speed-value">75%</span>
+      </div>
+    </div>
     <button class="pp-toggle-btn" id="clean-view-toggle" title="Hide UI chrome">
       <span class="pp-icon">&#x25A1;</span>
       <span class="pp-label">Clean UI</span>

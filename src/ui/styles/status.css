@@ -56,7 +56,7 @@
 #tilt-map-view[aria-pressed='true'] {
   border-color: var(--accent);
   color: var(--accent);
-  box-shadow: 0 0 14px rgba(0, 212, 255, 0.18);
+  box-shadow: 0 0 14px rgba(170, 170, 170, 0.18);
 }
 
 #north-up-view {
@@ -91,11 +91,11 @@
   max-width: calc(100vw - 32px);
   padding: 6px 10px;
   border-radius: 7px;
-  border: 1px solid rgba(0, 212, 255, 0.24);
+  border: 1px solid rgba(170, 170, 170, 0.24);
   background: rgba(3, 10, 18, 0.78);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  color: rgba(170, 252, 255, 0.92);
+  color: rgba(235, 235, 235, 0.92);
   font-family: var(--font-mono);
   font-size: 8px;
   letter-spacing: 1.35px;
@@ -103,20 +103,20 @@
   transform: translateX(-50%);
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.34),
-    0 0 14px rgba(0, 212, 255, 0.08);
+    0 0 14px rgba(170, 170, 170, 0.08);
   pointer-events: none;
 }
 #global-loading-status[hidden] {
   display: none;
 }
 #global-loading-label {
-  color: rgba(184, 244, 255, 0.92);
+  color: rgba(232, 232, 232, 0.92);
 }
 #global-loading-detail {
   min-width: 34px;
   max-width: min(220px, 38vw);
   overflow: hidden;
-  color: #00e1ff;
+  color: #b3b3b3;
   font-weight: 600;
   letter-spacing: 1.6px;
   text-align: right;
@@ -162,10 +162,10 @@
   color: #ffd488;
 }
 #global-loading-status[data-state='acquiring'] {
-  border-color: rgba(0, 212, 255, 0.42);
+  border-color: rgba(170, 170, 170, 0.42);
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.34),
-    0 0 18px rgba(0, 212, 255, 0.12);
+    0 0 18px rgba(170, 170, 170, 0.12);
 }
 
 .share-icon {
@@ -185,11 +185,11 @@
   gap: 10px;
   padding: 6px 10px;
   border-radius: 7px;
-  border: 1px solid rgba(0, 212, 255, 0.24);
+  border: 1px solid rgba(170, 170, 170, 0.24);
   background: rgba(3, 10, 18, 0.78);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  color: rgba(170, 252, 255, 0.92);
+  color: rgba(235, 235, 235, 0.92);
   font-family: var(--font-mono);
   font-size: 8px;
   letter-spacing: 1.35px;
@@ -201,7 +201,7 @@
     transform 0.22s ease;
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.34),
-    0 0 14px rgba(0, 212, 255, 0.08);
+    0 0 14px rgba(170, 170, 170, 0.08);
 }
 
 /* Stacked below the traffic chip so both can show at once */
@@ -217,12 +217,12 @@
 
 #traffic-sync-label,
 #cctv-sync-label {
-  color: rgba(184, 244, 255, 0.92);
+  color: rgba(232, 232, 232, 0.92);
 }
 
 #traffic-sync-progress,
 #cctv-sync-progress {
-  color: #00e1ff;
+  color: #b3b3b3;
   font-weight: 600;
   letter-spacing: 1.6px;
   min-width: 34px;
@@ -407,7 +407,7 @@
     opacity 0.3s ease,
     visibility 0.3s ease,
     transform 0.3s ease;
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.15);
+  box-shadow: 0 0 20px rgba(170, 170, 170, 0.15);
 }
 
 #toast.visible {

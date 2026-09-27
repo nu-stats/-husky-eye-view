@@ -63,6 +63,98 @@ test('infrastructure factory preserves identity and creates independent state wi
     [
       { id: 'local-datacenters', name: 'Datacenters', source: 'Local' },
       { id: 'local-dams', name: 'Dams', source: 'USACE' },
+      { id: 'local-chicago-events', name: 'Chicago Events', source: 'Local' },
+      { id: 'local-gang-map', name: 'Gang Map', source: 'Big Bas My Maps' },
+      {
+        id: 'local-gang-map-labels',
+        name: 'Gang Map Labels',
+        source: 'Hood names',
+      },
+      {
+        id: 'local-famous-shootings',
+        name: 'Famous Shootings',
+        source: 'Big Bas My Maps',
+      },
+      {
+        id: 'local-holc-redlining',
+        name: 'HOLC Redlining (1930s)',
+        source: 'Mapping Inequality',
+      },
+      {
+        id: 'local-life-expectancy',
+        name: 'Life Expectancy (tracts)',
+        source: 'USALEEP',
+      },
+      {
+        id: 'local-tract-le-clusters',
+        name: 'Life Expectancy Clusters (tracts)',
+        source: "Local Moran's I",
+      },
+      {
+        id: 'local-county-life-expectancy',
+        name: 'Life Expectancy (counties)',
+        source: 'County 2000–2019',
+      },
+      {
+        id: 'local-county-le-clusters',
+        name: 'Life Expectancy Clusters (counties)',
+        source: "Local Moran's I",
+      },
+      {
+        id: 'local-miami-homicides-1950s',
+        name: 'Miami Homicides 1956–1959',
+        source: 'Miami-Dade homicides',
+      },
+      {
+        id: 'local-miami-homicides-1960s',
+        name: 'Miami Homicides 1960s',
+        source: 'Miami-Dade homicides',
+      },
+      {
+        id: 'local-miami-homicides-1970s',
+        name: 'Miami Homicides 1970s',
+        source: 'Miami-Dade homicides',
+      },
+      {
+        id: 'local-miami-homicides-1980s',
+        name: 'Miami Homicides 1980s',
+        source: 'Miami-Dade homicides',
+      },
+      {
+        id: 'local-miami-homicides-1990s',
+        name: 'Miami Homicides 1990s',
+        source: 'Miami-Dade homicides',
+      },
+      {
+        id: 'local-miami-homicides-2000s',
+        name: 'Miami Homicides 2000–2011',
+        source: 'Miami-Dade homicides',
+      },
+      {
+        id: 'local-miami-homicide-hotspots',
+        name: 'Miami Homicide Hotspots',
+        source: 'Kernel density',
+      },
+      {
+        id: 'local-trauma-centers',
+        name: 'Trauma Centers',
+        source: 'HIFLD Hospitals',
+      },
+      {
+        id: 'local-public-housing',
+        name: 'Public Housing',
+        source: 'HUD',
+      },
+      {
+        id: 'local-gva-2015',
+        name: 'Gun Deaths 2015 (GVA)',
+        source: 'Gun Violence Archive',
+      },
+      {
+        id: 'local-mkdb',
+        name: 'MKDB Mass Killings (2006–2023)',
+        source: 'Mass Killing Database',
+      },
     ],
   );
   first.forEach((layer, index) => {
@@ -183,9 +275,11 @@ test('consumer build includes only infrastructure code and resolves assets under
   const entry = output.find((item) => item.type === 'chunk' && item.isEntry);
   const sources = Object.keys(entry.modules).filter((id) => id.endsWith('.js'));
   assert.deepEqual(sources.map((id) => id.split('/').at(-1)).sort(), [
+    'chunkedAreaLayer.js',
     'infrastructure.js',
     'localGeojsonCore.js',
     'localGeojsonLod.js',
+    'localLabelSettings.js',
   ]);
   assert.deepEqual(
     entry.imports,

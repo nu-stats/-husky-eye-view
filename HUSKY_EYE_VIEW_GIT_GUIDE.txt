@@ -1,0 +1,185 @@
+HUSKY EYE VIEW - HOW TO UPLOAD THIS VERSION TO GITHUB, DOWNLOAD IT AT WORK,
+AND SHARE IT WITH OTHERS
+===========================================================================
+
+What you are doing
+------------------
+Your copy of the app lives in:  C:\pinokio\api\gods-eye-view.git
+It is a customized copy of Bilawal Sidhu's open-source "gods-eye-view"
+project, and it still points at his GitHub page, which you cannot upload to.
+You will make your OWN GitHub repository, upload this exact version there,
+and then download ("clone") it at work or give others access.
+
+Already taken care of:
+  * Your API keys (OpenAI, Google Maps, Cesium...) live in
+    pinokio\ENVIRONMENT. Git is set to IGNORE that file, so your keys are
+    never uploaded. Everyone who downloads the app enters their own keys.
+  * The huge raw source files in data\source (about 4.3 GB) are also
+    ignored. The app does not need them to run; they are only needed to
+    rebuild the layer files, which ARE uploaded.
+  * The upload is about 420 MB (about 10,900 files). No single file is
+    over GitHub's 100 MB limit, so no special large-file setup is needed.
+
+
+PART 1 - ONE-TIME SETUP AND FIRST UPLOAD (at home, on this computer)
+====================================================================
+
+Step 1. Make a GitHub account (skip if you have one)
+    Go to https://github.com and sign up (your Northeastern email is fine).
+
+Step 2. Create an EMPTY, PRIVATE repository on GitHub
+    a. Signed in to github.com, click the "+" at the top right, then
+       "New repository".
+    b. Repository name:  husky-eye-view
+    c. Choose  "Private"  (recommended - see "Important notes" at the end).
+    d. Do NOT tick "Add a README", ".gitignore" or "license". It must be
+       completely empty.
+    e. Click "Create repository". Keep that page open; it shows your
+       repository address, which looks like:
+         https://github.com/<your-github-username>/husky-eye-view.git
+
+Step 3. Open PowerShell in the app folder
+    Press the Windows key, type  PowerShell , open it, and paste these two
+    lines (Git comes with Pinokio, but is not on the normal PATH):
+
+      $env:PATH = "C:\pinokio\bin\miniforge\Library\cmd;$env:PATH"
+      cd C:\pinokio\api\gods-eye-view.git
+
+    Check it works:   git --version     (should print a version number)
+
+    You need the $env:PATH line again every time you open a new PowerShell
+    window for Git.
+
+Step 4. Tell Git who you are (one time only)
+
+      git config --global user.name "Your Name"
+      git config --global user.email "j.stowell@northeastern.edu"
+
+Step 5. Point the folder at YOUR repository
+    Keep the original project as "upstream" (so you can still see its
+    updates) and make your new repository the place you upload to.
+    Replace <your-github-username> with your GitHub username:
+
+      git remote rename origin upstream
+      git remote add origin https://github.com/<your-github-username>/husky-eye-view.git
+      git remote -v
+
+    The last command should list "origin" as YOUR address and "upstream"
+    as bilawalsidhu/gods-eye-view.
+
+Step 6. (Optional) Remove leftover scratch files you don't want uploaded
+    These two look like your own leftovers; delete them first if you don't
+    need them:
+      src\chilayer.js.txt
+      src\worldFocus - Copy.js
+
+Step 7. Save this version as a commit
+
+      git add -A
+      git status
+
+    Look through the list. You should NOT see  pinokio/ENVIRONMENT  or
+    anything under  data/source/  (they are ignored). If you do, stop and
+    do not continue.
+
+      git commit -m "Husky Eye View: custom layers, voice, logo and data"
+
+Step 8. Upload it
+
+      git push -u origin main
+
+    A window will ask you to sign in to GitHub (choose "Sign in with your
+    browser"). The first upload is about 420 MB, so it can take several
+    minutes. When it finishes, refresh your repository page on github.com
+    and you will see all the files.
+
+
+PART 2 - DOWNLOAD THE SAME VERSION AT WORK (or on any other computer)
+====================================================================
+
+Step 1. Install Pinokio on the work computer (https://pinokio.co) and start
+        it once, so it creates C:\pinokio.
+
+Step 2. Open PowerShell and download ("clone") your repository into
+        Pinokio's app folder:
+
+      $env:PATH = "C:\pinokio\bin\miniforge\Library\cmd;$env:PATH"
+      cd C:\pinokio\api
+      git clone https://github.com/<your-github-username>/husky-eye-view.git
+
+        Because the repository is private, a sign-in window appears; sign in
+        with the same GitHub account.
+        (If "git" is not found, Pinokio has not finished setting up yet:
+        open Pinokio, let it finish installing its tools, and try again.)
+
+Step 3. In Pinokio, open the new "husky-eye-view" app, click  Install
+        (first time only, installs the app's parts), then  Start.
+
+Step 4. In the app, click "POWER UP" (bottom right) and paste your API
+        keys (Google Maps, OpenAI for voice, Cesium ion if you use it).
+        Keys are never uploaded, so every computer needs them entered once.
+
+
+PART 3 - SHARE IT WITH OTHERS
+=============================
+
+    1. On github.com, open your husky-eye-view repository.
+    2. Settings -> Collaborators (may be called "Collaborators and teams")
+       -> "Add people" -> type their GitHub username or email.
+    3. They accept the email invitation, then follow PART 2 on their own
+       computer with their own API keys.
+
+    To give read-only access to people without GitHub accounts instead, you
+    could make the repository public - but read "Important notes" first.
+
+
+PART 4 - KEEPING HOME AND WORK IN SYNC LATER
+============================================
+
+    After making changes on one computer, upload them:
+
+      $env:PATH = "C:\pinokio\bin\miniforge\Library\cmd;$env:PATH"
+      cd C:\pinokio\api\gods-eye-view.git      (at work:  cd C:\pinokio\api\husky-eye-view)
+      git add -A
+      git commit -m "Describe what you changed"
+      git push
+
+    On the other computer, get the changes BEFORE you start working there:
+
+      (stop the app in Pinokio first)
+      $env:PATH = "C:\pinokio\bin\miniforge\Library\cmd;$env:PATH"
+      cd C:\pinokio\api\husky-eye-view
+      git pull
+
+    Then start the app again. Rule of thumb: pull when you sit down, push
+    when you get up - that avoids conflicting edits between computers.
+
+
+IMPORTANT NOTES
+===============
+
+  * Keep the repository PRIVATE unless you have checked the data terms.
+    It contains data with its own conditions: Mapping Inequality's HOLC maps
+    (CC BY-NC-SA: non-commercial, credit required), Gun Violence Archive
+    records, a gang map copied from someone's public Google My Map, and
+    incident notes that name victims. Public repositories can be seen,
+    copied and indexed by anyone.
+  * The original project's MIT license lets you modify and share it; keep
+    its LICENSE file in the repository (it is included automatically).
+  * Never upload pinokio\ENVIRONMENT or paste API keys into files you
+    commit. If a key is ever uploaded by mistake, revoke it at the provider
+    (OpenAI, Google) right away and make a new one - deleting the file
+    afterwards is not enough.
+  * The raw source data in data\source is NOT uploaded. If you ever need
+    to rebuild layers at work, copy that folder separately (e.g. via
+    OneDrive or an external drive).
+
+Troubleshooting
+---------------
+  "git is not recognized"       -> run the  $env:PATH = ...  line first.
+  "remote origin already exists" in Step 5 -> you already renamed it; run
+                                   git remote -v  to check the addresses.
+  "Permission denied" / 403     -> the sign-in used the wrong account, or
+                                   the repository address has a typo.
+                                   Check with  git remote -v .
+  Push rejected ("fetch first") -> run  git pull  then  git push  again.

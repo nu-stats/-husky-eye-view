@@ -16,6 +16,13 @@ import { ContextControls } from './context.js';
 import { CctvControls } from './cctv.js';
 import { RadioControls } from './radio.js';
 import { LocationNavigation } from './locationNavigation.js';
+import { LocalSelectionCard } from './localSelectionCard.js';
+import { MapLabelControls } from './mapLabelControls.js';
+import {
+  RenderSpeedControls,
+  applyRenderSpeed,
+} from './renderSpeedControls.js';
+import { setLocalLabelSettings } from '../data/localLabelSettings.js';
 import { bindClearLayersControl } from './layers.js';
 import { bindCameraOrientationControls } from './cameraOrientationControls.js';
 import { createMapSourceControls } from './mapSource.js';
@@ -30,7 +37,7 @@ import { ShellFeedback } from './shellFeedback.js';
 import { runCctvLayerEnableTransition } from '../cctvFocusPolicy.js';
 
 /**
- * Central UI orchestrator for the God's Eye View application.
+ * Central UI orchestrator for the Husky Eye View application.
  *
  * Responsibilities:
  * - Visual controls and presets backed by the VisualEffects controller.
@@ -454,6 +461,18 @@ export class StyleManager extends ShellFacade {
       },
     );
     initTrackedReadout(viewer);
+    this._localSelectionCard = new LocalSelectionCard({
+      container: viewer.container,
+      lifetime: this._lifetime,
+    });
+    this._mapLabelControls = new MapLabelControls({
+      lifetime: this._lifetime,
+      apply: setLocalLabelSettings,
+    });
+    this._renderSpeedControls = new RenderSpeedControls({
+      lifetime: this._lifetime,
+      apply: (setting) => applyRenderSpeed(viewer, setting),
+    });
     setDetectionStyle(this.activeStyle);
     this._applyDetectionDensityFromUi();
 
@@ -1461,6 +1480,7 @@ export class StyleManager extends ShellFacade {
     this._navigation.stop();
     this._shareState.destroy();
     this._locationNavigation.destroy();
+    this._localSelectionCard?.destroy();
     this._lifetime.destroy();
     this._recording.destroy();
     this._panelChrome.destroy();

@@ -5,6 +5,10 @@ import {
   applyInfraEvictionGrace,
   shouldRecomputeInfraLod,
 } from './localGeojsonLod.js';
+import {
+  getLocalLabelSettings,
+  onLocalLabelSettings as subscribeLocalLabelSettings,
+} from './localLabelSettings.js';
 
 const DEFAULT_LABEL_MAX = 900;
 const DEFAULT_LABEL_GRID_PX = 132;
@@ -39,6 +43,40 @@ export const GROUND_SAMPLE_MAX_ARMED_RETRIES = 30;
 /** Ignore sub-metre camera-derived stem-tip noise at camera settle. */
 export const LOCAL_STEM_TIP_EPSILON_M = 0.5;
 const LOCAL_STEM_TIP_EPSILON_SQ = LOCAL_STEM_TIP_EPSILON_M ** 2;
+/** Click pick square (CSS px) and depth for resolving local-layer clicks. */
+const LOCAL_PICK_SIZE_PX = 15;
+const LOCAL_PICK_LIMIT = 8;
+/** Camera distance beyond which labeled-area names are hidden. */
+const AREA_LABEL_MAX_DISTANCE_M = 9_000;
+
+// App-wide label settings (Display panel Labels row) live in
+// localLabelSettings.js; re-exported here for existing consumers.
+export {
+  LOCAL_LABEL_SCALE_MIN,
+  LOCAL_LABEL_SCALE_MAX,
+  getLocalLabelSettings,
+  setLocalLabelSettings,
+} from './localLabelSettings.js';
+
+/** Card size curve at the given label scale (1 = the shipped curve). */
+function cardDistanceScale(scale = getLocalLabelSettings().scale) {
+  return {
+    near: 250000,
+    nearValue: scale,
+    far: 9000000,
+    farValue: 0.62 * scale,
+  };
+}
+
+/** Area-name size curve at the given label scale. */
+function areaDistanceScale(scale = getLocalLabelSettings().scale) {
+  return {
+    near: 1500,
+    nearValue: scale,
+    far: AREA_LABEL_MAX_DISTANCE_M,
+    farValue: 0.8 * scale,
+  };
+}
 
 /**
  * Build the owner-approved local-infrastructure card copy.
@@ -84,6 +122,65 @@ export function localInfrastructureOverlayCopy(properties, layerId) {
     if (river && river.toLocaleLowerCase() !== title.toLocaleLowerCase()) {
       details.push(clampCardLine(river));
     }
+  } else if (layerId === 'local-chicago-events') {
+    const victim = firstClean([props.victim]);
+    if (victim) details.push(clampCardLine(victim));
+    const time = firstClean([props.video_time]);
+    details.push(
+      clampCardLine(
+        time ? `Video ${time} · click for details` : props.coordinate_note,
+      ),
+    );
+  } else if (layerId === 'local-gva-2015' || layerId === 'local-mkdb') {
+    const toll = [
+      Number(props.killed) > 0 ? `${props.killed} killed` : '',
+      Number(props.injured) > 0 ? `${props.injured} injured` : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
+    details.push(clampCardLine([props.date, toll].filter(Boolean).join(' · ')));
+    if (layerId === 'local-mkdb') {
+      const how = [props.weapon, props.situation].filter(Boolean).join(' · ');
+      if (how) details.push(clampCardLine(how));
+    }
+    details.push('Click for details');
+  } else if (layerId === 'local-trauma-centers') {
+    const level = firstClean([props.trauma_level]);
+    if (level) details.push(clampCardLine(`${level} trauma center`));
+    details.push('Click for details');
+  } else if (layerId === 'local-public-housing') {
+    const first = Number(props.construct_year);
+    const last = Number(props.construct_year_last);
+    details.push(
+      clampCardLine(
+        first > 0
+          ? `Built ${first}${last > first ? `–${last}` : ''}`
+          : 'Construction year unknown',
+      ),
+    );
+    if (Number(props.units) > 0) {
+      details.push(
+        clampCardLine(`${props.buildings} bldg · ${props.units} units`),
+      );
+    }
+  } else if (layerId.startsWith('local-miami-homicides-')) {
+    const victim = [
+      Number(props.age) > 0 ? `Age ${props.age}` : '',
+      cleanLabel(props.victim_group),
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    if (victim) details.push(clampCardLine(victim));
+    details.push('Click for details');
+  } else if (layerId === 'local-famous-shootings') {
+    // Descriptions open with the date, then a one-line summary.
+    const lines = String(props.description ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    for (const line of lines.slice(0, 2)) {
+      if (!/^https?:/.test(line)) details.push(clampCardLine(line));
+    }
   }
 
   return { title, details };
@@ -99,6 +196,8 @@ export function localInfrastructureOverlayCopy(properties, layerId) {
  * @param {object} options.properties Unwrapped feature properties.
  * @param {number} options.priority Source-owned importance score.
  * @param {string} options.accent Source accent color.
+ * @param {function():void} [options.activate] Makes the card clickable; called
+ *   when the card is clicked or activated from the accessible action list.
  * @returns {object}
  */
 export function createLocalInfrastructureOverlayEntry({
@@ -108,9 +207,15 @@ export function createLocalInfrastructureOverlayEntry({
   properties,
   priority,
   accent,
+  activate,
 }) {
   const copy = localInfrastructureOverlayCopy(properties, layerId);
+  const clickable = typeof activate === 'function';
   return {
+    ...(clickable && {
+      activate,
+      accessibilityLabel: `${copy.title} details`,
+    }),
     id: String(id),
     source: layerId,
     position,
@@ -121,20 +226,56 @@ export function createLocalInfrastructureOverlayEntry({
     priority,
     collisionGroup: 'ambient-card',
     zIndex: 30,
-    interactive: false,
+    interactive: clickable,
     minDistance: 0,
     maxDistance: LOCAL_OVERLAY_MAX_DISTANCE_M,
     distanceFadeStartRatio: LOCAL_OVERLAY_FADE_START_RATIO,
-    distanceScale: {
-      near: 250000,
-      nearValue: 1,
-      far: 9000000,
-      farValue: 0.62,
-    },
+    distanceScale: cardDistanceScale(),
     edgeFade: 'keyhole',
     horizonCull: true,
     terrainOcclusion: false,
     gapPx: 15,
+    placement: 'above',
+  };
+}
+
+/**
+ * Shared-host name label for a labeled area, anchored at the area's ground
+ * center. Non-interactive: the native polygon stays the click surface.
+ * @param {object} options
+ * @param {string} options.id Stable id within the source.
+ * @param {Cesium.Cartesian3} options.position Area center on the ellipsoid.
+ * @param {string} options.title Label text.
+ * @param {number} options.priority Source-owned importance score.
+ * @param {string} options.accent Area fill color.
+ * @returns {object}
+ */
+export function createLocalAreaLabelEntry({
+  id,
+  position,
+  title,
+  priority,
+  accent,
+}) {
+  return {
+    id: `area:${id}`,
+    position,
+    variant: 'label',
+    title,
+    accent,
+    priority,
+    collisionGroup: 'ambient-label',
+    paintLane: 'ambient-label',
+    interactive: false,
+    minDistance: 0,
+    maxDistance: AREA_LABEL_MAX_DISTANCE_M,
+    distanceFadeStartRatio: 0.7,
+    distanceScale: areaDistanceScale(),
+    edgeFade: 'keyhole',
+    horizonCull: true,
+    terrainOcclusion: false,
+    gapPx: 4,
+    verticalOnly: true,
     placement: 'above',
   };
 }
@@ -267,6 +408,10 @@ export function createLocalInfrastructureOverlayPublisher({ sourceId, host }) {
       }));
       published = entries.length > 0;
     },
+    /** Force the next publish through (entry metadata changed in place). */
+    invalidate() {
+      lastPublication = null;
+    },
     hide() {
       if (destroyed) return;
       if (published) host.clearSource(sourceId);
@@ -305,6 +450,77 @@ export function localDatasetError(error) {
 }
 
 /**
+ * Fetch and parse a GeoJSON Lines (.geojsonl) file into Feature objects.
+ * @param {string} url
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<object[]>}
+ */
+async function fetchGeoJsonLines(url, signal) {
+  const response = await fetch(url, { signal });
+  // A 404 returns an HTML body that would otherwise die in JSON.parse one line
+  // later, reported as a parse error for a missing file.
+  if (!response.ok) throw new Error(`HTTP ${response.status ?? '?'}`);
+  const text = await response.text();
+  return text
+    .split('\n')
+    .filter((l) => l.trim().length > 0)
+    .map((line) => JSON.parse(line));
+}
+
+/**
+ * One download and parse of a GeoJSON Lines file shared by several layers
+ * (pass it as `featureSource`). The download is aborted only when every layer
+ * waiting on it has aborted; a failed load is forgotten so the next enable
+ * retries.
+ * @param {string} url
+ * @returns {{load: function(AbortSignal=): Promise<object[]>}}
+ */
+export function createSharedGeoJsonLinesSource(url) {
+  let pending = null;
+  let settled = null;
+  return {
+    load(signal) {
+      if (settled) return settled;
+      if (!pending) {
+        const controller = new AbortController();
+        const state = { controller, waiting: 0, promise: null };
+        state.promise = fetchGeoJsonLines(url, controller.signal).then(
+          (features) => {
+            if (pending === state) pending = null;
+            settled = Promise.resolve(features);
+            return features;
+          },
+          (error) => {
+            if (pending === state) pending = null;
+            throw error;
+          },
+        );
+        pending = state;
+      }
+      const state = pending;
+      state.waiting += 1;
+      let left = false;
+      const leave = (abort) => {
+        if (left) return;
+        left = true;
+        state.waiting -= 1;
+        if (abort && state.waiting === 0) {
+          if (pending === state) pending = null;
+          state.controller.abort();
+        }
+      };
+      const onAbort = () => leave(true);
+      if (signal?.aborted) onAbort();
+      else signal?.addEventListener?.('abort', onAbort, { once: true });
+      return state.promise.finally(() => {
+        signal?.removeEventListener?.('abort', onAbort);
+        leave(false);
+      });
+    },
+  };
+}
+
+/**
  * A minimal, rock-solid native implementation for loading local GeoJSON Data.
  * Draws 3D stems (polylines) attached to Point entities and ensures
  * standard scene.pick natively clicks them.
@@ -325,6 +541,23 @@ export function createLocalGeoJsonLayer(
     labels = true,
     labelMax = DEFAULT_LABEL_MAX,
     labelGridPx = DEFAULT_LABEL_GRID_PX,
+    // Optional per-feature color: (properties) => CSS color, or a falsy value
+    // to fall back to `color`.
+    featureColor: colorForFeature = null,
+    // Render polygon features as ground areas with no stem, outside the
+    // globe-LOD budget so every area stays drawn. Points keep their pins. Area
+    // names are shared-overlay labels, toggled with setAreaLabelsVisible().
+    labeledAreas = false,
+    // With labeledAreas: publish only the area names and draw nothing else (no
+    // fill, pins or picking), so a names layer can pair with a fill-only
+    // layer over the same data and each can be switched on alone.
+    areaNamesOnly = false,
+    // Optional shared loader (createSharedGeoJsonLinesSource) so layers drawn
+    // from the same file download and parse it once.
+    featureSource = null,
+    // Optional panel legend: [{label, color, test(properties)}], counted over
+    // the whole dataset.
+    legend = null,
     screenSpaceEventHandlerFactory = (canvas) =>
       new Cesium.ScreenSpaceEventHandler(canvas),
     projectToWindow = (scene, position) =>
@@ -350,6 +583,9 @@ export function createLocalGeoJsonLayer(
   let _preRenderRemover = null;
   let _cameraMoveEndRemover = null;
   let _stemRecords = [];
+  /** Labeled-area name records ({id, base, tip, priority, entry}). */
+  let _areaRecords = [];
+  let _areaLabelsVisible = true;
   let _stemGeometryDirty = true;
   let _lastVisibilityUpdate = 0;
   let _destroyed = false;
@@ -366,6 +602,9 @@ export function createLocalGeoJsonLayer(
    * @type {Array<object>|null}
    */
   let _cachedFeatures = null;
+  /** Legend counts over `_cachedFeatures` (null until loaded). */
+  let _legendCounts = null;
+  let _rowControlsListener = null;
   /**
    * Globe-LOD active set: the record ids allowed to carry a live stem right
    * now. This bounds geometry refreshes and ground-sample work to the
@@ -444,6 +683,21 @@ export function createLocalGeoJsonLayer(
     host: overlayHost,
   });
 
+  // Follow the app-wide label settings: resize the existing entries in place,
+  // then force the next walk to re-publish (or clear) this layer's labels.
+  const unsubscribeLabelSettings = subscribeLocalLabelSettings(({ scale }) => {
+    for (const record of _stemRecords) {
+      if (record.entry) record.entry.distanceScale = cardDistanceScale(scale);
+    }
+    for (const record of _areaRecords) {
+      record.entry.distanceScale = areaDistanceScale(scale);
+    }
+    _overlayPublisher.invalidate();
+    _stemGeometryDirty = true;
+    _lastVisibilityUpdate = Number.NEGATIVE_INFINITY;
+    if (_enabled) governorRequestRender(`local-labels:${id}`);
+  });
+
   /**
    * Take the built entities out of the scene entirely. The parsed features
    * stay cached, so the next enable() rebuilds without a fetch; what must not
@@ -455,6 +709,7 @@ export function createLocalGeoJsonLayer(
     const source = _dataSource;
     _dataSource = null;
     _stemRecords = [];
+    _areaRecords = [];
     _stemGeometryDirty = true;
     _lastVisibilityUpdate = Number.NEGATIVE_INFINITY;
     removeEntityContextsForLayer(id);
@@ -463,6 +718,57 @@ export function createLocalGeoJsonLayer(
     } catch {
       /* already gone */
     }
+  };
+
+  /**
+   * Select a feature (publishing its context, which opens a details card for
+   * features with source notes) and fly to its stem base or polygon center.
+   * Shared by globe clicks and clickable overlay cards.
+   * @param {Cesium.Viewer} viewer
+   * @param {Cesium.Entity} entity
+   */
+  const focusFeature = (viewer, entity) => {
+    if (!_enabled || !entity) return;
+    viewer.selectedEntity = entity;
+    selectEntityContext(entity);
+
+    let targetPos = null;
+    if (entity.polyline) {
+      // A stem: fly to its base.
+      const positions = entity.polyline.positions.getValue(
+        Cesium.JulianDate.now(),
+      );
+      if (positions && positions.length > 0) targetPos = positions[0];
+    } else if (entity.polygon && entity.polygon.hierarchy) {
+      // A polygon: fly to its center.
+      const hierarchy = entity.polygon.hierarchy.getValue(
+        Cesium.JulianDate.now(),
+      );
+      if (hierarchy && hierarchy.positions.length > 0) {
+        targetPos = Cesium.BoundingSphere.fromPoints(
+          hierarchy.positions,
+        ).center;
+      }
+    }
+    if (!targetPos) return;
+
+    const carto = Cesium.Cartographic.fromCartesian(targetPos);
+    // Disable interactions so Cesium doesn't magically cancel the flight
+    viewer.scene.screenSpaceCameraController.enableInputs = false;
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromRadians(
+        carto.longitude,
+        carto.latitude,
+        5000,
+      ),
+      duration: 1.5,
+      complete: () => {
+        viewer.scene.screenSpaceCameraController.enableInputs = true;
+      },
+      cancel: () => {
+        viewer.scene.screenSpaceCameraController.enableInputs = true;
+      },
+    });
   };
 
   const disableLayer = (viewer) => {
@@ -523,6 +829,93 @@ export function createLocalGeoJsonLayer(
      * is false until the first post-enable walk has run the selection.
      * @returns {{total:number, active:number, budgetLimit:number, computed:boolean}}
      */
+    /**
+     * Show or hide labeled-area names; areas and stems are unaffected.
+     * @param {boolean} visible
+     */
+    setAreaLabelsVisible: (visible) => {
+      const next = visible !== false;
+      if (next === _areaLabelsVisible) return;
+      _areaLabelsVisible = next;
+      _stemGeometryDirty = true;
+      _lastVisibilityUpdate = Number.NEGATIVE_INFINITY;
+      if (_enabled) governorRequestRender(`local-area-labels:${id}`);
+    },
+
+    ...(legend && {
+      getRowControls: () => ({
+        chips: [],
+        legend:
+          _enabled && _legendCounts
+            ? legend.map((item, index) => ({
+                label: item.label,
+                color: item.color,
+                count: _legendCounts[index],
+              }))
+            : [],
+      }),
+      setRowControlsListener: (listener) => {
+        _rowControlsListener = typeof listener === 'function' ? listener : null;
+      },
+    }),
+
+    /**
+     * The layer's features nearest a point, for voice and other readers:
+     * the closest `limit` (with straight-line distanceKm), how many lie within
+     * `radiusKm`, and the legend counts. Works at any camera height because
+     * it reads the loaded dataset, not what is drawn on screen.
+     * @param {{longitude:number, latitude:number, limit?:number, radiusKm?:number}} point
+     * @returns {Promise<object>}
+     */
+    getAreaContext: async ({
+      longitude,
+      latitude,
+      limit = 5,
+      radiusKm = 5,
+    } = {}) => {
+      // A names-only layer mirrors another layer's features; it has no answer.
+      if (areaNamesOnly) return null;
+      const base = { layerId: id, layerName: name, source };
+      if (!_enabled) return { ...base, status: 'disabled' };
+      if (!_cachedFeatures) {
+        await _loadPromise?.catch(() => {});
+        if (!_cachedFeatures) return { ...base, status: 'loading' };
+      }
+      const nearby = [];
+      let within = 0;
+      for (const feature of _cachedFeatures) {
+        const center = featureLonLat(feature);
+        if (!center) continue;
+        const km = approximateKm(longitude, latitude, center[0], center[1]);
+        if (km <= radiusKm) within += 1;
+        nearby.push({ feature, km });
+      }
+      nearby.sort((a, b) => a.km - b.km);
+      return {
+        ...base,
+        status: 'loaded',
+        loadedFeatures: _cachedFeatures.length,
+        withinKm: radiusKm,
+        countWithin: within,
+        // Flat fields only: nested blobs (e.g. OSM tag bundles) bloat voice.
+        nearby: nearby.slice(0, Math.max(0, limit)).map(({ feature, km }) => ({
+          ...Object.fromEntries(
+            Object.entries(feature.properties || {}).filter(
+              ([, value]) => value === null || typeof value !== 'object',
+            ),
+          ),
+          distanceKm: Math.round(km * 10) / 10,
+        })),
+        ...(legend &&
+          _legendCounts && {
+            legend: legend.map((item, index) => ({
+              label: item.label,
+              count: _legendCounts[index],
+            })),
+          }),
+      };
+    },
+
     getLodDiagnostics: () => ({
       total: _stemRecords.length,
       active: _activeLodIds.size,
@@ -564,22 +957,10 @@ export function createLocalGeoJsonLayer(
             try {
               let features = _cachedFeatures;
               if (!features) {
-                const response = await fetch(url, {
-                  signal: _loadController.signal,
-                });
+                features = await (featureSource
+                  ? featureSource.load(_loadController.signal)
+                  : fetchGeoJsonLines(url, _loadController.signal));
                 if (_destroyed) return;
-                // A 404 returns an HTML body that would otherwise die in JSON.parse
-                // one line later, reported as a parse error for a missing file.
-                if (!response.ok) {
-                  throw new Error(`HTTP ${response.status ?? '?'}`);
-                }
-                const text = await response.text();
-                if (_destroyed) return;
-                const lines = text
-                  .split('\n')
-                  .filter((l) => l.trim().length > 0);
-
-                features = lines.map((line) => JSON.parse(line));
                 _cachedFeatures = features;
               }
 
@@ -619,11 +1000,23 @@ export function createLocalGeoJsonLayer(
               const entities = loaded.entities.values;
               _count = entities.length;
               _stemRecords = [];
+              _areaRecords = [];
               _stemGeometryDirty = true;
 
+              const categoryColors = new Map();
               for (let i = 0; i < entities.length; i++) {
                 const feature = entities[i];
                 feature.__localLayerId = id; // Tag it so our click handler knows it belongs to this layer
+                const properties = propertyObject(feature);
+                const categoryCss = colorForFeature?.(properties) || undefined;
+                const featureCss = categoryCss || color;
+                if (!categoryColors.has(featureCss)) {
+                  categoryColors.set(
+                    featureCss,
+                    Cesium.Color.fromCssColorString(featureCss),
+                  );
+                }
+                const featureColor = categoryColors.get(featureCss);
 
                 let pos = feature.position?.getValue(Cesium.JulianDate.now());
 
@@ -631,7 +1024,13 @@ export function createLocalGeoJsonLayer(
                   // It's a polygon or line
                   if (feature.polygon) {
                     feature.polygon.outline = true;
-                    feature.polygon.outlineColor = baseColor;
+                    feature.polygon.outlineColor = featureColor;
+                    if (categoryCss) {
+                      feature.polygon.material =
+                        new Cesium.ColorMaterialProperty(
+                          featureColor.withAlpha(0.3),
+                        );
+                    }
 
                     // Calculate center point for the stem
                     const hierarchy = feature.polygon.hierarchy?.getValue(
@@ -665,8 +1064,36 @@ export function createLocalGeoJsonLayer(
                   carto.latitude,
                   tipHeight,
                 );
-                const properties = propertyObject(feature);
                 const recordId = String(feature.id ?? i);
+
+                // Names-only areas: keep the label, drop every drawn and
+                // pickable graphic, and publish no context (the fill layer
+                // owns selection).
+                if (labeledAreas && areaNamesOnly) {
+                  if (labels && feature.polygon) {
+                    const priority = labelPriorityFromProperties(
+                      properties,
+                      id,
+                    );
+                    _areaRecords.push({
+                      id: recordId,
+                      base,
+                      tip: base,
+                      priority,
+                      entry: createLocalAreaLabelEntry({
+                        id: recordId,
+                        position: base,
+                        title: areaLabelText(properties, id),
+                        priority,
+                        accent: featureCss,
+                      }),
+                    });
+                  }
+                  feature.polygon = undefined;
+                  feature.billboard = undefined;
+                  feature.point = undefined;
+                  continue;
+                }
 
                 // Store references for bounded stem scaling and native picking.
                 feature.__localBaseCarto = carto;
@@ -687,6 +1114,28 @@ export function createLocalGeoJsonLayer(
                   ),
                 });
 
+                // Labeled areas: the polygon fill stays pickable and selectable
+                // but carries no stem record, so the LOD walk never hides it.
+                // Its name is a shared-overlay label anchored at the center.
+                if (labeledAreas && feature.polygon) {
+                  if (labels) {
+                    _areaRecords.push({
+                      id: recordId,
+                      base,
+                      tip: base,
+                      priority: labelPriorityFromProperties(properties, id),
+                      entry: createLocalAreaLabelEntry({
+                        id: recordId,
+                        position: base,
+                        title: areaLabelText(properties, id),
+                        priority: labelPriorityFromProperties(properties, id),
+                        accent: featureCss,
+                      }),
+                    });
+                  }
+                  continue;
+                }
+
                 // Constant properties are refreshed on the existing 450 ms source
                 // cadence. Cesium no longer evaluates 2-3 callbacks per entity on
                 // every frame, while the point/stem pick surface stays native.
@@ -698,11 +1147,11 @@ export function createLocalGeoJsonLayer(
                 feature.polyline = new Cesium.PolylineGraphics({
                   positions: stemPositionBuffers[0],
                   width: 3.5,
-                  material: new Cesium.ColorMaterialProperty(baseColor),
+                  material: new Cesium.ColorMaterialProperty(featureColor),
                 });
                 feature.point = new Cesium.PointGraphics({
                   pixelSize: 10,
-                  color: baseColor,
+                  color: featureColor,
                   outlineColor: Cesium.Color.BLACK,
                   outlineWidth: 2,
                   // Never depth-cull the anchor against the photoreal mesh —
@@ -731,7 +1180,12 @@ export function createLocalGeoJsonLayer(
                         position: tip,
                         properties,
                         priority,
-                        accent: color,
+                        accent: featureCss,
+                        // Only features with source notes have a details
+                        // card to open, so only their overlay card clicks.
+                        activate: hasSourceNotes(properties)
+                          ? () => focusFeature(viewer, feature)
+                          : undefined,
                       })
                     : null,
                 });
@@ -739,6 +1193,18 @@ export function createLocalGeoJsonLayer(
               // Setup finished — publish it.
               _dataSource = loaded;
               _lastUpdate = Date.now();
+              if (legend && !_legendCounts) {
+                _legendCounts = legend.map(
+                  (item) =>
+                    _cachedFeatures.filter((f) => item.test(f.properties || {}))
+                      .length,
+                );
+              }
+              try {
+                _rowControlsListener?.();
+              } catch {
+                /* the panel re-renders on its own cadence too */
+              }
             } catch (e) {
               // The dataset ships with the build, so this is a broken install,
               // not a blip — it has to reach the chip, not just the console.
@@ -759,6 +1225,7 @@ export function createLocalGeoJsonLayer(
               removeEntityContextsForLayer(id);
               _count = 0;
               _stemRecords = [];
+              _areaRecords = [];
               console.error(`Failed to load ${id}:`, e);
             }
 
@@ -772,57 +1239,21 @@ export function createLocalGeoJsonLayer(
                 // A tool owns the pointer (src/data/inputOwnership.js).
                 if (!isPointerFree()) return;
                 if (!_enabled) return;
-                const picked = viewer.scene.pick(click.position);
-
-                if (picked && picked.id && picked.id.__localLayerId === id) {
-                  const entity = picked.id;
-                  viewer.selectedEntity = entity;
-                  selectEntityContext(entity);
-
-                  // We zoom to the surface base of the stem or the center of the polygon
-                  let targetPos = null;
-
-                  if (entity.polyline) {
-                    // If it's a stem, fly to the base
-                    const positions = entity.polyline.positions.getValue(
-                      Cesium.JulianDate.now(),
-                    );
-                    if (positions && positions.length > 0) {
-                      targetPos = positions[0];
-                    }
-                  } else if (entity.polygon && entity.polygon.hierarchy) {
-                    // If it's a polygon, just fly to its center
-                    const hierarchy = entity.polygon.hierarchy.getValue(
-                      Cesium.JulianDate.now(),
-                    );
-                    if (hierarchy && hierarchy.positions.length > 0) {
-                      targetPos = Cesium.BoundingSphere.fromPoints(
-                        hierarchy.positions,
-                      ).center;
-                    }
-                  }
-
-                  if (targetPos) {
-                    const carto = Cesium.Cartographic.fromCartesian(targetPos);
-
-                    // Disable interactions so Cesium doesn't magically cancel the flight
-                    viewer.scene.screenSpaceCameraController.enableInputs = false;
-
-                    viewer.camera.flyTo({
-                      destination: Cesium.Cartesian3.fromRadians(
-                        carto.longitude,
-                        carto.latitude,
-                        5000,
-                      ),
-                      duration: 1.5,
-                      complete: () => {
-                        viewer.scene.screenSpaceCameraController.enableInputs = true;
-                      },
-                      cancel: () => {
-                        viewer.scene.screenSpaceCameraController.enableInputs = true;
-                      },
-                    });
-                  }
+                // A clickable local card (one with source notes) sits above
+                // the globe, so it wins the click. Every local layer resolves
+                // it identically and only the card's own layer acts on it.
+                const card = overlayHost.hitTest?.(
+                  click.position.x,
+                  click.position.y,
+                  { filter: isLocalCardAction },
+                );
+                if (card) {
+                  if (card.sourceId === id) card.entry.activate();
+                  return;
+                }
+                const target = pickLocalEntity(viewer.scene, click.position);
+                if (target && target.__localLayerId === id) {
+                  focusFeature(viewer, target);
                 }
               }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
             }
@@ -997,6 +1428,20 @@ export function createLocalGeoJsonLayer(
             }
             if (isVisible && record.entry) visibleOverlayRecords.push(record);
           }
+          // Area names compete for the same label budget as stem cards, so
+          // only near areas enter: a city-wide view would otherwise spend the
+          // whole budget on names too far away to read.
+          if (_areaLabelsVisible) {
+            for (const record of _areaRecords) {
+              if (
+                occluder.isPointVisible(record.base) &&
+                Cesium.Cartesian3.distance(cameraPos, record.base) <
+                  AREA_LABEL_MAX_DISTANCE_M
+              ) {
+                visibleOverlayRecords.push(record);
+              }
+            }
+          }
           _stemGeometryDirty = false;
           // Tiles ARE streaming in: real progress re-opens the give-up budget
           // so the records still waiting get their own bounded run of retries.
@@ -1004,17 +1449,17 @@ export function createLocalGeoJsonLayer(
           if (groundRetryPending) scheduleGroundRetryRender(viewer);
 
           const canvas = viewer.scene.canvas;
-          const cohort = selectLocalInfrastructureOverlayCohort(
-            visibleOverlayRecords,
-            {
-              maxEntries: labelMax,
-              gridPx: labelGridPx,
-              width: canvas.clientWidth || canvas.width || 0,
-              height: canvas.clientHeight || canvas.height || 0,
-              cohortLimit: LOCAL_OVERLAY_COHORT_LIMIT,
-              project: (record) => projectToWindow(viewer.scene, record.tip),
-            },
-          );
+          // The Display panel's Labels switch hides every local label.
+          const cohort = !getLocalLabelSettings().visible
+            ? []
+            : selectLocalInfrastructureOverlayCohort(visibleOverlayRecords, {
+                maxEntries: labelMax,
+                gridPx: labelGridPx,
+                width: canvas.clientWidth || canvas.width || 0,
+                height: canvas.clientHeight || canvas.height || 0,
+                cohortLimit: LOCAL_OVERLAY_COHORT_LIMIT,
+                project: (record) => projectToWindow(viewer.scene, record.tip),
+              });
           _overlayPublisher.publish(cohort);
         });
       }
@@ -1060,10 +1505,12 @@ export function createLocalGeoJsonLayer(
       if (_dataSource && viewer) {
         viewer.dataSources.remove(_dataSource, true);
       }
+      unsubscribeLabelSettings();
       _overlayPublisher.destroy();
       _dataSource = null;
       _cachedFeatures = null;
       _stemRecords = [];
+      _areaRecords = [];
       _count = 0;
       _lastUpdate = null;
       _error = null;
@@ -1265,6 +1712,99 @@ function clampLabel(value) {
   return text.length > 34 ? `${text.slice(0, 31)}...` : text;
 }
 
+/**
+ * Whether a feature carries source notes (a caption summary, source link or
+ * incident summary) that the details card can show.
+ * @param {object} properties Unwrapped feature properties.
+ * @returns {boolean}
+ */
+function hasSourceNotes(properties) {
+  return Boolean(
+    properties?.video_summary || properties?.video_url || properties?.summary,
+  );
+}
+
+/** [lon, lat] of a Point, or the bounding-box center of any other geometry. */
+function featureLonLat(feature) {
+  const geometry = feature?.geometry;
+  if (geometry?.type === 'Point') return geometry.coordinates;
+  let w = Infinity;
+  let s = Infinity;
+  let e = -Infinity;
+  let n = -Infinity;
+  const visit = (value) => {
+    if (typeof value?.[0] === 'number') {
+      if (value[0] < w) w = value[0];
+      if (value[0] > e) e = value[0];
+      if (value[1] < s) s = value[1];
+      if (value[1] > n) n = value[1];
+    } else if (Array.isArray(value)) value.forEach(visit);
+  };
+  visit(geometry?.coordinates);
+  return Number.isFinite(w) ? [(w + e) / 2, (s + n) / 2] : null;
+}
+
+/** Great-circle distance in km between two lon/lat points. */
+function approximateKm(lon1, lat1, lon2, lat2) {
+  const rad = Math.PI / 180;
+  const a =
+    Math.sin(((lat2 - lat1) * rad) / 2) ** 2 +
+    Math.cos(lat1 * rad) *
+      Math.cos(lat2 * rad) *
+      Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(a));
+}
+
+/** Overlay hit-test filter: a clickable card published by a local layer. */
+export function isLocalCardAction(entry) {
+  return (
+    typeof entry?.activate === 'function' &&
+    String(entry.source || '').startsWith('local-')
+  );
+}
+
+/**
+ * Resolve the local-layer entity a click means. A small square around the
+ * cursor is drilled so a 10 px pin is easy to hit, and any pin (an entity with
+ * a point) wins over a ground area beneath it; otherwise the topmost local
+ * entity wins. Every local layer resolves the same click identically, so
+ * exactly one layer handles it.
+ * @param {Cesium.Scene} scene
+ * @param {Cesium.Cartesian2} position
+ * @returns {Cesium.Entity|undefined}
+ */
+export function pickLocalEntity(scene, position) {
+  const picks =
+    typeof scene.drillPick === 'function'
+      ? scene.drillPick(
+          position,
+          LOCAL_PICK_LIMIT,
+          LOCAL_PICK_SIZE_PX,
+          LOCAL_PICK_SIZE_PX,
+        )
+      : [scene.pick(position)];
+  const hits = picks
+    .map((picked) => picked?.id)
+    .filter((entity) => entity?.__localLayerId);
+  return hits.find((entity) => entity.point) || hits[0];
+}
+
+/**
+ * Ground-label text for a labeled area: the feature name without emoji
+ * (canvas labels render them inconsistently), clamped like stem labels.
+ * @param {object} properties Unwrapped feature properties.
+ * @param {string} layerId Local layer id.
+ * @returns {string}
+ */
+function areaLabelText(properties, layerId) {
+  const name = featureLabelFromProperties(properties, layerId)
+    .replace(/[\p{Extended_Pictographic}\u{FE0F}\u{20E3}\u{200D}]/gu, '')
+    .replace(/\s*-\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return clampLabel(name || layerTitle(layerId));
+}
+
 function clampCardLine(value) {
   const text = cleanLabel(value);
   return text.length > 48 ? `${text.slice(0, 45)}...` : text;
@@ -1273,5 +1813,13 @@ function clampCardLine(value) {
 function layerTitle(layerId) {
   if (layerId === 'local-datacenters') return 'Datacenter';
   if (layerId === 'local-dams') return 'Dam';
+  if (layerId === 'local-chicago-events') return 'Event';
+  if (layerId === 'local-gang-map') return 'Hood';
+  if (layerId === 'local-famous-shootings') return 'Shooting';
+  if (layerId?.startsWith('local-miami-homicides-')) return 'Homicide';
+  if (layerId === 'local-trauma-centers') return 'Trauma center';
+  if (layerId === 'local-gva-2015') return 'Gun death';
+  if (layerId === 'local-mkdb') return 'Mass killing';
+  if (layerId === 'local-public-housing') return 'Public housing';
   return 'Feature';
 }

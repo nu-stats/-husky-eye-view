@@ -22,11 +22,11 @@
     rgba(10, 27, 37, 0.92),
     rgba(7, 13, 22, 0.9)
   );
-  border: 1px solid rgba(54, 220, 255, 0.38);
+  border: 1px solid rgba(187, 187, 187, 0.38);
   border-radius: 0.42rem;
   box-shadow:
     0 0.4rem 1.6rem rgba(0, 0, 0, 0.5),
-    0 0 1.2rem rgba(0, 212, 255, 0.07);
+    0 0 1.2rem rgba(170, 170, 170, 0.07);
   backdrop-filter: blur(18px) saturate(1.2);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   cursor: pointer;
@@ -43,13 +43,13 @@
     rgba(14, 38, 51, 0.95),
     rgba(9, 18, 28, 0.93)
   );
-  border-color: rgba(54, 220, 255, 0.7);
+  border-color: rgba(187, 187, 187, 0.7);
   outline: none;
   transform: translateY(-1px);
 }
 
 #key-setup-chip .material-symbols-outlined {
-  color: #55dff5;
+  color: #c3c3c3;
   font-size: 0.95rem;
 }
 
@@ -73,11 +73,11 @@
   background:
     linear-gradient(145deg, rgba(10, 27, 37, 0.97), rgba(7, 13, 22, 0.95)),
     rgba(7, 17, 25, 0.96);
-  border: 1px solid rgba(54, 220, 255, 0.42);
+  border: 1px solid rgba(187, 187, 187, 0.42);
   border-radius: 0.65rem;
   box-shadow:
     0 1.4rem 4.5rem rgba(0, 0, 0, 0.72),
-    0 0 2.5rem rgba(0, 212, 255, 0.09),
+    0 0 2.5rem rgba(170, 170, 170, 0.09),
     inset 0 0 0 1px rgba(255, 255, 255, 0.025);
   backdrop-filter: blur(28px) saturate(1.25);
   -webkit-backdrop-filter: blur(28px) saturate(1.25);
@@ -107,10 +107,10 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(54, 220, 255, 0.8),
+    rgba(187, 187, 187, 0.8),
     transparent
   );
-  box-shadow: 0 0 1rem rgba(54, 220, 255, 0.45);
+  box-shadow: 0 0 1rem rgba(187, 187, 187, 0.45);
   pointer-events: none;
 }
 
@@ -128,7 +128,7 @@
 }
 
 .key-setup-kicker {
-  color: rgba(54, 220, 255, 0.86);
+  color: rgba(187, 187, 187, 0.86);
 }
 
 .key-setup-close {
@@ -148,7 +148,7 @@
 .key-setup-close:hover,
 .key-setup-close:focus-visible {
   color: rgba(225, 244, 248, 0.95);
-  border-color: rgba(54, 220, 255, 0.5);
+  border-color: rgba(187, 187, 187, 0.5);
   outline: none;
 }
 
@@ -175,7 +175,7 @@
 #key-setup-description code {
   padding: 0.05rem 0.25rem;
   font-size: 0.92em;
-  background: rgba(54, 220, 255, 0.08);
+  background: rgba(187, 187, 187, 0.08);
   border-radius: 0.2rem;
 }
 
@@ -187,7 +187,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(54, 220, 255, 0.45) transparent;
+  scrollbar-color: rgba(187, 187, 187, 0.45) transparent;
   scrollbar-gutter: stable;
 }
 
@@ -195,7 +195,7 @@
   width: 6px;
 }
 .key-setup-rows::-webkit-scrollbar-thumb {
-  background: rgba(54, 220, 255, 0.45);
+  background: rgba(187, 187, 187, 0.45);
   border-radius: 3px;
 }
 
@@ -204,7 +204,7 @@
   gap: 0.35rem;
   padding: 0.6rem 0.7rem;
   background: rgba(29, 69, 81, 0.14);
-  border: 1px solid rgba(100, 200, 220, 0.15);
+  border: 1px solid rgba(180, 180, 180, 0.15);
   border-radius: 0.42rem;
 }
 
@@ -255,7 +255,7 @@
 
 .key-setup-get {
   margin-left: auto;
-  color: rgba(54, 220, 255, 0.75);
+  color: rgba(187, 187, 187, 0.75);
   font-size: 0.58rem;
   letter-spacing: 0.08rem;
   text-decoration: none;
@@ -264,7 +264,7 @@
 
 .key-setup-get:hover,
 .key-setup-get:focus-visible {
-  color: rgba(54, 220, 255, 1);
+  color: rgba(187, 187, 187, 1);
   text-decoration: underline;
   outline: none;
 }
@@ -287,12 +287,12 @@
   font-family: var(--font-mono);
   font-size: 0.66rem;
   background: rgba(4, 14, 20, 0.72);
-  border: 1px solid rgba(100, 200, 220, 0.22);
+  border: 1px solid rgba(180, 180, 180, 0.22);
   border-radius: 0.32rem;
 }
 
 .key-setup-fields input:focus {
-  border-color: rgba(54, 220, 255, 0.65);
+  border-color: rgba(187, 187, 187, 0.65);
   outline: none;
 }
 
@@ -311,7 +311,7 @@
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.09rem;
-  background: linear-gradient(180deg, #45e0ff, #1fb9dd);
+  background: linear-gradient(180deg, #c1c1c1, #9b9b9b);
   border: none;
   border-radius: 0.38rem;
   cursor: pointer;
@@ -362,11 +362,11 @@ body.scene-playback-mode #key-setup {
 /* Provider Settings additions: externally-managed badge + per-row remove. */
 .key-setup-external {
   padding: 0.05rem 0.3rem;
-  color: rgba(148, 200, 220, 0.7);
+  color: rgba(190, 190, 190, 0.7);
   font-size: 0.5rem;
   letter-spacing: 0.06rem;
   text-transform: uppercase;
-  border: 1px solid rgba(148, 200, 220, 0.28);
+  border: 1px solid rgba(190, 190, 190, 0.28);
   border-radius: 0.3rem;
   white-space: nowrap;
 }

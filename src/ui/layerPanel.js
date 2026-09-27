@@ -41,7 +41,45 @@ const PANEL_GROUPS = [
   },
   {
     label: 'Events',
-    ids: ['rocket-launches', 'earthquakes', 'local-firms'],
+    ids: [
+      'rocket-launches',
+      'earthquakes',
+      'local-firms',
+      'local-chicago-events',
+      'local-famous-shootings',
+      'local-gva-2015',
+      'local-mkdb',
+    ],
+  },
+  {
+    label: 'Miami-Dade Homicides',
+    ids: [
+      'local-miami-homicide-hotspots',
+      'local-miami-homicides-1950s',
+      'local-miami-homicides-1960s',
+      'local-miami-homicides-1970s',
+      'local-miami-homicides-1980s',
+      'local-miami-homicides-1990s',
+      'local-miami-homicides-2000s',
+    ],
+  },
+  {
+    label: 'Chicago Gangs',
+    ids: ['local-gang-map', 'local-gang-map-labels'],
+  },
+  {
+    label: 'Neighborhood Data (US)',
+    ids: [
+      'local-holc-redlining',
+      'local-life-expectancy',
+      'local-tract-le-clusters',
+      'local-county-life-expectancy',
+      'local-county-le-clusters',
+    ],
+  },
+  {
+    label: 'Health & Housing (US)',
+    ids: ['local-trauma-centers', 'local-public-housing'],
   },
   {
     label: 'Utilities',

@@ -7,6 +7,7 @@ import {
 } from '../data/contextStore.js';
 import {
   clearOverlaySource,
+  hitTestWorldOverlay,
   setOverlayEntries,
   setOverlaySourceVisible,
 } from '../overlays/worldOverlay.js';
@@ -14,6 +15,7 @@ import {
 export const localGeoJsonServices = Object.freeze({
   overlayHost: Object.freeze({
     clearSource: clearOverlaySource,
+    hitTest: hitTestWorldOverlay,
     setEntries: setOverlayEntries,
     setVisible: setOverlaySourceVisible,
   }),

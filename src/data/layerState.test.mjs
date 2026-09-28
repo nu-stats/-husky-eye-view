@@ -158,8 +158,8 @@ function encode(state) {
 
 test('production registry is exact, canonical, and rejects incomplete contracts', async () => {
   assert.equal(validateLayerStateRegistry(), true);
-  assert.equal(REGISTERED_LAYER_IDS.length, 30);
-  assert.equal(new Set(REGISTERED_LAYER_IDS).size, 30);
+  assert.equal(REGISTERED_LAYER_IDS.length, 41);
+  assert.equal(new Set(REGISTERED_LAYER_IDS).size, 41);
   assert.ok(REGISTERED_LAYER_IDS.includes('transit'));
   assert.deepEqual(REGISTERED_LAYER_IDS, [...REGISTERED_LAYER_IDS].sort());
   assert.throws(
@@ -1546,6 +1546,16 @@ test('oversized and out-of-grammar tracking IDs are rejected, never truncated', 
       `round-trip preserved: ${good}`,
     );
   }
+});
+
+test('a link with every registered layer enabled round-trips under the size cap', () => {
+  const params = encodeLayerStateParams(new URLSearchParams([['v', '2']]), {
+    ...createDefaultLayerState(),
+    enabledLayerIds: [...REGISTERED_LAYER_IDS],
+  });
+  const decoded = decodeLayerStateParams(params);
+  assert.ok(decoded, 'the all-layers payload decodes');
+  assert.deepEqual([...decoded.enabledLayerIds].sort(), [...REGISTERED_LAYER_IDS].sort());
 });
 
 test('an oversized enabled-layer field fails closed instead of decoding a prefix', () => {

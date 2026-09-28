@@ -112,8 +112,81 @@ test('non-https links are dropped and features without notes open nothing', () =
       env.nodes().some((n) => n.tagName === 'A'),
       false,
     );
-    env.select({ id: 'x', layerId: 'local-gang-map', properties: { name: 'Hood' } });
+    env.select({
+      id: 'x',
+      layerId: 'local-gang-map',
+      properties: { name: 'Hood' },
+    });
     assert.equal(env.container.children.length, 0);
+  } finally {
+    env.cleanup();
+  }
+});
+
+test('a shooting shows its nearest trauma center and the nearest Level I', () => {
+  const env = setup();
+  try {
+    env.select({
+      id: 'local-famous-shootings:1',
+      layerId: 'local-famous-shootings',
+      layerName: 'Famous Shootings',
+      properties: {
+        name: 'Gary shooting',
+        summary: '06-28-2024 · Shot & killed.',
+        nearest_trauma_center: 'Methodist Hospitals Inc',
+        nearest_trauma_level: 'Level III',
+        nearest_trauma_miles: 0.72,
+        nearest_level1_center: 'The University Of Chicago Medical Center',
+        nearest_level1_miles: 18.94,
+      },
+    });
+    const text = env
+      .nodes()
+      .map((n) => n.textContent)
+      .join('\n');
+    assert.match(
+      text,
+      /Nearest trauma center: Methodist Hospitals Inc \(Level III\), 0\.72 mi/,
+    );
+    assert.match(
+      text,
+      /Nearest Level I: The University Of Chicago Medical Center, 18\.94 mi/,
+    );
+    assert.match(text, /Straight-line distance/);
+  } finally {
+    env.cleanup();
+  }
+});
+
+test('an incident with a source_url links to its source record (https only)', () => {
+  const env = setup();
+  try {
+    env.select({
+      id: 'local-gva-2015:gva-376457-0',
+      layerId: 'local-gva-2015',
+      layerName: 'Gun Deaths 2015 (GVA)',
+      properties: {
+        name: 'Leon Wiggins Road, Andalusia',
+        summary: 'Jul 16, 2015: 1 killed.',
+        source_url: 'https://www.gunviolencearchive.org/incident/376457',
+      },
+    });
+    const link = env.nodes().find((n) => n.tagName === 'A');
+    assert.equal(link.textContent, 'Open source record ↗');
+    assert.equal(
+      link.href,
+      'https://www.gunviolencearchive.org/incident/376457',
+    );
+    assert.equal(link.rel, 'noopener noreferrer');
+    env.select({
+      id: 'local-gva-2015:x',
+      layerId: 'local-gva-2015',
+      properties: { name: 'x', summary: 'y', source_url: 'http://example.com' },
+    });
+    assert.equal(
+      env.nodes().some((n) => n.tagName === 'A'),
+      false,
+    );
   } finally {
     env.cleanup();
   }

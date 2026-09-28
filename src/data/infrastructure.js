@@ -58,6 +58,76 @@ const clusterLegend = () =>
     color: c.color,
     test: (p) => p.cluster === c.type,
   }));
+// Miami-Dade homicides 1956-2011: one pin layer per decade, each in its own
+// color (the 1950s and 2000s layers are partial decades). Files are written
+// by scripts/convert-miami-dade-homicides.mjs.
+const HOMICIDE_DECADES = Object.freeze([
+  {
+    key: '1950s',
+    label: '1956–1959',
+    color: '#f0f921',
+    url: new URL(
+      './local_data/miami_dade_homicides/homicides_1950s.geojsonl',
+      import.meta.url,
+    ).href,
+  },
+  {
+    key: '1960s',
+    label: '1960s',
+    color: '#fdb42f',
+    url: new URL(
+      './local_data/miami_dade_homicides/homicides_1960s.geojsonl',
+      import.meta.url,
+    ).href,
+  },
+  {
+    key: '1970s',
+    label: '1970s',
+    color: '#f07f4f',
+    url: new URL(
+      './local_data/miami_dade_homicides/homicides_1970s.geojsonl',
+      import.meta.url,
+    ).href,
+  },
+  {
+    key: '1980s',
+    label: '1980s',
+    color: '#d8576b',
+    url: new URL(
+      './local_data/miami_dade_homicides/homicides_1980s.geojsonl',
+      import.meta.url,
+    ).href,
+  },
+  {
+    key: '1990s',
+    label: '1990s',
+    color: '#b83289',
+    url: new URL(
+      './local_data/miami_dade_homicides/homicides_1990s.geojsonl',
+      import.meta.url,
+    ).href,
+  },
+  {
+    key: '2000s',
+    label: '2000–2011',
+    color: '#8b0aa5',
+    url: new URL(
+      './local_data/miami_dade_homicides/homicides_2000s.geojsonl',
+      import.meta.url,
+    ).href,
+  },
+]);
+// Homicide hotspot bands (kernel density, homicides per km² over 1956-2011;
+// top-weighted percentile breaks from scripts/build-miami-homicide-hotspots.mjs), off-white
+// for the lowest to orange for the most concentrated.
+const HOMICIDE_HOTSPOT_BANDS = Object.freeze([
+  { band: 1, label: '1–3.8 per km²', color: '#fff5eb' },
+  { band: 2, label: '3.8–8.7', color: '#fee6ce' },
+  { band: 3, label: '8.7–16', color: '#fdd0a2' },
+  { band: 4, label: '16–31', color: '#fdae6b' },
+  { band: 5, label: '31–86', color: '#fd8d3c' },
+  { band: 6, label: '86–532 (top 3%)', color: '#f16913' },
+]);
 /** County layers are drawn nationwide: every state, from space-station height. */
 const COUNTY_LAYER_OPTIONS = Object.freeze({
   maxHeightM: 8_000_000,
@@ -86,6 +156,95 @@ const famousShootingsUrl = new URL(
   './local_data/gang_map/famous_shootings.geojsonl',
   import.meta.url,
 ).href;
+// Trauma centers (HIFLD Hospitals, open hospitals with a trauma designation;
+// scripts/fetch-trauma-centers.mjs), colored by trauma level.
+const traumaCentersUrl = new URL(
+  './local_data/trauma_centers/trauma_centers.geojsonl',
+  import.meta.url,
+).href;
+const TRAUMA_LEVELS = Object.freeze([
+  {
+    label: 'Level I',
+    color: '#e31a1c',
+    test: (p) => p.trauma_level === 'Level I',
+  },
+  {
+    label: 'Level II',
+    color: '#fd8d3c',
+    test: (p) => p.trauma_level === 'Level II',
+  },
+  {
+    label: 'Level III',
+    color: '#fecc5c',
+    test: (p) => p.trauma_level === 'Level III',
+  },
+  {
+    label: 'Level IV',
+    color: '#a1dab4',
+    test: (p) => p.trauma_level === 'Level IV',
+  },
+  {
+    label: 'Level V',
+    color: '#41b6c4',
+    test: (p) => p.trauma_level === 'Level V',
+  },
+  {
+    label: 'Pediatric only',
+    color: '#c51b8a',
+    test: (p) => String(p.trauma_level).startsWith('Pediatric'),
+  },
+  {
+    label: 'Other designation',
+    color: '#bdbdbd',
+    test: (p) => p.trauma_level === 'Other designation',
+  },
+]);
+// Public housing developments (HUD; scripts/fetch-public-housing.mjs), one
+// pin per development, colored by the decade its first building was built.
+const publicHousingUrl = new URL(
+  './local_data/public_housing/developments.geojsonl',
+  import.meta.url,
+).href;
+const HOUSING_ERAS = Object.freeze([
+  { label: 'Before 1950', color: '#bf812d', min: 0, max: 1950 },
+  { label: '1950s', color: '#dfc27d', min: 1950, max: 1960 },
+  { label: '1960s', color: '#f6e8c3', min: 1960, max: 1970 },
+  { label: '1970s', color: '#c7eae5', min: 1970, max: 1980 },
+  { label: '1980s', color: '#80cdc1', min: 1980, max: 1990 },
+  { label: '1990 and later', color: '#35978f', min: 1990, max: Infinity },
+]);
+const housingEra = (p) =>
+  Number(p.construct_year) > 0
+    ? HOUSING_ERAS.find(
+        (e) => p.construct_year >= e.min && p.construct_year < e.max,
+      )
+    : null;
+// Gun Violence Archive 2015 gun deaths, geocoded by
+// scripts/geocode-gva-incidents.mjs and built by scripts/build-gva-layer.mjs.
+const gva2015Url = new URL(
+  './local_data/gva_2015/incidents.geojsonl',
+  import.meta.url,
+).href;
+const GVA_DEATHS = Object.freeze([
+  { label: '1 killed', color: '#fc9272', min: 1, max: 2 },
+  { label: '2 killed', color: '#ef3b2c', min: 2, max: 3 },
+  { label: '3–4 killed', color: '#cb181d', min: 3, max: 5 },
+  { label: '5 or more killed', color: '#67000d', min: 5, max: Infinity },
+]);
+const gvaDeaths = (p) =>
+  GVA_DEATHS.find((d) => p.killed >= d.min && p.killed < d.max);
+// Mass Killing Database incidents (4+ killed, 2006–2023), tract-checked and
+// built by scripts/convert-mkdb-incidents.mjs.
+const mkdbUrl = new URL('./local_data/mkdb/incidents.geojsonl', import.meta.url)
+  .href;
+const MKDB_DEATHS = Object.freeze([
+  { label: '4 killed', color: '#d4b9da', min: 4, max: 5 },
+  { label: '5 killed', color: '#c994c7', min: 5, max: 6 },
+  { label: '6–9 killed', color: '#df65b0', min: 6, max: 10 },
+  { label: '10 or more killed', color: '#ce1256', min: 10, max: Infinity },
+]);
+const mkdbDeaths = (p) =>
+  MKDB_DEATHS.find((d) => p.killed >= d.min && p.killed < d.max);
 
 // Hoods without a gang line and non-hood areas keep one color per source
 // My Maps layer.
@@ -338,6 +497,140 @@ export function createInfrastructureLayers(services) {
     services,
   );
 
+  const miamiHomicideHotspots = createChunkedAreaLayer(
+    {
+      id: 'local-miami-homicide-hotspots',
+      name: 'Miami Homicide Hotspots',
+      baseUrl: 'context/miami-homicide-hotspots/',
+      icon: '▦',
+      source: 'Kernel density',
+      sourceNote:
+        'Kernel density of 13,348 Miami-Dade homicides, 1956–2011 (quartic kernel, 800 m radius, 200 m cells; bands at the 40th/65th/80th/90th/97th percentiles). 667 incidents stacked on fallback geocodes are left out.',
+      featureColor: (p) =>
+        HOMICIDE_HOTSPOT_BANDS.find((b) => b.band === p.band)?.color ||
+        NO_DATA_COLOR,
+      legend: HOMICIDE_HOTSPOT_BANDS.map((b) => ({
+        label: b.label,
+        color: b.color,
+        test: (p) => p.band === b.band,
+      })),
+      fillAlpha: 0.6,
+      maxHeightM: 400_000,
+      maxChunks: 1,
+      zoomInMessage: 'zoom in to Miami-Dade to load',
+    },
+    services,
+  );
+
+  // Same pins, stems and clickable cards as Chicago Events, one layer per
+  // decade in that decade's color.
+  const miamiHomicides = HOMICIDE_DECADES.map((decade) =>
+    createLocalGeoJsonLayer(
+      {
+        id: `local-miami-homicides-${decade.key}`,
+        name: `Miami Homicides ${decade.label}`,
+        url: decade.url,
+        color: decade.color,
+        icon: '●',
+        source: 'Miami-Dade homicides',
+        labels: true,
+        labelMax: 50,
+        labelGridPx: 90,
+        legend: [
+          { label: decade.label, color: decade.color, test: () => true },
+        ],
+      },
+      services,
+    ),
+  );
+
+  const gva2015 = createLocalGeoJsonLayer(
+    {
+      id: 'local-gva-2015',
+      name: 'Gun Deaths 2015 (GVA)',
+      url: gva2015Url,
+      color: '#ef3b2c',
+      icon: '●',
+      source: 'Gun Violence Archive',
+      labels: true,
+      labelMax: 50,
+      labelGridPx: 90,
+      featureColor: (p) => gvaDeaths(p)?.color,
+      legend: GVA_DEATHS.map((d) => ({
+        label: d.label,
+        color: d.color,
+        test: (p) => gvaDeaths(p) === d,
+      })),
+    },
+    services,
+  );
+
+  const mkdb = createLocalGeoJsonLayer(
+    {
+      id: 'local-mkdb',
+      name: 'MKDB Mass Killings (2006–2023)',
+      url: mkdbUrl,
+      color: '#df65b0',
+      icon: '●',
+      source: 'Mass Killing Database',
+      labels: true,
+      labelMax: 50,
+      labelGridPx: 90,
+      featureColor: (p) => mkdbDeaths(p)?.color,
+      legend: MKDB_DEATHS.map((d) => ({
+        label: d.label,
+        color: d.color,
+        test: (p) => mkdbDeaths(p) === d,
+      })),
+    },
+    services,
+  );
+
+  const traumaCenters = createLocalGeoJsonLayer(
+    {
+      id: 'local-trauma-centers',
+      name: 'Trauma Centers',
+      url: traumaCentersUrl,
+      color: '#e31a1c',
+      icon: '✚',
+      source: 'HIFLD Hospitals',
+      labels: true,
+      labelMax: 60,
+      labelGridPx: 110,
+      featureColor: (p) => TRAUMA_LEVELS.find((l) => l.test(p))?.color,
+      legend: TRAUMA_LEVELS,
+    },
+    services,
+  );
+
+  const publicHousing = createLocalGeoJsonLayer(
+    {
+      id: 'local-public-housing',
+      name: 'Public Housing',
+      url: publicHousingUrl,
+      color: '#80cdc1',
+      icon: '⌂',
+      source: 'HUD',
+      labels: true,
+      labelMax: 60,
+      labelGridPx: 110,
+      featureColor: (p) => housingEra(p)?.color || NO_DATA_COLOR,
+      legend: [
+        ...HOUSING_ERAS.map((e) => ({
+          label: e.label,
+          color: e.color,
+          test: (p) => housingEra(p) === e,
+        })),
+        {
+          label: 'Year unknown',
+          color: NO_DATA_COLOR,
+          test: (p) => !housingEra(p),
+        },
+      ],
+    },
+    services,
+  );
+
   return [
     datacenters,
     dams,
@@ -350,5 +643,11 @@ export function createInfrastructureLayers(services) {
     tractClusters,
     countyLifeExpectancy,
     countyClusters,
+    ...miamiHomicides,
+    miamiHomicideHotspots,
+    traumaCenters,
+    publicHousing,
+    gva2015,
+    mkdb,
   ];
 }

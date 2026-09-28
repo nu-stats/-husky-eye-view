@@ -3,8 +3,14 @@
 // Each point is joined by point_id to its caption-derived note in
 // src/data/local_data/chicago_events/video_notes.json, which adds the incident
 // summary and a link to the moment in the source video that discusses it.
+// Each point also gets its nearest trauma center (any level, and adult Level I)
+// with straight-line distances; run scripts/fetch-trauma-centers.mjs first.
 // Usage: node scripts/convert-chicago-events.mjs
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  loadTraumaCenters,
+  nearestTraumaProperties,
+} from './lib/nearest-trauma.mjs';
 
 const input = 'public/chicago_events2.json';
 const outDir = 'src/data/local_data/chicago_events';
@@ -21,6 +27,7 @@ function toSeconds(time) {
 
 const esri = JSON.parse(readFileSync(input, 'utf8'));
 const { video, notes } = JSON.parse(readFileSync(notesPath, 'utf8'));
+const traumaCenters = loadTraumaCenters();
 const lines = [];
 const skipped = [];
 const withoutNotes = [];
@@ -42,6 +49,7 @@ for (const { attributes: a, geometry } of esri.features) {
         name: a.location,
         point_id: a.point_id,
         coordinate_note: a.coordinate,
+        ...nearestTraumaProperties(x, y, traumaCenters),
         ...(note && {
           victim: note.victim,
           victim_gang: note.victim_gang,

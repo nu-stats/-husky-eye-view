@@ -60,6 +60,9 @@ export function chunksInView(index, view, limit) {
  * @param {number} [options.maxHeightM]
  * @param {number} [options.maxChunks]
  * @param {string} [options.zoomInMessage] Panel hint above `maxHeightM`.
+ * @param {string} [options.sourceNote] Source line for every area's details
+ *   card, instead of repeating it in each feature.
+ * @param {number} [options.fillAlpha] Area fill opacity (0–1).
  * @param {Function} [options.screenSpaceEventHandlerFactory] Test seam.
  * @param {object} services Shared context/overlay operations.
  */
@@ -75,6 +78,8 @@ export function createChunkedAreaLayer(
     maxHeightM = CHUNKED_AREA_MAX_HEIGHT_M,
     maxChunks = CHUNKED_AREA_MAX_CHUNKS,
     zoomInMessage = 'zoom in to a city or county to load',
+    sourceNote = null,
+    fillAlpha = FILL_ALPHA,
     screenSpaceEventHandlerFactory = (canvas) =>
       new Cesium.ScreenSpaceEventHandler(canvas),
   },
@@ -208,7 +213,7 @@ export function createChunkedAreaLayer(
       const props =
         entity.properties?.getValue?.(Cesium.JulianDate.now()) || {};
       entity.polygon.material = new Cesium.ColorMaterialProperty(
-        colorFor(featureColor(props) || '#9e9e9e').withAlpha(FILL_ALPHA),
+        colorFor(featureColor(props) || '#9e9e9e').withAlpha(fillAlpha),
       );
       entity.polygon.outline = false;
     }
@@ -286,7 +291,10 @@ export function createChunkedAreaLayer(
   }
 
   function selectArea(entity) {
-    const props = entity.properties?.getValue?.(Cesium.JulianDate.now()) || {};
+    const props = {
+      ...(entity.properties?.getValue?.(Cesium.JulianDate.now()) || {}),
+      ...(sourceNote && { source_note: sourceNote }),
+    };
     const hierarchy = entity.polygon?.hierarchy?.getValue(
       Cesium.JulianDate.now(),
     );

@@ -17,12 +17,13 @@ const PENDING_TRACKING_POLL_MS = 1_000;
  */
 const TRACKING_ID_GRAMMAR = /^[0-9a-z~_-]{1,16}$/;
 /**
- * Ceilings for the untrusted v2 layer fields. Both are far above any legitimate
- * payload (16 one-character tokens; a dozen short option assignments), so a
- * value past them is malformed or hostile. Reject the WHOLE payload, matching
- * the unknown-token rule — never salvage a prefix.
+ * Ceilings for the untrusted v2 layer fields. Both are above any legitimate
+ * payload (every registered layer enabled: ~40 tokens of one or two
+ * characters plus their dots; a dozen short option assignments), so a value
+ * past them is malformed or hostile. Reject the WHOLE payload, matching the
+ * unknown-token rule — never salvage a prefix.
  */
-const MAX_ENABLED_LAYERS_CHARS = 64;
+const MAX_ENABLED_LAYERS_CHARS = 160;
 const MAX_LAYER_OPTIONS_CHARS = 512;
 export const LAYER_STATE_STORAGE_KEY = 'gev:layer-state:v2';
 export const LAYER_RESTORE_ORIGINS = Object.freeze({
@@ -375,6 +376,11 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
     disposition: 'enabled-only',
   }),
   Object.freeze({
+    id: 'local-gva-2015',
+    token: 'gv',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
     id: 'local-holc-redlining',
     token: 'o',
     disposition: 'enabled-only',
@@ -385,8 +391,58 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
     disposition: 'enabled-only',
   }),
   Object.freeze({
+    id: 'local-miami-homicide-hotspots',
+    token: 'mh',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-miami-homicides-1950s',
+    token: '5',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-miami-homicides-1960s',
+    token: '6',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-miami-homicides-1970s',
+    token: '7',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-miami-homicides-1980s',
+    token: '8',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-miami-homicides-1990s',
+    token: '9',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-miami-homicides-2000s',
+    token: '0',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-mkdb',
+    token: 'mk',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-public-housing',
+    token: 'ph',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
     id: 'local-tract-le-clusters',
     token: '4',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-trauma-centers',
+    token: 'tc',
     disposition: 'enabled-only',
   }),
   Object.freeze({
@@ -489,7 +545,8 @@ export function validateLayerStateRegistry(registry = LAYER_STATE_REGISTRY) {
     if (ids.has(entry.id))
       throw new Error(`Duplicate layer-state id: ${entry.id}`);
     ids.add(entry.id);
-    if (!/^[a-z0-9]$/.test(entry.token || ''))
+    // One character for the original layers; two once those ran out.
+    if (!/^[a-z0-9]{1,2}$/.test(entry.token || ''))
       throw new Error(`Invalid layer-state token: ${entry.id}`);
     if (tokens.has(entry.token))
       throw new Error(`Duplicate layer-state token: ${entry.token}`);

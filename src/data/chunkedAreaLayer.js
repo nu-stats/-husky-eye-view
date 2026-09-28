@@ -21,6 +21,54 @@ export const CHUNKED_AREA_MAX_CHUNKS = 30;
 /** Parsed chunks kept after leaving the view, so panning back is instant. */
 const CHUNK_CACHE_LIMIT = 90;
 const FILL_ALPHA = 0.4;
+/** Longest getAreaContext waits for areas still loading. */
+const AREA_CONTEXT_WAIT_MS = 6000;
+
+/** Polygon rings of a Polygon/MultiPolygon geometry, as [outer, ...holes][]. */
+function polygonsOf(geometry) {
+  if (geometry?.type === 'Polygon') return [geometry.coordinates];
+  if (geometry?.type === 'MultiPolygon') return geometry.coordinates;
+  return [];
+}
+
+/** Whether a ring of [lon, lat] points contains the point (even-odd rule). */
+function ringContains(ring, x, y) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)
+      inside = !inside;
+  }
+  return inside;
+}
+
+/** Whether a Polygon/MultiPolygon feature contains [lon, lat] (holes excluded). */
+function featureContains(feature, lon, lat) {
+  return polygonsOf(feature.geometry).some(
+    ([outer, ...holes]) =>
+      outer &&
+      ringContains(outer, lon, lat) &&
+      !holes.some((hole) => ringContains(hole, lon, lat)),
+  );
+}
+
+/** Center of a feature's bounding box, [lon, lat] degrees (null if empty). */
+function featureCenter(feature) {
+  let w = Infinity;
+  let s = Infinity;
+  let e = -Infinity;
+  let n = -Infinity;
+  for (const rings of polygonsOf(feature.geometry)) {
+    for (const [lon, lat] of rings[0] || []) {
+      if (lon < w) w = lon;
+      if (lat < s) s = lat;
+      if (lon > e) e = lon;
+      if (lat > n) n = lat;
+    }
+  }
+  return Number.isFinite(w) ? [(w + e) / 2, (s + n) / 2] : null;
+}
 
 /**
  * Chunks whose bbox intersects the view rectangle, nearest center first.
@@ -224,8 +272,15 @@ export function createChunkedAreaLayer(
     }
   }
 
+  /** The latest reconcile, so readers can wait for the view to finish loading. */
+  let currentRefresh = Promise.resolve();
+  function refresh() {
+    currentRefresh = reconcileView();
+    return currentRefresh;
+  }
+
   /** Reconcile the drawn chunks with the current camera view. */
-  async function refresh() {
+  async function reconcileView() {
     if (!enabled || destroyed || !viewer) return;
     const gen = ++generation;
     const height = viewer.camera.positionCartographic?.height;
@@ -437,6 +492,74 @@ export function createChunkedAreaLayer(
     }),
     setRowControlsListener: (listener) => {
       rowControlsListener = typeof listener === 'function' ? listener : null;
+    },
+
+    /**
+     * What this layer shows around a point, for voice and other readers: the
+     * area containing the point (if loaded), the nearest other areas, and the
+     * legend counts over what is loaded. Areas only exist in chunks that are
+     * drawn, so a zoomed-out or disabled layer reports its status instead.
+     * @param {{longitude:number, latitude:number, limit?:number}} point
+     * @returns {Promise<object>}
+     */
+    getAreaContext: async ({ longitude, latitude, limit = 5 } = {}) => {
+      const base = { layerId: id, layerName: name, source };
+      // Right after a fly-to the chunks for the new view may not even have
+      // started loading: reconcile with the current camera now and wait
+      // (bounded), following any newer reconcile that supersedes ours, so the
+      // answer covers where the camera is now.
+      if (enabled && !destroyed && viewer) {
+        const deadline = Date.now() + AREA_CONTEXT_WAIT_MS;
+        let awaited = refresh();
+        for (;;) {
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) break;
+          await Promise.race([
+            awaited.catch(() => {}),
+            new Promise((resolve) => setTimeout(resolve, remaining)),
+          ]);
+          if (currentRefresh === awaited || Date.now() >= deadline) break;
+          awaited = currentRefresh;
+        }
+      }
+      if (!enabled) return { ...base, status: 'disabled' };
+      if (status === 'zoom-in')
+        return { ...base, status: 'zoom-in', statusMessage: zoomInMessage };
+      const withNote = (properties) => ({
+        ...properties,
+        ...(sourceNote && { source_note: sourceNote }),
+      });
+      let atPoint = null;
+      const nearby = [];
+      for (const chunkId of drawn.keys()) {
+        for (const feature of cache.get(chunkId) || []) {
+          if (!atPoint && featureContains(feature, longitude, latitude)) {
+            atPoint = feature;
+            continue;
+          }
+          const center = featureCenter(feature);
+          if (!center) continue;
+          const dx =
+            (center[0] - longitude) * Math.cos((latitude * Math.PI) / 180);
+          const dy = center[1] - latitude;
+          nearby.push({ feature, d2: dx * dx + dy * dy });
+        }
+      }
+      nearby.sort((a, b) => a.d2 - b.d2);
+      return {
+        ...base,
+        status: 'loaded',
+        loadedAreas: loadedCount(),
+        atPoint: atPoint ? withNote(atPoint.properties || {}) : null,
+        nearby: nearby.slice(0, Math.max(0, limit)).map(({ feature, d2 }) => ({
+          ...withNote(feature.properties || {}),
+          distanceKm: Math.round(Math.sqrt(d2) * 111.2 * 10) / 10,
+        })),
+        legend: legend.map((item) => ({
+          label: item.label,
+          count: countBy(item.test),
+        })),
+      };
     },
 
     /** Test/QA seam: chunk ids currently drawn. */

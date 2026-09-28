@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { GEV_ACTION_SCHEMAS, createActionTools } from './actionSchemas.js';
 import { GEV_REALTIME_TOOLS } from '../../server/providers/openai/tools.js';
+import { REGISTERED_LAYER_IDS } from '../data/layerState.js';
 
 const stable = (value) =>
   Array.isArray(value)
@@ -16,13 +17,37 @@ const stable = (value) =>
       : value;
 
 test('the complete Realtime tool payload retains its pre-extraction contract and wording', () => {
+  // The layer enums are the layer registry (pinned by the next test), so a
+  // newly registered layer does not move this digest.
+  const registry = REGISTERED_LAYER_IDS.join();
+  const layerList = (key, value) =>
+    Array.isArray(value) && value.join() === registry
+      ? 'REGISTERED_LAYER_IDS'
+      : value;
   const digest = createHash('sha256')
-    .update(JSON.stringify(stable(GEV_REALTIME_TOOLS)))
+    .update(JSON.stringify(stable(GEV_REALTIME_TOOLS), layerList))
     .digest('hex');
   assert.equal(
     digest,
-    '956381c3456d3644ed7c9cda72910dc68a34d9191e0b3e414ee200c348245214',
+    // Updated 2026-09-27: get_entity_context documents its `areas` answer and
+    // the three layer enums became every registered layer.
+    '4b80c26f06252e53e4753469470aa1466787dbeebfdaddfa662465393b8ce0e8',
   );
+});
+
+test('every registered data layer is voice-controllable, including future ones', () => {
+  for (const name of [
+    'set_layer_visibility',
+    'show_data_layers_menu',
+    'get_entity_context',
+  ]) {
+    const schema = GEV_ACTION_SCHEMAS.find((item) => item.name === name);
+    assert.deepEqual(
+      [...schema.parameters.properties.layerId.enum],
+      [...REGISTERED_LAYER_IDS],
+      name,
+    );
+  }
 });
 
 test('descriptions customize wording without changing immutable shared arguments', () => {

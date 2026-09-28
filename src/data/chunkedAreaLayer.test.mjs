@@ -254,6 +254,69 @@ test('clicking an area selects it with its summary', async () => {
   }
 });
 
+test('area context names the area under a point, its neighbors and the legend (voice)', async () => {
+  const env = await createHarness({
+    layerOptions: { sourceNote: 'USALEEP tract life expectancy.' },
+  });
+  try {
+    await env.layer.enable(env.viewer);
+    const context = await env.layer.getAreaContext({
+      longitude: -87.662,
+      latitude: 42.015,
+    });
+    assert.equal(context.status, 'loaded');
+    assert.equal(context.layerId, 'local-life-expectancy');
+    assert.equal(context.atPoint.name, 'Census Tract 101, Cook County, IL');
+    assert.equal(context.atPoint.life_exp_8, 68.8);
+    assert.equal(context.atPoint.source_note, 'USALEEP tract life expectancy.');
+    assert.deepEqual(context.legend, [{ label: 'low', count: 1 }]);
+
+    // Outside every area: no atPoint, but the nearest area with its distance.
+    const nearby = await env.layer.getAreaContext({
+      longitude: -87.7,
+      latitude: 41.9,
+    });
+    assert.equal(nearby.atPoint, null);
+    assert.equal(nearby.nearby[0].name, 'Census Tract 101, Cook County, IL');
+    assert.ok(nearby.nearby[0].distanceKm > 5);
+
+    env.layer.disable(env.viewer);
+    assert.equal(
+      (await env.layer.getAreaContext({ longitude: -87.662, latitude: 42.015 }))
+        .status,
+      'disabled',
+    );
+  } finally {
+    env.cleanup();
+  }
+  const high = await createHarness({ heightM: 5_000_000 });
+  try {
+    await high.layer.enable(high.viewer);
+    const context = await high.layer.getAreaContext({
+      longitude: -87.662,
+      latitude: 42.015,
+    });
+    assert.equal(context.status, 'zoom-in');
+    assert.match(context.statusMessage, /zoom in/);
+  } finally {
+    high.cleanup();
+  }
+});
+
+test('fillAlpha sets the area fill opacity', async () => {
+  const env = await createHarness({ layerOptions: { fillAlpha: 0.6 } });
+  try {
+    await env.layer.enable(env.viewer);
+    const entity = env.added[0].entities.values[0];
+    const color = entity.polygon.material.color.getValue(
+      Cesium.JulianDate.now(),
+    );
+    assert.ok(Math.abs(color.alpha - 0.6) < 1e-6);
+  } finally {
+    env.cleanup();
+  }
+});
+
 test('disable releases every drawn county', async () => {
   const env = await createHarness();
   try {

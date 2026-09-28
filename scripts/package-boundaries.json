@@ -272,6 +272,7 @@
       "src/hudSummaryResponse.js",
       "src/voice/voiceCost.js",
       "src/voice/actionSchemas.js",
+      "src/data/layerState.js",
       "server/providers/openai/toolDescriptions.js",
       "src/sources/rateLimit.js"
     ],
@@ -2421,7 +2422,7 @@
   },
   "voice-action-schemas": {
     "exports": ["./voice/action-schemas"],
-    "modules": ["src/voice/actionSchemas.js"],
+    "modules": ["src/data/layerState.js", "src/voice/actionSchemas.js"],
     "external": []
   },
   "voice-session": {

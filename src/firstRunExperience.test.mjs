@@ -1,6 +1,7 @@
 import { expandApplicationHtml } from '../build/application-html.js';
 import { readStylesheet } from './testSupport/readStylesheet.mjs';
 import { GEV_REALTIME_TOOLS } from '../server/providers/openai/tools.js';
+import { REGISTERED_LAYER_IDS } from './data/layerState.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -661,11 +662,18 @@ test('the voice TOOL SCHEMA matches the pinned release — the mission mapping i
   // Canonical serialization pins every tool name, description, property and
   // ordering while allowing source formatting. Derived from the unchanged
   // release schema before formatting (the previous source-byte pin passed).
-  const block = JSON.stringify(GEV_REALTIME_TOOLS);
-  assert.equal(block.length, 26208, 'serialized tool schema length drifted');
+  // Re-derived 2026-09-27: life expectancy, cluster, HOLC, Miami hotspot, public housing, trauma center and GVA layers joined the
+  // layer enums and get_entity_context documents its `areas` answer.
+  // Re-derived again 2026-09-27: the three layer enums are now the layer
+  // registry (pinned in actionSchemas.test.mjs), so they are left out here
+  // and registering a new layer does not move this pin.
+  const registry = REGISTERED_LAYER_IDS.join();
+  const block = JSON.stringify(GEV_REALTIME_TOOLS, (key, value) =>
+    Array.isArray(value) && value.join() === registry ? 'REGISTERED_LAYER_IDS' : value);
+  assert.equal(block.length, 27058, 'serialized tool schema length drifted');
   assert.equal(
     crypto.createHash('sha256').update(block).digest('hex'),
-    '135d4ec66239777da34a8476cdf8348574421d7afd2e981cc3490909a5bc8686',
+    '6a2377e25426e827c76febee7528acf9bfd2b7275bb5c25759b9f83e32771d32',
     'the first-run missions must ride EXISTING tools: no schema edit, no cache bust',
   );
   const instructions = fs.readFileSync(new URL('../server/providers/openai/instructions.js', import.meta.url), 'utf8');

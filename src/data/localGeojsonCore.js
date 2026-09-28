@@ -131,47 +131,6 @@ export function localInfrastructureOverlayCopy(properties, layerId) {
         time ? `Video ${time} · click for details` : props.coordinate_note,
       ),
     );
-  } else if (layerId === 'local-gva-2015' || layerId === 'local-mkdb') {
-    const toll = [
-      Number(props.killed) > 0 ? `${props.killed} killed` : '',
-      Number(props.injured) > 0 ? `${props.injured} injured` : '',
-    ]
-      .filter(Boolean)
-      .join(', ');
-    details.push(clampCardLine([props.date, toll].filter(Boolean).join(' · ')));
-    if (layerId === 'local-mkdb') {
-      const how = [props.weapon, props.situation].filter(Boolean).join(' · ');
-      if (how) details.push(clampCardLine(how));
-    }
-    details.push('Click for details');
-  } else if (layerId === 'local-trauma-centers') {
-    const level = firstClean([props.trauma_level]);
-    if (level) details.push(clampCardLine(`${level} trauma center`));
-    details.push('Click for details');
-  } else if (layerId === 'local-public-housing') {
-    const first = Number(props.construct_year);
-    const last = Number(props.construct_year_last);
-    details.push(
-      clampCardLine(
-        first > 0
-          ? `Built ${first}${last > first ? `–${last}` : ''}`
-          : 'Construction year unknown',
-      ),
-    );
-    if (Number(props.units) > 0) {
-      details.push(
-        clampCardLine(`${props.buildings} bldg · ${props.units} units`),
-      );
-    }
-  } else if (layerId.startsWith('local-miami-homicides-')) {
-    const victim = [
-      Number(props.age) > 0 ? `Age ${props.age}` : '',
-      cleanLabel(props.victim_group),
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    if (victim) details.push(clampCardLine(victim));
-    details.push('Click for details');
   } else if (layerId === 'local-famous-shootings') {
     // Descriptions open with the date, then a one-line summary.
     const lines = String(props.description ?? '')
@@ -450,77 +409,6 @@ export function localDatasetError(error) {
 }
 
 /**
- * Fetch and parse a GeoJSON Lines (.geojsonl) file into Feature objects.
- * @param {string} url
- * @param {AbortSignal} [signal]
- * @returns {Promise<object[]>}
- */
-async function fetchGeoJsonLines(url, signal) {
-  const response = await fetch(url, { signal });
-  // A 404 returns an HTML body that would otherwise die in JSON.parse one line
-  // later, reported as a parse error for a missing file.
-  if (!response.ok) throw new Error(`HTTP ${response.status ?? '?'}`);
-  const text = await response.text();
-  return text
-    .split('\n')
-    .filter((l) => l.trim().length > 0)
-    .map((line) => JSON.parse(line));
-}
-
-/**
- * One download and parse of a GeoJSON Lines file shared by several layers
- * (pass it as `featureSource`). The download is aborted only when every layer
- * waiting on it has aborted; a failed load is forgotten so the next enable
- * retries.
- * @param {string} url
- * @returns {{load: function(AbortSignal=): Promise<object[]>}}
- */
-export function createSharedGeoJsonLinesSource(url) {
-  let pending = null;
-  let settled = null;
-  return {
-    load(signal) {
-      if (settled) return settled;
-      if (!pending) {
-        const controller = new AbortController();
-        const state = { controller, waiting: 0, promise: null };
-        state.promise = fetchGeoJsonLines(url, controller.signal).then(
-          (features) => {
-            if (pending === state) pending = null;
-            settled = Promise.resolve(features);
-            return features;
-          },
-          (error) => {
-            if (pending === state) pending = null;
-            throw error;
-          },
-        );
-        pending = state;
-      }
-      const state = pending;
-      state.waiting += 1;
-      let left = false;
-      const leave = (abort) => {
-        if (left) return;
-        left = true;
-        state.waiting -= 1;
-        if (abort && state.waiting === 0) {
-          if (pending === state) pending = null;
-          state.controller.abort();
-        }
-      };
-      const onAbort = () => leave(true);
-      if (signal?.aborted) onAbort();
-      else signal?.addEventListener?.('abort', onAbort, { once: true });
-      return state.promise.finally(() => {
-        signal?.removeEventListener?.('abort', onAbort);
-        leave(false);
-      });
-    },
-  };
-}
-
-/**
  * A minimal, rock-solid native implementation for loading local GeoJSON Data.
  * Draws 3D stems (polylines) attached to Point entities and ensures
  * standard scene.pick natively clicks them.
@@ -552,12 +440,6 @@ export function createLocalGeoJsonLayer(
     // fill, pins or picking), so a names layer can pair with a fill-only
     // layer over the same data and each can be switched on alone.
     areaNamesOnly = false,
-    // Optional shared loader (createSharedGeoJsonLinesSource) so layers drawn
-    // from the same file download and parse it once.
-    featureSource = null,
-    // Optional panel legend: [{label, color, test(properties)}], counted over
-    // the whole dataset.
-    legend = null,
     screenSpaceEventHandlerFactory = (canvas) =>
       new Cesium.ScreenSpaceEventHandler(canvas),
     projectToWindow = (scene, position) =>
@@ -602,9 +484,6 @@ export function createLocalGeoJsonLayer(
    * @type {Array<object>|null}
    */
   let _cachedFeatures = null;
-  /** Legend counts over `_cachedFeatures` (null until loaded). */
-  let _legendCounts = null;
-  let _rowControlsListener = null;
   /**
    * Globe-LOD active set: the record ids allowed to carry a live stem right
    * now. This bounds geometry refreshes and ground-sample work to the
@@ -842,80 +721,6 @@ export function createLocalGeoJsonLayer(
       if (_enabled) governorRequestRender(`local-area-labels:${id}`);
     },
 
-    ...(legend && {
-      getRowControls: () => ({
-        chips: [],
-        legend:
-          _enabled && _legendCounts
-            ? legend.map((item, index) => ({
-                label: item.label,
-                color: item.color,
-                count: _legendCounts[index],
-              }))
-            : [],
-      }),
-      setRowControlsListener: (listener) => {
-        _rowControlsListener = typeof listener === 'function' ? listener : null;
-      },
-    }),
-
-    /**
-     * The layer's features nearest a point, for voice and other readers:
-     * the closest `limit` (with straight-line distanceKm), how many lie within
-     * `radiusKm`, and the legend counts. Works at any camera height because
-     * it reads the loaded dataset, not what is drawn on screen.
-     * @param {{longitude:number, latitude:number, limit?:number, radiusKm?:number}} point
-     * @returns {Promise<object>}
-     */
-    getAreaContext: async ({
-      longitude,
-      latitude,
-      limit = 5,
-      radiusKm = 5,
-    } = {}) => {
-      // A names-only layer mirrors another layer's features; it has no answer.
-      if (areaNamesOnly) return null;
-      const base = { layerId: id, layerName: name, source };
-      if (!_enabled) return { ...base, status: 'disabled' };
-      if (!_cachedFeatures) {
-        await _loadPromise?.catch(() => {});
-        if (!_cachedFeatures) return { ...base, status: 'loading' };
-      }
-      const nearby = [];
-      let within = 0;
-      for (const feature of _cachedFeatures) {
-        const center = featureLonLat(feature);
-        if (!center) continue;
-        const km = approximateKm(longitude, latitude, center[0], center[1]);
-        if (km <= radiusKm) within += 1;
-        nearby.push({ feature, km });
-      }
-      nearby.sort((a, b) => a.km - b.km);
-      return {
-        ...base,
-        status: 'loaded',
-        loadedFeatures: _cachedFeatures.length,
-        withinKm: radiusKm,
-        countWithin: within,
-        // Flat fields only: nested blobs (e.g. OSM tag bundles) bloat voice.
-        nearby: nearby.slice(0, Math.max(0, limit)).map(({ feature, km }) => ({
-          ...Object.fromEntries(
-            Object.entries(feature.properties || {}).filter(
-              ([, value]) => value === null || typeof value !== 'object',
-            ),
-          ),
-          distanceKm: Math.round(km * 10) / 10,
-        })),
-        ...(legend &&
-          _legendCounts && {
-            legend: legend.map((item, index) => ({
-              label: item.label,
-              count: _legendCounts[index],
-            })),
-          }),
-      };
-    },
-
     getLodDiagnostics: () => ({
       total: _stemRecords.length,
       active: _activeLodIds.size,
@@ -957,10 +762,22 @@ export function createLocalGeoJsonLayer(
             try {
               let features = _cachedFeatures;
               if (!features) {
-                features = await (featureSource
-                  ? featureSource.load(_loadController.signal)
-                  : fetchGeoJsonLines(url, _loadController.signal));
+                const response = await fetch(url, {
+                  signal: _loadController.signal,
+                });
                 if (_destroyed) return;
+                // A 404 returns an HTML body that would otherwise die in JSON.parse
+                // one line later, reported as a parse error for a missing file.
+                if (!response.ok) {
+                  throw new Error(`HTTP ${response.status ?? '?'}`);
+                }
+                const text = await response.text();
+                if (_destroyed) return;
+                const lines = text
+                  .split('\n')
+                  .filter((l) => l.trim().length > 0);
+
+                features = lines.map((line) => JSON.parse(line));
                 _cachedFeatures = features;
               }
 
@@ -1193,18 +1010,6 @@ export function createLocalGeoJsonLayer(
               // Setup finished — publish it.
               _dataSource = loaded;
               _lastUpdate = Date.now();
-              if (legend && !_legendCounts) {
-                _legendCounts = legend.map(
-                  (item) =>
-                    _cachedFeatures.filter((f) => item.test(f.properties || {}))
-                      .length,
-                );
-              }
-              try {
-                _rowControlsListener?.();
-              } catch {
-                /* the panel re-renders on its own cadence too */
-              }
             } catch (e) {
               // The dataset ships with the build, so this is a broken install,
               // not a blip — it has to reach the chip, not just the console.
@@ -1713,46 +1518,13 @@ function clampLabel(value) {
 }
 
 /**
- * Whether a feature carries source notes (a caption summary, source link or
- * incident summary) that the details card can show.
+ * Whether a feature carries source notes (a caption summary or source link)
+ * that the details card can show.
  * @param {object} properties Unwrapped feature properties.
  * @returns {boolean}
  */
 function hasSourceNotes(properties) {
-  return Boolean(
-    properties?.video_summary || properties?.video_url || properties?.summary,
-  );
-}
-
-/** [lon, lat] of a Point, or the bounding-box center of any other geometry. */
-function featureLonLat(feature) {
-  const geometry = feature?.geometry;
-  if (geometry?.type === 'Point') return geometry.coordinates;
-  let w = Infinity;
-  let s = Infinity;
-  let e = -Infinity;
-  let n = -Infinity;
-  const visit = (value) => {
-    if (typeof value?.[0] === 'number') {
-      if (value[0] < w) w = value[0];
-      if (value[0] > e) e = value[0];
-      if (value[1] < s) s = value[1];
-      if (value[1] > n) n = value[1];
-    } else if (Array.isArray(value)) value.forEach(visit);
-  };
-  visit(geometry?.coordinates);
-  return Number.isFinite(w) ? [(w + e) / 2, (s + n) / 2] : null;
-}
-
-/** Great-circle distance in km between two lon/lat points. */
-function approximateKm(lon1, lat1, lon2, lat2) {
-  const rad = Math.PI / 180;
-  const a =
-    Math.sin(((lat2 - lat1) * rad) / 2) ** 2 +
-    Math.cos(lat1 * rad) *
-      Math.cos(lat2 * rad) *
-      Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
-  return 12742 * Math.asin(Math.sqrt(a));
+  return Boolean(properties?.video_summary || properties?.video_url);
 }
 
 /** Overlay hit-test filter: a clickable card published by a local layer. */
@@ -1816,10 +1588,5 @@ function layerTitle(layerId) {
   if (layerId === 'local-chicago-events') return 'Event';
   if (layerId === 'local-gang-map') return 'Hood';
   if (layerId === 'local-famous-shootings') return 'Shooting';
-  if (layerId?.startsWith('local-miami-homicides-')) return 'Homicide';
-  if (layerId === 'local-trauma-centers') return 'Trauma center';
-  if (layerId === 'local-gva-2015') return 'Gun death';
-  if (layerId === 'local-mkdb') return 'Mass killing';
-  if (layerId === 'local-public-housing') return 'Public housing';
   return 'Feature';
 }

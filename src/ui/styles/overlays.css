@@ -106,9 +106,9 @@
   transition:
     opacity 0.4s ease,
     visibility 0.4s ease;
-  --hud-color: rgba(201, 201, 201, 0.6);
-  --hud-glow: rgba(201, 201, 201, 0.4);
-  --hud-border: rgba(201, 201, 201, 0.15);
+  --hud-color: rgba(0, 255, 255, 0.6);
+  --hud-glow: rgba(0, 255, 255, 0.4);
+  --hud-border: rgba(0, 255, 255, 0.15);
 }
 
 #intel-hud.active {
@@ -316,7 +316,7 @@
   transform: translateX(-50%);
   border-color: rgba(255, 255, 255, 0.24);
   background: linear-gradient(90deg, rgba(0, 0, 0, 0.56), rgba(8, 26, 34, 0.5));
-  box-shadow: 0 0 24px rgba(201, 201, 201, 0.08);
+  box-shadow: 0 0 24px rgba(0, 255, 255, 0.08);
 }
 
 #intel-hud[data-variant='tactical'] .hud-top-left,

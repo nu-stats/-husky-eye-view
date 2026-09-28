@@ -272,7 +272,6 @@
       "src/hudSummaryResponse.js",
       "src/voice/voiceCost.js",
       "src/voice/actionSchemas.js",
-      "src/data/layerState.js",
       "server/providers/openai/toolDescriptions.js",
       "src/sources/rateLimit.js"
     ],
@@ -510,7 +509,6 @@
       "src/ui/applicationShell.js",
       "src/ui/localSelectionCard.js",
       "src/ui/mapLabelControls.js",
-      "src/ui/renderSpeedControls.js",
       "src/ui/locationNavigation.js",
       "src/ui/cockpitCoordinator.js",
       "src/ui/cameraOrientationControls.js",
@@ -1631,7 +1629,6 @@
       "src/ui/applicationShell.js",
       "src/ui/localSelectionCard.js",
       "src/ui/mapLabelControls.js",
-      "src/ui/renderSpeedControls.js",
       "src/ui/locationNavigation.js",
       "src/ui/cockpitCoordinator.js",
       "src/ui/cameraOrientationControls.js",
@@ -2424,7 +2421,7 @@
   },
   "voice-action-schemas": {
     "exports": ["./voice/action-schemas"],
-    "modules": ["src/data/layerState.js", "src/voice/actionSchemas.js"],
+    "modules": ["src/voice/actionSchemas.js"],
     "external": []
   },
   "voice-session": {

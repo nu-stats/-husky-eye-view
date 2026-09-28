@@ -11,10 +11,9 @@
         stroke-width: 1px;
       }
 
-      /* Northeastern colors: black, grey, red and white. */
       .cls-1 {
-        fill: #111111b3;
-        stroke: #a2aaad;
+        fill: #4454727a;
+        stroke: #48b;
         stroke-width: 10px;
       }
 
@@ -23,11 +22,11 @@
       }
 
       .cls-2 {
-        fill: #c8102e;
+        fill: #00f6ff;
       }
 
       .cls-3 {
-        stroke: #ffffff;
+        stroke: #00f6ff;
         stroke-linecap: round;
         stroke-width: 6.99px;
       }
@@ -47,7 +46,7 @@
       /* Husky head in the pupil (Northeastern red, black and white). */
       .husky-pupil {
         fill: #101217;
-        stroke: #ffffff;
+        stroke: #c8102e;
         stroke-width: 8px;
       }
 
@@ -67,7 +66,7 @@
       }
 
       .husky-eye {
-        fill: #d0d3d4;
+        fill: #8fe3ff;
         stroke: #000;
         stroke-width: 2.5px;
       }

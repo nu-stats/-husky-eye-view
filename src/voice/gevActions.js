@@ -221,53 +221,6 @@ const LAYER_ALIASES = new Map([
   ['license plate readers', 'alpr-cameras'],
   ['license plate cameras', 'alpr-cameras'],
   ['plate readers', 'alpr-cameras'],
-  ['life expectancy', 'local-life-expectancy'],
-  ['tract life expectancy', 'local-life-expectancy'],
-  ['life expectancy tracts', 'local-life-expectancy'],
-  ['county life expectancy', 'local-county-life-expectancy'],
-  ['life expectancy counties', 'local-county-life-expectancy'],
-  ['life expectancy clusters', 'local-tract-le-clusters'],
-  ['tract clusters', 'local-tract-le-clusters'],
-  ['life expectancy hot spots', 'local-tract-le-clusters'],
-  ['county clusters', 'local-county-le-clusters'],
-  ['county life expectancy clusters', 'local-county-le-clusters'],
-  ['holc', 'local-holc-redlining'],
-  ['redlining', 'local-holc-redlining'],
-  ['holc redlining', 'local-holc-redlining'],
-  ['redlining map', 'local-holc-redlining'],
-  ['miami hotspots', 'local-miami-homicide-hotspots'],
-  ['miami homicide hotspots', 'local-miami-homicide-hotspots'],
-  ['homicide hotspots', 'local-miami-homicide-hotspots'],
-  ['public housing', 'local-public-housing'],
-  ['housing projects', 'local-public-housing'],
-  ['projects', 'local-public-housing'],
-  ['trauma centers', 'local-trauma-centers'],
-  ['trauma centres', 'local-trauma-centers'],
-  ['trauma units', 'local-trauma-centers'],
-  ['hospitals', 'local-trauma-centers'],
-  ['gun deaths', 'local-gva-2015'],
-  ['gun violence', 'local-gva-2015'],
-  ['gva', 'local-gva-2015'],
-  ['chicago events', 'local-chicago-events'],
-  ['chicago homicides', 'local-chicago-events'],
-  ['gang map', 'local-gang-map'],
-  ['gang territories', 'local-gang-map'],
-  ['gangs', 'local-gang-map'],
-  ['gang names', 'local-gang-map-labels'],
-  ['gang labels', 'local-gang-map-labels'],
-  ['famous shootings', 'local-famous-shootings'],
-  ['shootings', 'local-famous-shootings'],
-  ['miami homicides 1950s', 'local-miami-homicides-1950s'],
-  ['miami homicides 1960s', 'local-miami-homicides-1960s'],
-  ['miami homicides 1970s', 'local-miami-homicides-1970s'],
-  ['miami homicides 1980s', 'local-miami-homicides-1980s'],
-  ['miami homicides 1990s', 'local-miami-homicides-1990s'],
-  ['miami homicides 2000s', 'local-miami-homicides-2000s'],
-  ['mkdb', 'local-mkdb'],
-  ['mass killings', 'local-mkdb'],
-  ['mass killing database', 'local-mkdb'],
-  ['transit', 'transit'],
-  ['directions', 'directions'],
 ]);
 
 const CITY_ALIASES = new Map([
@@ -412,7 +365,7 @@ export function createGevActionRunner({
     }
 
     if (name === 'set_layer_visibility') {
-      const layerId = resolveLayerId(dataManager, args.layerId);
+      const layerId = normalizeLayerId(args.layerId);
       if (!layerId) {
         throw new Error(`Unknown data layer: ${args.layerId || 'missing'}`);
       }
@@ -938,7 +891,7 @@ export function createGevActionRunner({
     }
 
     if (name === 'show_data_layers_menu') {
-      const layerId = resolveLayerId(dataManager, args.layerId || args.layer);
+      const layerId = normalizeLayerId(args.layerId || args.layer);
       setPanelOpen(styleManager, 'data-panel', true);
       const focusedLayer =
         layerId && dataManager.layers.has(layerId)
@@ -2720,20 +2673,6 @@ function normalizeLayerId(value) {
   return raw;
 }
 
-/**
- * Normalize a layer id, falling back to the panel name ("Chicago Events"), so
- * a layer added later is reachable by its spoken name without a new alias.
- */
-function resolveLayerId(dataManager, value) {
-  const layerId = normalizeLayerId(value);
-  if (!layerId || dataManager?.layers?.has(layerId)) return layerId;
-  const wanted = layerId.toLowerCase();
-  const match = dataManager
-    ?.getAll?.()
-    .find((layer) => String(layer.name || '').toLowerCase() === wanted);
-  return match?.id || layerId;
-}
-
 function normalizeCockpitTargetLayer(value) {
   const layerId = normalizeLayerId(value);
   if (!layerId || !COCKPIT_TARGET_LAYERS.has(layerId)) return null;
@@ -3098,11 +3037,8 @@ async function getEntityContext(
   service = defaultGeospatial,
 ) {
   const startedAt = performance.now();
-  // A question asked right after a fly-to must be answered for where the
-  // camera lands, not where it was when the flight began.
-  await waitForCameraFlight(viewer);
   const scope = String(args.scope || 'auto').toLowerCase();
-  const layerId = resolveLayerId(dataManager, args.layerId || args.layer);
+  const layerId = normalizeLayerId(args.layerId || args.layer);
   const limit = Math.round(clampNumber(args.limit, 1, 12, 5));
   const selected = selectedEntityContext(dataManager);
   const cameraHeightM = viewer.camera.positionCartographic.height;
@@ -3124,11 +3060,6 @@ async function getEntityContext(
           target: viewTarget,
         })
       : [];
-  const areas = await areaLayerContexts(viewer, dataManager, {
-    layerId,
-    limit,
-    target: viewTarget,
-  });
   const scene = await scenePromise;
 
   if ((scope === 'selected' || scope === 'auto') && selected) {
@@ -3139,7 +3070,6 @@ async function getEntityContext(
       scope: 'selected',
       scene,
       selected,
-      ...(areas.length ? { areas } : {}),
     };
   }
 
@@ -3153,67 +3083,7 @@ async function getEntityContext(
     visible,
     count: visible.length,
     visibleScanSkipped: !shouldScanVisibleEntities(cameraHeightM),
-    ...(areas.length ? { areas } : {}),
   };
-}
-
-/**
- * Wait (bounded) while a camera flight is in progress. Cesium keeps the
- * active flight on camera._currentFlight; without one this returns at once.
- */
-async function waitForCameraFlight(viewer, maxMs = 8000) {
-  const started = performance.now();
-  while (
-    viewer?.camera?._currentFlight &&
-    performance.now() - started < maxMs
-  ) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-}
-
-/**
- * Area and point layers (life expectancy, clusters, HOLC, public housing,
- * trauma centers...) answer for the view center directly: area layers draw in
- * batches the visible-entity scan cannot see, and point layers only register
- * what is on screen when zoomed in. Each enabled layer with getAreaContext
- * reports the area under the point (or its nearest sites), neighbors and
- * legend counts.
- */
-export async function areaLayerContexts(
-  viewer,
-  dataManager,
-  { layerId = null, limit = 5, target = null } = {},
-) {
-  // The screen-center pick can misfire right after a flight (a tilted, low
-  // camera or a frame not yet drawn returns a point thousands of km away);
-  // then the ground under the camera is the honest "here".
-  const camera = viewer.camera.positionCartographic;
-  const plausibleKm = Math.max(25, (camera.height / 1000) * 4);
-  const point =
-    target &&
-    haversineKm(
-      Cesium.Math.toDegrees(camera.latitude),
-      Cesium.Math.toDegrees(camera.longitude),
-      Cesium.Math.toDegrees(target.latitude),
-      Cesium.Math.toDegrees(target.longitude),
-    ) <= plausibleKm
-      ? target
-      : camera;
-  const longitude = Cesium.Math.toDegrees(point.longitude);
-  const latitude = Cesium.Math.toDegrees(point.latitude);
-  const pending = [];
-  for (const layer of dataManager.getAll()) {
-    if (!layer.enabled || (layerId && layer.id !== layerId)) continue;
-    const module = dataManager.layers?.get(layer.id)?.module;
-    if (typeof module?.getAreaContext !== 'function') continue;
-    // One layer's failure must not sink the whole context answer.
-    pending.push(
-      Promise.resolve()
-        .then(() => module.getAreaContext({ longitude, latitude, limit }))
-        .catch(() => null),
-    );
-  }
-  return (await Promise.all(pending)).filter(Boolean);
 }
 
 /**

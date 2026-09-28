@@ -21,11 +21,11 @@
   background:
     linear-gradient(145deg, rgba(10, 27, 37, 0.97), rgba(7, 13, 22, 0.95)),
     rgba(7, 17, 25, 0.96);
-  border: 1px solid rgba(187, 187, 187, 0.42);
+  border: 1px solid rgba(54, 220, 255, 0.42);
   border-radius: 0.65rem;
   box-shadow:
     0 1.4rem 4.5rem rgba(0, 0, 0, 0.72),
-    0 0 2.5rem rgba(170, 170, 170, 0.09),
+    0 0 2.5rem rgba(0, 212, 255, 0.09),
     inset 0 0 0 1px rgba(255, 255, 255, 0.025);
   backdrop-filter: blur(28px) saturate(1.25);
   -webkit-backdrop-filter: blur(28px) saturate(1.25);
@@ -60,10 +60,10 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(187, 187, 187, 0.8),
+    rgba(54, 220, 255, 0.8),
     transparent
   );
-  box-shadow: 0 0 1rem rgba(187, 187, 187, 0.45);
+  box-shadow: 0 0 1rem rgba(54, 220, 255, 0.45);
   pointer-events: none;
 }
 
@@ -81,7 +81,7 @@
 }
 
 .first-run-kicker {
-  color: rgba(187, 187, 187, 0.86);
+  color: rgba(54, 220, 255, 0.86);
 }
 
 #first-run-launcher h2 {
@@ -112,7 +112,7 @@
   scroll-behavior: smooth;
   /* A visible, non-overlaying affordance that the list continues. */
   scrollbar-width: thin;
-  scrollbar-color: rgba(187, 187, 187, 0.45) transparent;
+  scrollbar-color: rgba(54, 220, 255, 0.45) transparent;
   scrollbar-gutter: stable;
 }
 
@@ -120,7 +120,7 @@
   width: 6px;
 }
 .first-run-choices::-webkit-scrollbar-thumb {
-  background: rgba(187, 187, 187, 0.45);
+  background: rgba(54, 220, 255, 0.45);
   border-radius: 3px;
 }
 
@@ -135,7 +135,7 @@
   color: rgba(225, 244, 248, 0.92);
   text-align: left;
   background: rgba(29, 69, 81, 0.18);
-  border: 1px solid rgba(180, 180, 180, 0.18);
+  border: 1px solid rgba(100, 200, 220, 0.18);
   border-radius: 0.42rem;
   cursor: pointer;
   transition:
@@ -146,8 +146,8 @@
 
 .first-run-choices button:hover,
 .first-run-choices button:focus-visible {
-  background: rgba(126, 126, 126, 0.16);
-  border-color: rgba(187, 187, 187, 0.62);
+  background: rgba(25, 151, 178, 0.16);
+  border-color: rgba(54, 220, 255, 0.62);
   outline: none;
   transform: translateX(2px);
 }
@@ -162,7 +162,7 @@
 }
 
 .first-run-choices button > .material-symbols-outlined:first-child {
-  color: #c3c3c3;
+  color: #55dff5;
   font-size: 1.35rem;
 }
 
@@ -185,7 +185,7 @@
 }
 
 .first-run-arrow {
-  color: rgba(187, 187, 187, 0.4);
+  color: rgba(54, 220, 255, 0.4);
   font-size: 1rem;
   transition:
     transform var(--transition-fast),
@@ -194,7 +194,7 @@
 
 .first-run-choices button:hover .first-run-arrow,
 .first-run-choices button:focus-visible .first-run-arrow {
-  color: rgba(187, 187, 187, 0.9);
+  color: rgba(54, 220, 255, 0.9);
   transform: translateX(2px);
 }
 
@@ -224,7 +224,7 @@
   width: 0.82rem;
   height: 0.82rem;
   margin: 0;
-  accent-color: #bbbbbb;
+  accent-color: #36dcff;
   cursor: pointer;
 }
 
@@ -244,7 +244,7 @@
 }
 
 #first-run-launcher[data-state='loading'] .first-run-note {
-  color: rgba(187, 187, 187, 0.85);
+  color: rgba(54, 220, 255, 0.85);
 }
 
 /* Every surface that claims the screen hides the launcher. This list is the CSS

@@ -18,10 +18,6 @@ import { RadioControls } from './radio.js';
 import { LocationNavigation } from './locationNavigation.js';
 import { LocalSelectionCard } from './localSelectionCard.js';
 import { MapLabelControls } from './mapLabelControls.js';
-import {
-  RenderSpeedControls,
-  applyRenderSpeed,
-} from './renderSpeedControls.js';
 import { setLocalLabelSettings } from '../data/localLabelSettings.js';
 import { bindClearLayersControl } from './layers.js';
 import { bindCameraOrientationControls } from './cameraOrientationControls.js';
@@ -468,10 +464,6 @@ export class StyleManager extends ShellFacade {
     this._mapLabelControls = new MapLabelControls({
       lifetime: this._lifetime,
       apply: setLocalLabelSettings,
-    });
-    this._renderSpeedControls = new RenderSpeedControls({
-      lifetime: this._lifetime,
-      apply: (setting) => applyRenderSpeed(viewer, setting),
     });
     setDetectionStyle(this.activeStyle);
     this._applyDetectionDensityFromUi();

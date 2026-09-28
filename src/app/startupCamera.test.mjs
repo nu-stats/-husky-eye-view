@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { flyToBoston } from '../camera.js';
+import { flyToAustin } from '../camera.js';
 
 test('teardown before the initial camera delay prevents a late flight', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   let flights = 0;
   let cancelled = 0;
-  const stop = flyToBoston({
+  const stop = flyToAustin({
     isDestroyed: () => false,
     camera: {
       setView() {},

@@ -44,9 +44,9 @@ const HUD_COLORS = {
     border: 'rgba(255, 170, 0, 0.2)',
   },
   _default: {
-    main: 'rgba(201, 201, 201, 0.6)',
-    glow: 'rgba(201, 201, 201, 0.4)',
-    border: 'rgba(201, 201, 201, 0.15)',
+    main: 'rgba(0, 255, 255, 0.6)',
+    glow: 'rgba(0, 255, 255, 0.4)',
+    border: 'rgba(0, 255, 255, 0.15)',
   },
 };
 

@@ -7,7 +7,7 @@ export function createSceneDialog(title, onClose) {
   Object.assign(dialog.style, {
     background: '#08141e',
     color: '#e3faff',
-    border: '1px solid #656565',
+    border: '1px solid #397080',
     borderRadius: '6px',
     padding: '20px',
     width: 'min(720px,calc(100vw - 32px))',
@@ -47,7 +47,7 @@ export function createSceneDialog(title, onClose) {
     Object.assign(b.style, {
       background: '#10242e',
       color: '#e3faff',
-      border: '1px solid #656565',
+      border: '1px solid #397080',
       borderRadius: '3px',
       padding: '7px 11px',
       margin: '6px 6px 6px 0',
@@ -74,7 +74,7 @@ export function createSceneDialog(title, onClose) {
       margin: '6px 0 14px',
       color: '#e3faff',
       background: '#10242e',
-      border: '1px solid #656565',
+      border: '1px solid #397080',
       font: multiline ? '12px monospace' : 'inherit',
     });
     if (multiline) node.rows = 9;

@@ -25,7 +25,7 @@ export function createSceneInteractions(
         if (item.action.url) {
           const link = document.createElement('a');
           link.textContent = 'Source';
-          link.style.color = '#d1d1d1';
+          link.style.color = '#6eeaff';
           link.href = item.action.url;
           link.target = '_blank';
           link.rel = 'noopener noreferrer';
@@ -39,7 +39,7 @@ export function createSceneInteractions(
       for (const [id, button] of buttons) {
         button.disabled = state.busy;
         button.setAttribute('aria-pressed', String(state.selected === id));
-        button.style.outline = state.selected === id ? '2px solid #d1d1d1' : '';
+        button.style.outline = state.selected === id ? '2px solid #6eeaff' : '';
       }
     },
   });
@@ -98,7 +98,7 @@ export function createSceneInteractions(
         overflowY: 'auto',
         background: '#08141eed',
         color: '#e3faff',
-        border: '1px solid #7b7b7b',
+        border: '1px solid #2491a8',
         padding: '10px',
         font: '13px sans-serif',
       });
@@ -120,7 +120,7 @@ export function createSceneInteractions(
           display: 'block',
           background: '#10242e',
           color: '#e3faff',
-          border: '1px solid #656565',
+          border: '1px solid #397080',
           borderRadius: '3px',
           padding: '6px 10px',
           cursor: 'pointer',
@@ -154,7 +154,7 @@ export function createSceneInteractions(
         for (const item of items) {
           const button = buttons.get(item.id);
           button.style.outline = matches.includes(item)
-            ? '2px solid #d1d1d1'
+            ? '2px solid #6eeaff'
             : '';
         }
         status.textContent = `Selected feature: ${matches[0].target.featureId}. Choose an action.`;

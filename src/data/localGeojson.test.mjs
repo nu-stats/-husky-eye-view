@@ -178,34 +178,6 @@ test('local infrastructure card copy uses the owner-approved source fields', () 
   });
 });
 
-test('gun death and mass killing cards state the toll with its numbers', () => {
-  assert.deepEqual(localInfrastructureOverlayCopy({
-    name: 'Leon Wiggins Road, Andalusia',
-    date: '2015-07-16',
-    killed: 2,
-    injured: 1,
-  }, 'local-gva-2015'), {
-    title: 'Leon Wiggins Road, Andalusia',
-    details: ['2015-07-16 · 2 killed, 1 injured', 'Click for details'],
-  });
-
-  assert.deepEqual(localInfrastructureOverlayCopy({
-    name: 'Boston, MA',
-    date: '2010-09-28',
-    killed: 4,
-    injured: 1,
-    weapon: 'Shooting',
-    situation: 'Robbery',
-  }, 'local-mkdb'), {
-    title: 'Boston, MA',
-    details: [
-      '2010-09-28 · 4 killed, 1 injured',
-      'Shooting · Robbery',
-      'Click for details',
-    ],
-  });
-});
-
 test('local infrastructure entries satisfy the shared presentation contract', () => {
   const position = Cesium.Cartesian3.fromDegrees(-97.7, 30.2, 2000);
   const entry = createLocalInfrastructureOverlayEntry({

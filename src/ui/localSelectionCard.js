@@ -59,7 +59,7 @@ export class LocalSelectionCard {
       zIndex: '40',
       color: '#e3faff',
       background: '#08141eed',
-      border: '1px solid #7b7b7b',
+      border: '1px solid #2491a8',
       padding: '10px 12px',
       font: '12px/1.45 sans-serif',
     });
@@ -72,7 +72,7 @@ export class LocalSelectionCard {
       float: 'right',
       background: 'none',
       border: 'none',
-      color: '#d1d1d1',
+      color: '#6eeaff',
       font: '16px sans-serif',
       cursor: 'pointer',
     });
@@ -103,30 +103,6 @@ export class LocalSelectionCard {
         card.append(line(text, { marginTop: '6px', whiteSpace: 'pre-wrap' }));
       }
     }
-    if (props.nearest_trauma_center) {
-      card.append(
-        line(
-          `Nearest trauma center: ${props.nearest_trauma_center} (${props.nearest_trauma_level}), ${props.nearest_trauma_miles} mi`,
-          { marginTop: '6px' },
-        ),
-      );
-      if (
-        props.nearest_level1_center &&
-        props.nearest_level1_center !== props.nearest_trauma_center
-      ) {
-        card.append(
-          line(
-            `Nearest Level I: ${props.nearest_level1_center}, ${props.nearest_level1_miles} mi`,
-          ),
-        );
-      }
-      card.append(
-        line('Straight-line distance, not driving distance.', {
-          fontSize: '11px',
-          opacity: '0.65',
-        }),
-      );
-    }
     const href = safeHttpsUrl(props.video_url);
     if (href) {
       const link = document.createElement('a');
@@ -139,21 +115,7 @@ export class LocalSelectionCard {
       Object.assign(link.style, {
         display: 'inline-block',
         marginTop: '8px',
-        color: '#d1d1d1',
-      });
-      card.append(link);
-    }
-    const sourceHref = safeHttpsUrl(props.source_url);
-    if (sourceHref) {
-      const link = document.createElement('a');
-      link.textContent = 'Open source record ↗';
-      link.href = sourceHref;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      Object.assign(link.style, {
-        display: 'block',
-        marginTop: '8px',
-        color: '#c9c9c9',
+        color: '#6eeaff',
       });
       card.append(link);
     }

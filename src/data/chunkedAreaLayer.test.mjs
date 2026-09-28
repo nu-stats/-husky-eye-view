@@ -1,7 +1,6 @@
 // Nationwide chunked area layers (HOLC redlining, tract life expectancy):
-// only the county chunks in view are fetched and drawn (one ground primitive
-// per chunk), zoomed-out views ask the user to zoom in or use the coarse copy,
-// and clicking an area selects it for the details card.
+// only the county chunks in view are fetched and drawn, zoomed-out views ask
+// the user to zoom in, and clicking an area selects it for the details card.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as Cesium from 'cesium';
@@ -37,39 +36,23 @@ const INDEX = [
   { id: '06037', bbox: [-118.9, 33.7, -117.6, 34.8], count: 1 }, // LA, CA
 ];
 const CHUNKS = {
-  17031: [
-    {
-      type: 'Feature',
-      id: 'tract-17031010100',
-      properties: {
-        name: 'Census Tract 101, Cook County, IL',
-        geoid: '17031010100',
-        life_exp_8: 68.8,
-        summary: 'Life expectancy at birth: 68.8 years.',
-      },
-      geometry: square(-87.67, 42.02),
+  17031: {
+    type: 'Feature',
+    id: 'tract-17031010100',
+    properties: {
+      name: 'Census Tract 101, Cook County, IL',
+      geoid: '17031010100',
+      life_exp_8: 68.8,
+      summary: 'Life expectancy at birth: 68.8 years.',
     },
-    {
-      type: 'Feature',
-      id: 'tract-17031010200',
-      properties: { name: 'Tract 102', life_exp_8: 81.2, summary: 'y' },
-      geometry: {
-        type: 'MultiPolygon',
-        coordinates: [
-          square(-87.64, 42.02).coordinates,
-          square(-87.6, 42.0).coordinates,
-        ],
-      },
-    },
-  ],
-  '06037': [
-    {
-      type: 'Feature',
-      id: 'tract-06037101110',
-      properties: { name: 'LA tract', life_exp_8: 80.1, summary: 'x' },
-      geometry: square(-118.3, 34.2),
-    },
-  ],
+    geometry: square(-87.67, 42.02),
+  },
+  '06037': {
+    type: 'Feature',
+    id: 'tract-06037101110',
+    properties: { name: 'LA tract', life_exp_8: 80.1, summary: 'x' },
+    geometry: square(-118.3, 34.2),
+  },
 };
 
 test('chunksInView keeps intersecting chunks, nearest first, up to the limit', () => {
@@ -104,17 +87,23 @@ async function createHarness({ heightM = 20_000, layerOptions = {} } = {}) {
     return {
       ok: true,
       status: 200,
-      text: async () =>
-        CHUNKS[id].map((feature) => JSON.stringify(feature)).join('\n'),
+      text: async () => `${JSON.stringify(CHUNKS[id])}\n`,
     };
   };
   const moveEnd = new MockEvent();
-  const postRender = new MockEvent();
   const added = [];
   let clickAction = null;
   let pickResult = null;
   const viewer = {
     selectedEntity: undefined,
+    dataSources: {
+      add: async (ds) => added.push(ds),
+      remove: (ds) => {
+        const i = added.indexOf(ds);
+        if (i >= 0) added.splice(i, 1);
+        return true;
+      },
+    },
     camera: {
       moveEnd,
       positionCartographic: Cesium.Cartographic.fromDegrees(
@@ -128,15 +117,6 @@ async function createHarness({ heightM = 20_000, layerOptions = {} } = {}) {
     },
     scene: {
       canvas: {},
-      postRender,
-      groundPrimitives: {
-        add: (primitive) => added.push(primitive),
-        remove: (primitive) => {
-          const i = added.indexOf(primitive);
-          if (i >= 0) added.splice(i, 1);
-          return i >= 0;
-        },
-      },
       pick: () => pickResult,
       requestRender() {},
     },
@@ -177,16 +157,8 @@ async function createHarness({ heightM = 20_000, layerOptions = {} } = {}) {
     added,
     selected,
     moveEnd,
-    postRender,
-    setHeight: (height) => {
-      viewer.camera.positionCartographic = Cesium.Cartographic.fromDegrees(
-        -87.65,
-        41.85,
-        height,
-      );
-    },
-    setPick: (pickId) => {
-      pickResult = pickId ? { primitive: added[0], id: pickId } : null;
+    setPick: (entity) => {
+      pickResult = entity ? { id: entity } : null;
     },
     click: () => clickAction({ position: new Cesium.Cartesian2(10, 10) }),
     cleanup() {
@@ -207,24 +179,10 @@ test('only the counties in view are fetched and drawn', async () => {
       !env.fetched.some((u) => u.endsWith('/06037.geojsonl')),
       'Los Angeles is never downloaded for a Chicago view',
     );
-    assert.equal(env.layer.getStats().count, 2);
+    assert.equal(env.layer.getStats().count, 1);
     assert.deepEqual(
       env.layer.getRowControls().legend.map((l) => [l.label, l.count]),
       [['low', 1]],
-    );
-    // One batched ground primitive per chunk; a MultiPolygon adds one
-    // instance per part, each colored by its feature.
-    assert.equal(env.added.length, 1);
-    assert.ok(env.added[0] instanceof Cesium.GroundPrimitive);
-    const instances = env.added[0].geometryInstances;
-    assert.equal(instances.length, 3);
-    assert.deepEqual(
-      instances.map((i) => i.id.feature.id),
-      ['tract-17031010100', 'tract-17031010200', 'tract-17031010200'],
-    );
-    assert.notDeepEqual(
-      [...instances[0].attributes.color.value],
-      [...instances[1].attributes.color.value],
     );
   } finally {
     env.cleanup();
@@ -282,7 +240,8 @@ test('clicking an area selects it with its summary', async () => {
   const env = await createHarness();
   try {
     await env.layer.enable(env.viewer);
-    env.setPick(env.added[0].geometryInstances[0].id);
+    const entity = env.added[0].entities.values[0];
+    env.setPick(entity);
     env.click();
     assert.equal(env.selected.length, 1);
     const record = env.selected[0];
@@ -290,7 +249,6 @@ test('clicking an area selects it with its summary', async () => {
     assert.equal(record.properties.life_exp_8, 68.8);
     assert.match(record.properties.summary, /68\.8 years/);
     assert.ok(Number.isFinite(record.latitude));
-    assert.equal(env.viewer.selectedEntity.id, record.id);
   } finally {
     env.cleanup();
   }
@@ -304,118 +262,6 @@ test('disable releases every drawn county', async () => {
     env.layer.disable(env.viewer);
     assert.equal(env.added.length, 0);
     assert.deepEqual(env.layer.getDrawnChunkIds(), []);
-  } finally {
-    env.cleanup();
-  }
-});
-
-test('above coarseHeightM the coarse copy loads, and zooming in swaps to full detail without a gap', async () => {
-  const env = await createHarness({
-    heightM: 120_000,
-    layerOptions: { coarseHeightM: 50_000 },
-  });
-  try {
-    await env.layer.enable(env.viewer);
-    assert.ok(env.fetched.some((u) => u.endsWith('/coarse/17031.geojsonl')));
-    assert.deepEqual(env.layer.getDrawnLevels(), { 17031: 'coarse' });
-    const coarse = env.added[0];
-
-    env.setHeight(20_000);
-    env.moveEnd.raise();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    assert.deepEqual(env.layer.getDrawnLevels(), { 17031: 'detail' });
-    assert.equal(
-      env.added.length,
-      2,
-      'the coarse copy stays until detail is ready',
-    );
-    const detail = env.added[1];
-    env.postRender.raise();
-    assert.equal(env.added.length, 2);
-    Object.defineProperty(detail, 'ready', { value: true });
-    env.postRender.raise();
-    assert.deepEqual(env.added, [detail]);
-    assert.ok(!env.added.includes(coarse));
-  } finally {
-    env.cleanup();
-  }
-});
-
-test('a whole-globe view rectangle (tilted or hidden view) still loads what is under the camera', async () => {
-  const env = await createHarness();
-  try {
-    env.viewer.camera.computeViewRectangle = () =>
-      Cesium.Rectangle.fromDegrees(-180, -90, 180, 90);
-    await env.layer.enable(env.viewer);
-    assert.deepEqual(env.layer.getDrawnChunkIds(), ['17031']);
-  } finally {
-    env.cleanup();
-  }
-});
-
-test('a layer-wide source note reaches the details card and fill opacity is configurable', async () => {
-  const env = await createHarness({
-    layerOptions: { sourceNote: 'Kernel density note.', fillAlpha: 0.6 },
-  });
-  try {
-    await env.layer.enable(env.viewer);
-    const instance = env.added[0].geometryInstances[0];
-    assert.equal(Math.round(instance.attributes.color.value[3] / 2.55), 60);
-    env.setPick(instance.id);
-    env.click();
-    assert.equal(
-      env.selected[0].properties.source_note,
-      'Kernel density note.',
-    );
-  } finally {
-    env.cleanup();
-  }
-});
-
-test('getAreaContext reports the area under a point, its neighbors and legend counts', async () => {
-  const env = await createHarness();
-  try {
-    assert.equal(
-      (await env.layer.getAreaContext({ longitude: 0, latitude: 0 })).status,
-      'disabled',
-    );
-    await env.layer.enable(env.viewer);
-    const context = await env.layer.getAreaContext({
-      longitude: -87.672,
-      latitude: 42.012,
-      limit: 2,
-    });
-    assert.equal(context.status, 'loaded');
-    assert.equal(context.layerId, 'local-life-expectancy');
-    assert.equal(context.atPoint.name, 'Census Tract 101, Cook County, IL');
-    assert.equal(context.atPoint.life_exp_8, 68.8);
-    assert.deepEqual(
-      context.nearby.map((area) => area.name),
-      ['Tract 102'],
-    );
-    assert.ok(context.nearby[0].distanceKm > 0);
-    assert.deepEqual(context.legend, [{ label: 'low', count: 1 }]);
-    const outside = await env.layer.getAreaContext({
-      longitude: -87.0,
-      latitude: 41.0,
-    });
-    assert.equal(outside.atPoint, null);
-  } finally {
-    env.cleanup();
-  }
-});
-
-test('getAreaContext says to zoom in when the layer is zoomed out', async () => {
-  const env = await createHarness({ heightM: 5_000_000 });
-  try {
-    await env.layer.enable(env.viewer);
-    const context = await env.layer.getAreaContext({
-      longitude: -87.67,
-      latitude: 42.02,
-    });
-    assert.equal(context.status, 'zoom-in');
-    assert.match(context.statusMessage, /zoom in/);
   } finally {
     env.cleanup();
   }

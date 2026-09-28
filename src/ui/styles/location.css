@@ -64,7 +64,7 @@
   font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.8px;
-  color: #e6e6e6;
+  color: #bdefff;
 }
 
 .location-mini-poi {
@@ -130,7 +130,7 @@
   background: var(--accent-dim);
   border-color: var(--accent);
   color: var(--accent);
-  box-shadow: 0 0 12px rgba(170, 170, 170, 0.15);
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.15);
 }
 
 /* ── Expandable POI Row ──────────────────────── */
@@ -205,7 +205,7 @@
 .poi-pill.active {
   background: var(--accent-dim);
   border-color: var(--accent);
-  box-shadow: 0 0 12px rgba(170, 170, 170, 0.15);
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.15);
 }
 
 .poi-pill-name {
@@ -233,7 +233,7 @@
 
 .poi-pill.active .poi-pill-key {
   color: var(--accent);
-  background: rgba(170, 170, 170, 0.12);
+  background: rgba(0, 212, 255, 0.12);
 }
 
 /* ── Location Search ─────────────────────────── */

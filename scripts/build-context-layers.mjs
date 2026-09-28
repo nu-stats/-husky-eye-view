@@ -19,16 +19,9 @@
 // The cluster files carry no GEOID: their SOURCE_ID is the feature's position
 // in the matching life expectancy file, which is verified before use.
 // Usage: node scripts/build-context-layers.mjs [layer ...]
-//   layers: holc, tract-le, county-le, county-clusters, tract-clusters, coarse
-//   (default: all layers; each also writes its coarse/ copy. `coarse` alone
-//   rebuilds just the coarse copies from the existing chunks.)
-import {
-  createReadStream,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+//   layers: holc, tract-le, county-le, county-clusters, tract-clusters
+//   (default: all)
+import { createReadStream, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 
 // Raw nationwide sources live outside public/ so a production build does not
@@ -254,225 +247,49 @@ function createChunkWriter(layerDir) {
       console.log(
         `${layerDir}: ${features} features in ${index.length} files, ${(bytes / 1e6).toFixed(1)} MB`,
       );
-      buildCoarseCopy(layerDir);
     },
   };
 }
 
-// ---- Coarse copies for zoomed-out views -----------------------------------------
-// Every chunked layer also gets <layer>/coarse/<chunk>.geojsonl: the same
-// features and properties with outlines simplified for distant views. The app
-// draws them above the layer's coarseHeightM (src/data/infrastructure.js).
-const COARSE_TOLERANCE_DEG = {
-  holc: 0.0015, // ~150 m
-  'life-expectancy': 0.0015,
-  'tract-clusters': 0.0015,
-  'county-life-expectancy': 0.02, // ~2 km, for the nationwide view
-  'county-clusters': 0.02,
-};
-
-/** Write <layer>/coarse/ from the layer's full-detail chunk files. */
-function buildCoarseCopy(layerDir) {
-  const tolerance = COARSE_TOLERANCE_DEG[layerDir];
-  if (!tolerance) return;
-  const dir = `${OUT_ROOT}/${layerDir}`;
-  const coarseDir = `${dir}/coarse`;
-  rmSync(coarseDir, { recursive: true, force: true });
-  mkdirSync(coarseDir, { recursive: true });
-  const index = JSON.parse(readFileSync(`${dir}/index.json`, 'utf8'));
-  let before = 0;
-  let after = 0;
-  for (const { id } of index) {
-    const text = readFileSync(`${dir}/${id}.geojsonl`, 'utf8');
-    before += Buffer.byteLength(text);
-    const lines = text
-      .split('\n')
-      .filter((line) => line.trim())
-      .map((line) => {
-        const feature = JSON.parse(line);
-        // Tiny areas that would collapse keep their full outline.
-        const geometry =
-          cleanGeometry(feature.geometry, (p) => p, tolerance) ||
-          feature.geometry;
-        return JSON.stringify({ ...feature, geometry });
-      });
-    const coarse = `${lines.join('\n')}\n`;
-    after += Buffer.byteLength(coarse);
-    writeFileSync(`${coarseDir}/${id}.geojsonl`, coarse);
-  }
-  console.log(
-    `  ${layerDir}/coarse: ${(after / 1e6).toFixed(1)} MB (full detail ${(before / 1e6).toFixed(1)} MB)`,
-  );
-}
-
 // ---- HOLC redlining, nationwide ----------------------------------------------
-// The source splits every HOLC area along 2010 census-tract lines (~40k
-// pieces for ~8.4k areas). Pieces of one area share exact boundary points, so
-// they are merged back by cancelling the edges they share: 4-5x fewer shapes
-// to download and drape. An area whose edges do not close up keeps its pieces.
-
-const edgeKey = (pt) => `${pt[0].toFixed(7)},${pt[1].toFixed(7)}`;
-
-/** Outer boundary rings of the union of `pieces`, or null if they don't close. */
-function mergeRings(pieces) {
-  const edges = new Map(); // "a|b" -> [a, b]
-  for (const piece of pieces) {
-    const polygons =
-      piece.geometry.type === 'Polygon'
-        ? [piece.geometry.coordinates]
-        : piece.geometry.coordinates;
-    for (const rings of polygons) {
-      for (const ring of rings) {
-        for (let i = 0; i < ring.length - 1; i++) {
-          const ka = edgeKey(ring[i]);
-          const kb = edgeKey(ring[i + 1]);
-          if (ka === kb) continue;
-          // A shared edge is walked once in each direction and cancels.
-          if (edges.has(`${kb}|${ka}`)) edges.delete(`${kb}|${ka}`);
-          else edges.set(`${ka}|${kb}`, [ring[i], ring[i + 1]]);
-        }
-      }
-    }
-  }
-  const outgoing = new Map();
-  for (const [key, [a]] of edges) {
-    const ka = edgeKey(a);
-    if (!outgoing.has(ka)) outgoing.set(ka, []);
-    outgoing.get(ka).push(key);
-  }
-  const used = new Set();
-  const rings = [];
-  for (const [startKey, [start]] of edges) {
-    if (used.has(startKey)) continue;
-    const ring = [start];
-    const first = edgeKey(start);
-    let key = startKey;
-    for (;;) {
-      used.add(key);
-      const end = edges.get(key)[1];
-      ring.push(end);
-      const ke = edgeKey(end);
-      if (ke === first) break;
-      key = (outgoing.get(ke) || []).find((candidate) => !used.has(candidate));
-      if (!key) return null; // an open chain: the pieces don't meet exactly
-    }
-    if (ring.length >= 4) rings.push(ring);
-  }
-  return rings.length ? rings : null;
-}
-
-const ringArea = (ring) => {
-  let sum = 0;
-  for (let i = 0; i < ring.length - 1; i++) {
-    sum += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
-  }
-  return Math.abs(sum / 2);
-};
-
-function pointInRing([x, y], ring) {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [xi, yi] = ring[i];
-    const [xj, yj] = ring[j];
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
-
-/** Group merged rings into polygons: a ring inside an odd number of larger
- * rings is a hole of the innermost one. */
-function ringsToGeometry(rings) {
-  const sorted = [...rings].sort((a, b) => ringArea(b) - ringArea(a));
-  const polygons = []; // [outer, ...holes]
-  const placed = []; // { ring, polygon, depth }
-  for (const ring of sorted) {
-    const containers = placed.filter((p) => pointInRing(ring[0], p.ring));
-    const depth = containers.length;
-    if (depth % 2 === 0) {
-      const polygon = [ring];
-      polygons.push(polygon);
-      placed.push({ ring, polygon, depth });
-    } else {
-      const parent = containers[containers.length - 1];
-      parent.polygon.push(ring);
-      placed.push({ ring, polygon: parent.polygon, depth });
-    }
-  }
-  return polygons.length === 1
-    ? { type: 'Polygon', coordinates: polygons[0] }
-    : { type: 'MultiPolygon', coordinates: polygons };
-}
-
 async function buildHolc() {
-  const areas = new Map();
+  const writer = createChunkWriter('holc');
+  let dropped = 0;
   for await (const f of features(HOLC_INPUT)) {
     const p = f.properties;
-    const key = `${p.map_id}|${p.polygon_id}`;
-    if (!areas.has(key)) areas.set(key, []);
-    areas.get(key).push(f);
-  }
-  const writer = createChunkWriter('holc');
-  let merged = 0;
-  let kept = 0;
-  let dropped = 0;
-  for (const [key, pieces] of areas) {
-    // The area is filed under the county holding most of its pieces.
-    const counties = new Map();
-    for (const { properties: q } of pieces) {
-      const county =
-        q.state_code && q.county_cod
-          ? `${q.state_code}${q.county_cod}`
-          : `map-${q.map_id ?? 'unknown'}`;
-      counties.set(county, (counties.get(county) || 0) + 1);
+    const geometry = cleanGeometry(f.geometry);
+    if (!geometry) {
+      dropped += 1;
+      continue;
     }
-    const chunkId = [...counties].sort((a, b) => b[1] - a[1])[0][0];
-    const p = pieces[0].properties;
     const grade = String(p.holc_grade || '').toUpperCase();
     const label = HOLC_GRADE_LABELS[grade];
     const city = p.st_name ? `${p.st_name}, ${p.state}` : p.state || '';
-    const properties = {
-      name: p.name ? `${p.holc_id} · ${p.name}` : `HOLC area ${p.holc_id}`,
-      holc_id: p.holc_id,
-      holc_grade: grade,
-      city,
-      summary: label
-        ? `Graded ${grade} ("${label}") on the 1930s Home Owners' Loan Corporation map of ${city}.`
-        : `Ungraded area on the 1930s HOLC map of ${city}.`,
-    };
-    const rings = pieces.length > 1 ? mergeRings(pieces) : null;
-    const shapes = rings
-      ? [
-          {
-            id: `holc-${key.replace('|', '-')}`,
-            geometry: ringsToGeometry(rings),
-          },
-        ]
-      : pieces.map((piece) => ({
-          id: `holc-${key.replace('|', '-')}-${piece.properties.geoid ?? 'na'}`,
-          geometry: piece.geometry,
-        }));
-    if (rings) merged += 1;
-    else if (pieces.length > 1) kept += 1;
-    for (const shape of shapes) {
-      const geometry = cleanGeometry(shape.geometry);
-      if (!geometry) {
-        dropped += 1;
-        continue;
-      }
-      writer.add(chunkId, {
-        type: 'Feature',
-        id: shape.id,
-        properties,
-        geometry,
-      });
-    }
+    // Chunk by county; pieces without a county fall back to their HOLC map.
+    const chunkId =
+      p.state_code && p.county_cod
+        ? `${p.state_code}${p.county_cod}`
+        : `map-${p.map_id ?? 'unknown'}`;
+    writer.add(chunkId, {
+      type: 'Feature',
+      id: `holc-${p.id}-${p.polygon_id}-${p.geoid ?? 'na'}`,
+      properties: {
+        name: p.name ? `${p.holc_id} · ${p.name}` : `HOLC area ${p.holc_id}`,
+        holc_id: p.holc_id,
+        holc_grade: grade,
+        city,
+        summary: label
+          ? `Graded ${grade} ("${label}") on the 1930s Home Owners' Loan Corporation map of ${city}.`
+          : `Ungraded area on the 1930s HOLC map of ${city}.`,
+        source_note:
+          'Mapping Inequality (University of Richmond); HOLC areas split by 2010 census tract.',
+      },
+      geometry,
+    });
   }
   writer.finish();
-  console.log(
-    `  holc: ${areas.size} areas; ${merged} merged from tract pieces, ${kept} kept as pieces; dropped ${dropped} slivers`,
-  );
+  if (dropped)
+    console.log(`  holc: dropped ${dropped} slivers with no drawable area`);
 }
 
 // ---- Life expectancy, every census tract -------------------------------------
@@ -864,16 +681,9 @@ const BUILDERS = {
   'county-le': buildCountyLifeExpectancy,
   'county-clusters': buildCountyClusters,
   'tract-clusters': buildTractClusters,
-  // Rebuild only the coarse copies from the existing full-detail chunks.
-  coarse: async () => {
-    for (const layerDir of Object.keys(COARSE_TOLERANCE_DEG))
-      buildCoarseCopy(layerDir);
-  },
 };
 const requested = process.argv.slice(2);
-// A full build writes each coarse copy as its layer finishes.
-const defaults = Object.keys(BUILDERS).filter((name) => name !== 'coarse');
-for (const name of requested.length ? requested : defaults) {
+for (const name of requested.length ? requested : Object.keys(BUILDERS)) {
   if (!BUILDERS[name]) throw new Error(`Unknown layer "${name}"`);
   await BUILDERS[name]();
 }

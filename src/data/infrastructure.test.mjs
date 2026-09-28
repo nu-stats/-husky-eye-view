@@ -100,61 +100,6 @@ test('infrastructure factory preserves identity and creates independent state wi
         name: 'Life Expectancy Clusters (counties)',
         source: "Local Moran's I",
       },
-      {
-        id: 'local-miami-homicides-1950s',
-        name: 'Miami Homicides 1956–1959',
-        source: 'Miami-Dade homicides',
-      },
-      {
-        id: 'local-miami-homicides-1960s',
-        name: 'Miami Homicides 1960s',
-        source: 'Miami-Dade homicides',
-      },
-      {
-        id: 'local-miami-homicides-1970s',
-        name: 'Miami Homicides 1970s',
-        source: 'Miami-Dade homicides',
-      },
-      {
-        id: 'local-miami-homicides-1980s',
-        name: 'Miami Homicides 1980s',
-        source: 'Miami-Dade homicides',
-      },
-      {
-        id: 'local-miami-homicides-1990s',
-        name: 'Miami Homicides 1990s',
-        source: 'Miami-Dade homicides',
-      },
-      {
-        id: 'local-miami-homicides-2000s',
-        name: 'Miami Homicides 2000–2011',
-        source: 'Miami-Dade homicides',
-      },
-      {
-        id: 'local-miami-homicide-hotspots',
-        name: 'Miami Homicide Hotspots',
-        source: 'Kernel density',
-      },
-      {
-        id: 'local-trauma-centers',
-        name: 'Trauma Centers',
-        source: 'HIFLD Hospitals',
-      },
-      {
-        id: 'local-public-housing',
-        name: 'Public Housing',
-        source: 'HUD',
-      },
-      {
-        id: 'local-gva-2015',
-        name: 'Gun Deaths 2015 (GVA)',
-        source: 'Gun Violence Archive',
-      },
-      {
-        id: 'local-mkdb',
-        name: 'MKDB Mass Killings (2006–2023)',
-        source: 'Mass Killing Database',
-      },
     ],
   );
   first.forEach((layer, index) => {

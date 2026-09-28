@@ -4,21 +4,10 @@ import { isLocalCardAction, pickLocalEntity } from './localGeojsonCore.js';
 
 /**
  * Nationwide area layer loaded on demand. The dataset is split into chunks
- * (one GeoJSON Lines file per county or state) described by an index of
- * bounding boxes; only the chunks in view are fetched and drawn, and chunks
- * that leave the view are released. Zoomed out past `maxHeightM` nothing is
- * drawn and the panel shows a zoom-in hint.
- *
- * Each chunk is drawn as ONE ground primitive with a color per area. Entities
- * (GeoJsonDataSource) were far slower here: Cesium splits clamped entity
- * polygons into a new batch whenever their bounding rectangles overlap, and
- * neighboring tracts always overlap, so one county became dozens of separately
- * built primitives. These areas tile the map without overlapping, so a single
- * batch is safe.
- *
- * With `coarseHeightM`, a lighter copy of every chunk (under `coarse/`, same
- * ids and properties, simplified outlines) is drawn while the camera is above
- * that height, and the full-detail chunks below it.
+ * (one GeoJSON Lines file per county) described by an index of bounding
+ * boxes; only the chunks in view are fetched and drawn, and chunks that leave
+ * the view are released. Zoomed out past `maxHeightM` nothing is drawn and the
+ * panel shows a zoom-in hint.
  *
  * Areas are shaded by `featureColor(properties)` and are selectable: a click
  * publishes the feature's context, which opens the details card for features
@@ -32,21 +21,17 @@ export const CHUNKED_AREA_MAX_CHUNKS = 30;
 /** Parsed chunks kept after leaving the view, so panning back is instant. */
 const CHUNK_CACHE_LIMIT = 90;
 const FILL_ALPHA = 0.4;
-/** Longest getAreaContext waits for areas still loading. */
-const AREA_CONTEXT_WAIT_MS = 6000;
 
 /**
- * Chunks whose bbox intersects the view rectangle, nearest first.
+ * Chunks whose bbox intersects the view rectangle, nearest center first.
  * @param {Array<{id:string,bbox:number[]}>} index
  * @param {{west:number,south:number,east:number,north:number}} view Degrees.
  * @param {number} limit
- * @param {[number, number]} [center] [lon, lat] to measure nearness from;
- *   defaults to the middle of `view`.
  * @returns {string[]}
  */
-export function chunksInView(index, view, limit, center) {
-  const cx = center ? center[0] : (view.west + view.east) / 2;
-  const cy = center ? center[1] : (view.south + view.north) / 2;
+export function chunksInView(index, view, limit) {
+  const cx = (view.west + view.east) / 2;
+  const cy = (view.south + view.north) / 2;
   return index
     .filter(
       ({ bbox: [w, s, e, n] }) =>
@@ -63,52 +48,6 @@ export function chunksInView(index, view, limit, center) {
     .map((chunk) => chunk.id);
 }
 
-/** Polygon rings of a Polygon/MultiPolygon, as a list of polygons. */
-function polygonsOf(geometry) {
-  if (geometry?.type === 'Polygon') return [geometry.coordinates];
-  if (geometry?.type === 'MultiPolygon') return geometry.coordinates;
-  return [];
-}
-
-/** Whether a ring of [lon, lat] points contains the point (even-odd rule). */
-function ringContains(ring, x, y) {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [xi, yi] = ring[i];
-    const [xj, yj] = ring[j];
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)
-      inside = !inside;
-  }
-  return inside;
-}
-
-/** Whether a Polygon/MultiPolygon feature contains [lon, lat] (holes excluded). */
-function featureContains(feature, lon, lat) {
-  return polygonsOf(feature.geometry).some(
-    ([outer, ...holes]) =>
-      outer &&
-      ringContains(outer, lon, lat) &&
-      !holes.some((hole) => ringContains(hole, lon, lat)),
-  );
-}
-
-/** Center of a feature's bounding box, [lon, lat] degrees (null if empty). */
-function featureCenter(feature) {
-  let w = Infinity;
-  let s = Infinity;
-  let e = -Infinity;
-  let n = -Infinity;
-  for (const rings of polygonsOf(feature.geometry)) {
-    for (const [lon, lat] of rings[0] || []) {
-      if (lon < w) w = lon;
-      if (lat < s) s = lat;
-      if (lon > e) e = lon;
-      if (lat > n) n = lat;
-    }
-  }
-  return Number.isFinite(w) ? [(w + e) / 2, (s + n) / 2] : null;
-}
-
 /**
  * @param {object} options
  * @param {string} options.id Layer id.
@@ -120,12 +59,7 @@ function featureCenter(feature) {
  * @param {string} [options.source]
  * @param {number} [options.maxHeightM]
  * @param {number} [options.maxChunks]
- * @param {number} [options.coarseHeightM] Above this camera height draw the
- *   `coarse/` chunks; omit when the dataset has no coarse copy.
  * @param {string} [options.zoomInMessage] Panel hint above `maxHeightM`.
- * @param {string} [options.sourceNote] Source line for every area's details
- *   card, instead of repeating it in each feature.
- * @param {number} [options.fillAlpha] Area fill opacity (0–1).
  * @param {Function} [options.screenSpaceEventHandlerFactory] Test seam.
  * @param {object} services Shared context/overlay operations.
  */
@@ -140,10 +74,7 @@ export function createChunkedAreaLayer(
     source = 'Local',
     maxHeightM = CHUNKED_AREA_MAX_HEIGHT_M,
     maxChunks = CHUNKED_AREA_MAX_CHUNKS,
-    coarseHeightM = null,
     zoomInMessage = 'zoom in to a city or county to load',
-    sourceNote = null,
-    fillAlpha = FILL_ALPHA,
     screenSpaceEventHandlerFactory = (canvas) =>
       new Cesium.ScreenSpaceEventHandler(canvas),
   },
@@ -179,18 +110,14 @@ export function createChunkedAreaLayer(
   let clickHandler = null;
   let moveEndRemover = null;
   let rowControlsListener = null;
-  /** chunk id -> { primitive, features, level } currently in the scene */
+  /** chunk id -> Cesium.GeoJsonDataSource currently in the scene */
   const drawn = new Map();
-  /** `${level}/${chunk id}` -> parsed features (LRU by insertion order) */
+  /** chunk id -> parsed features (LRU by insertion order) */
   const cache = new Map();
   const colors = new Map();
 
   const colorFor = (css) => {
-    if (!colors.has(css))
-      colors.set(
-        css,
-        Cesium.Color.fromCssColorString(css).withAlpha(fillAlpha),
-      );
+    if (!colors.has(css)) colors.set(css, Cesium.Color.fromCssColorString(css));
     return colors.get(css);
   };
 
@@ -219,17 +146,15 @@ export function createChunkedAreaLayer(
     }
   }
 
-  async function loadChunkFeatures(chunkId, level) {
-    const key = `${level}/${chunkId}`;
-    if (cache.has(key)) {
-      const features = cache.get(key);
-      cache.delete(key);
-      cache.set(key, features); // refresh LRU position
+  async function loadChunkFeatures(chunkId) {
+    if (cache.has(chunkId)) {
+      const features = cache.get(chunkId);
+      cache.delete(chunkId);
+      cache.set(chunkId, features); // refresh LRU position
       return features;
     }
-    const folder = level === 'coarse' ? 'coarse/' : '';
     const response = await fetch(
-      `${base}${folder}${encodeURIComponent(chunkId)}.geojsonl`,
+      `${base}${encodeURIComponent(chunkId)}.geojsonl`,
     );
     if (!response.ok) throw new Error(`HTTP ${response.status ?? '?'}`);
     const text = await response.text();
@@ -237,143 +162,65 @@ export function createChunkedAreaLayer(
       .split('\n')
       .filter((line) => line.trim())
       .map((line) => JSON.parse(line));
-    cache.set(key, features);
+    cache.set(chunkId, features);
     while (cache.size > CHUNK_CACHE_LIMIT) {
       const oldest = cache.keys().next().value;
-      const [oldLevel, ...rest] = oldest.split('/');
-      if (drawn.get(rest.join('/'))?.level === oldLevel) break;
+      if (drawn.has(oldest)) break;
       cache.delete(oldest);
     }
     return features;
   }
 
   function releaseChunk(chunkId) {
-    const chunk = drawn.get(chunkId);
-    if (!chunk) return;
+    const dataSource = drawn.get(chunkId);
+    if (!dataSource) return;
     drawn.delete(chunkId);
     if (viewer?.selectedEntity?.__chunkedChunkId === chunkId) {
       viewer.selectedEntity = undefined;
       clearSelectedEntityContextForLayer(id);
     }
-    removePrimitive(chunk.primitive);
-  }
-
-  function releaseAll() {
-    for (const chunkId of [...drawn.keys()]) releaseChunk(chunkId);
-    clearRetiring();
-  }
-
-  /** One ground primitive holding every area of a chunk. */
-  function buildPrimitive(chunkId, features) {
-    const instances = [];
-    for (const feature of features) {
-      const color = Cesium.ColorGeometryInstanceAttribute.fromColor(
-        colorFor(featureColor(feature.properties || {}) || '#9e9e9e'),
-      );
-      // The pick id stands in for an entity: pickLocalEntity reads
-      // __localLayerId, and a click turns it into a selection.
-      const pickId = {
-        __localLayerId: id,
-        __chunkedChunkId: chunkId,
-        feature,
-      };
-      for (const rings of polygonsOf(feature.geometry)) {
-        if (!rings[0] || rings[0].length < 4) continue;
-        const [outer, ...holes] = rings.map((ring) =>
-          Cesium.Cartesian3.fromDegreesArray(ring.flat()),
-        );
-        instances.push(
-          new Cesium.GeometryInstance({
-            geometry: new Cesium.PolygonGeometry({
-              polygonHierarchy: new Cesium.PolygonHierarchy(
-                outer,
-                holes.map((hole) => new Cesium.PolygonHierarchy(hole)),
-              ),
-            }),
-            id: pickId,
-            attributes: { color },
-          }),
-        );
-      }
-    }
-    if (!instances.length) return null;
-    return new Cesium.GroundPrimitive({
-      geometryInstances: instances,
-      appearance: new Cesium.PerInstanceColorAppearance({
-        flat: true,
-        translucent: true,
-      }),
-      classificationType: Cesium.ClassificationType.BOTH,
-      asynchronous: true,
-    });
-  }
-
-  /** Primitives replaced by another detail level, removed once it is ready. */
-  let retiring = [];
-  let retireRemover = null;
-
-  function removePrimitive(primitive) {
     try {
-      viewer?.scene?.groundPrimitives?.remove(primitive);
+      viewer?.dataSources?.remove(dataSource, true);
     } catch {
       /* already gone */
     }
   }
 
-  function clearRetiring() {
-    for (const { old } of retiring) removePrimitive(old);
-    retiring = [];
-    retireRemover?.();
-    retireRemover = null;
+  function releaseAll() {
+    for (const chunkId of [...drawn.keys()]) releaseChunk(chunkId);
   }
 
-  /** Keep `old` on screen until `replacement` has finished building. */
-  function retire(old, replacement) {
-    retiring.push({ old, replacement, since: Date.now() });
-    retireRemover ||= viewer.scene.postRender?.addEventListener(() => {
-      const now = Date.now();
-      retiring = retiring.filter(
-        ({ old: previous, replacement: next, since }) => {
-          const done =
-            next.ready || next.isDestroyed?.() || now - since > 10_000;
-          if (done) removePrimitive(previous);
-          return !done;
-        },
-      );
-      if (!retiring.length) {
-        retireRemover?.();
-        retireRemover = null;
-      } else {
-        governorRequestRender?.(`chunked-area:${id}`);
-      }
-    });
-    if (!retireRemover) clearRetiring(); // no render hook: swap at once
-  }
-
-  async function drawChunk(chunkId, level, gen) {
-    const features = await loadChunkFeatures(chunkId, level);
-    if (gen !== generation || !enabled || destroyed) return;
-    const previous = drawn.get(chunkId);
-    if (previous?.level === level) return;
-    const primitive = buildPrimitive(chunkId, features);
-    if (!primitive) {
-      releaseChunk(chunkId);
+  async function drawChunk(chunkId, gen) {
+    const features = await loadChunkFeatures(chunkId);
+    if (gen !== generation || !enabled || destroyed || drawn.has(chunkId))
       return;
+    const dataSource = await Cesium.GeoJsonDataSource.load(
+      { type: 'FeatureCollection', features },
+      { clampToGround: true },
+    );
+    if (gen !== generation || !enabled || destroyed || drawn.has(chunkId))
+      return;
+    dataSource.name = `${name} ${chunkId}`;
+    for (const entity of dataSource.entities.values) {
+      entity.__localLayerId = id;
+      entity.__chunkedChunkId = chunkId;
+      if (!entity.polygon) continue;
+      const props =
+        entity.properties?.getValue?.(Cesium.JulianDate.now()) || {};
+      entity.polygon.material = new Cesium.ColorMaterialProperty(
+        colorFor(featureColor(props) || '#9e9e9e').withAlpha(FILL_ALPHA),
+      );
+      entity.polygon.outline = false;
     }
-    viewer.scene.groundPrimitives.add(primitive);
-    drawn.set(chunkId, { primitive, features, level });
-    if (previous) retire(previous.primitive, primitive);
+    drawn.set(chunkId, dataSource);
+    await viewer.dataSources.add(dataSource);
+    if (gen !== generation || !enabled || destroyed) {
+      releaseChunk(chunkId);
+    }
   }
 
   /** Reconcile the drawn chunks with the current camera view. */
-  /** The latest reconcile, so readers can wait for areas still loading. */
-  let currentRefresh = Promise.resolve();
-  function refresh() {
-    currentRefresh = reconcileView();
-    return currentRefresh;
-  }
-
-  async function reconcileView() {
+  async function refresh() {
     if (!enabled || destroyed || !viewer) return;
     const gen = ++generation;
     const height = viewer.camera.positionCartographic?.height;
@@ -385,8 +232,6 @@ export function createChunkedAreaLayer(
       return;
     }
     status = null;
-    const level =
-      coarseHeightM !== null && height > coarseHeightM ? 'coarse' : 'detail';
     let list;
     try {
       list = await loadIndex();
@@ -400,44 +245,33 @@ export function createChunkedAreaLayer(
       viewer.scene.globe?.ellipsoid ?? Cesium.Ellipsoid.WGS84,
     );
     const carto = viewer.camera.positionCartographic;
-    const lon = Cesium.Math.toDegrees(carto.longitude);
-    const lat = Cesium.Math.toDegrees(carto.latitude);
-    // A tilted camera's rectangle runs out to the horizon (and a hidden,
-    // zero-size canvas yields the whole globe), so bound it to a box around
-    // the camera sized by height, and load the chunks nearest the camera.
-    const half = Math.max(0.5, (height / 111_000) * 4);
     const view = rect
       ? {
-          west: Math.max(Cesium.Math.toDegrees(rect.west), lon - half),
-          south: Math.max(Cesium.Math.toDegrees(rect.south), lat - half),
-          east: Math.min(Cesium.Math.toDegrees(rect.east), lon + half),
-          north: Math.min(Cesium.Math.toDegrees(rect.north), lat + half),
+          west: Cesium.Math.toDegrees(rect.west),
+          south: Cesium.Math.toDegrees(rect.south),
+          east: Cesium.Math.toDegrees(rect.east),
+          north: Cesium.Math.toDegrees(rect.north),
         }
       : {
           // Horizon-up views have no ground rectangle: use a box under the camera.
-          west: lon - 0.5,
-          south: lat - 0.5,
-          east: lon + 0.5,
-          north: lat + 0.5,
+          west: Cesium.Math.toDegrees(carto.longitude) - 0.5,
+          south: Cesium.Math.toDegrees(carto.latitude) - 0.5,
+          east: Cesium.Math.toDegrees(carto.longitude) + 0.5,
+          north: Cesium.Math.toDegrees(carto.latitude) + 0.5,
         };
-    const wanted = new Set(chunksInView(list, view, maxChunks, [lon, lat]));
+    const wanted = new Set(chunksInView(list, view, maxChunks));
     for (const chunkId of [...drawn.keys()]) {
       if (!wanted.has(chunkId)) releaseChunk(chunkId);
     }
-    // Chunks at the other detail level stay on screen until their
-    // replacement is ready (see retire), so switching never blanks the map.
-    const missing = [...wanted].filter(
-      (chunkId) => drawn.get(chunkId)?.level !== level,
-    );
+    const missing = [...wanted].filter((chunkId) => !drawn.has(chunkId));
     if (!missing.length) {
       notifyRowControls();
       return;
     }
     pending += 1;
-    notifyRowControls();
     try {
       const results = await Promise.allSettled(
-        missing.map((chunkId) => drawChunk(chunkId, level, gen)),
+        missing.map((chunkId) => drawChunk(chunkId, gen)),
       );
       const failed = results.filter((r) => r.status === 'rejected');
       error = failed.length
@@ -451,37 +285,30 @@ export function createChunkedAreaLayer(
     governorRequestRender?.(`chunked-area:${id}`);
   }
 
-  /**
-   * Turn a picked area into a selection. A light entity (not added to the
-   * scene) carries the context the details card and voice tools read.
-   */
-  function selectArea(target) {
-    const { feature, __chunkedChunkId: chunkId } = target;
-    const props = {
-      ...(feature.properties || {}),
-      ...(sourceNote && { source_note: sourceNote }),
-    };
-    const center = featureCenter(feature);
-    const entity = new Cesium.Entity({
-      id: `${id}:${feature.id ?? props.name ?? 'area'}`,
-      name: props.name || name,
-      position: center
-        ? Cesium.Cartesian3.fromDegrees(center[0], center[1])
-        : undefined,
-      properties: props,
-    });
-    entity.__localLayerId = id;
-    entity.__chunkedChunkId = chunkId;
+  function selectArea(entity) {
+    const props = entity.properties?.getValue?.(Cesium.JulianDate.now()) || {};
+    const hierarchy = entity.polygon?.hierarchy?.getValue(
+      Cesium.JulianDate.now(),
+    );
+    const center = hierarchy?.positions?.length
+      ? Cesium.Cartographic.fromCartesian(
+          Cesium.BoundingSphere.fromPoints(hierarchy.positions).center,
+        )
+      : null;
     registerEntityContext(entity, {
-      id: entity.id,
+      id: `${id}:${entity.id}`,
       layerId: id,
       layerName: name,
       source,
-      dataSource: drawn.get(chunkId)?.primitive,
+      dataSource: drawn.get(entity.__chunkedChunkId),
       label: props.name || name,
       properties: props,
-      latitude: center ? Number(center[1].toFixed(6)) : undefined,
-      longitude: center ? Number(center[0].toFixed(6)) : undefined,
+      latitude: center
+        ? Number(Cesium.Math.toDegrees(center.latitude).toFixed(6))
+        : undefined,
+      longitude: center
+        ? Number(Cesium.Math.toDegrees(center.longitude).toFixed(6))
+        : undefined,
     });
     viewer.selectedEntity = entity;
     selectEntityContext(entity);
@@ -503,16 +330,17 @@ export function createChunkedAreaLayer(
       )
         return;
       const target = pickLocalEntity(viewer.scene, click.position);
-      if (target && target.__localLayerId === id && target.feature)
-        selectArea(target);
+      if (target && target.__localLayerId === id) selectArea(target);
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   }
 
   function countBy(test) {
     let count = 0;
-    for (const chunk of drawn.values()) {
-      for (const feature of chunk.features) {
-        if (test(feature.properties || {})) count += 1;
+    for (const dataSource of drawn.values()) {
+      for (const entity of dataSource.entities.values) {
+        const props =
+          entity.properties?.getValue?.(Cesium.JulianDate.now()) || {};
+        if (test(props)) count += 1;
       }
     }
     return count;
@@ -520,7 +348,8 @@ export function createChunkedAreaLayer(
 
   function loadedCount() {
     let count = 0;
-    for (const chunk of drawn.values()) count += chunk.features.length;
+    for (const dataSource of drawn.values())
+      count += dataSource.entities.values.length;
     return count;
   }
 
@@ -602,78 +431,7 @@ export function createChunkedAreaLayer(
       rowControlsListener = typeof listener === 'function' ? listener : null;
     },
 
-    /**
-     * What this layer shows around a point, for voice and other readers: the
-     * area containing the point (if loaded), the nearest other areas, and the
-     * legend counts over what is loaded. Areas only exist in chunks that are
-     * drawn, so a zoomed-out or disabled layer reports its status instead.
-     * @param {{longitude:number, latitude:number, limit?:number}} point
-     * @returns {object}
-     */
-    getAreaContext: async ({ longitude, latitude, limit = 5 } = {}) => {
-      const base = { layerId: id, layerName: name, source };
-      // Right after a fly-to the chunks for the new view may not even have
-      // started loading: reconcile with the current camera now and wait
-      // (bounded), following any newer reconcile that supersedes ours, so the
-      // answer covers where the camera is now.
-      if (enabled && !destroyed && viewer) {
-        const deadline = Date.now() + AREA_CONTEXT_WAIT_MS;
-        let awaited = refresh();
-        for (;;) {
-          const remaining = deadline - Date.now();
-          if (remaining <= 0) break;
-          await Promise.race([
-            awaited.catch(() => {}),
-            new Promise((resolve) => setTimeout(resolve, remaining)),
-          ]);
-          if (currentRefresh === awaited || Date.now() >= deadline) break;
-          awaited = currentRefresh;
-        }
-      }
-      if (!enabled) return { ...base, status: 'disabled' };
-      if (status === 'zoom-in')
-        return { ...base, status: 'zoom-in', statusMessage: zoomInMessage };
-      const withNote = (properties) => ({
-        ...properties,
-        ...(sourceNote && { source_note: sourceNote }),
-      });
-      let atPoint = null;
-      const nearby = [];
-      for (const chunk of drawn.values()) {
-        for (const feature of chunk.features) {
-          if (!atPoint && featureContains(feature, longitude, latitude)) {
-            atPoint = feature;
-            continue;
-          }
-          const center = featureCenter(feature);
-          if (!center) continue;
-          const dx =
-            (center[0] - longitude) * Math.cos((latitude * Math.PI) / 180);
-          const dy = center[1] - latitude;
-          nearby.push({ feature, d2: dx * dx + dy * dy });
-        }
-      }
-      nearby.sort((a, b) => a.d2 - b.d2);
-      return {
-        ...base,
-        status: 'loaded',
-        loadedAreas: loadedCount(),
-        atPoint: atPoint ? withNote(atPoint.properties || {}) : null,
-        nearby: nearby.slice(0, Math.max(0, limit)).map(({ feature, d2 }) => ({
-          ...withNote(feature.properties || {}),
-          distanceKm: Math.round(Math.sqrt(d2) * 111.2 * 10) / 10,
-        })),
-        legend: legend.map((item) => ({
-          label: item.label,
-          count: countBy(item.test),
-        })),
-      };
-    },
-
     /** Test/QA seam: chunk ids currently drawn. */
     getDrawnChunkIds: () => [...drawn.keys()],
-    /** Test/QA seam: detail level ('detail' | 'coarse') of each drawn chunk. */
-    getDrawnLevels: () =>
-      Object.fromEntries([...drawn].map(([key, chunk]) => [key, chunk.level])),
   };
 }

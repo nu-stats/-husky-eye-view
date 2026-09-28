@@ -52,11 +52,11 @@
 }
 
 #command-dock > #location-bar {
-  border-right: 1px solid rgba(177, 177, 177, 0.18);
+  border-right: 1px solid rgba(123, 189, 211, 0.18);
 }
 
 #command-dock > #control-panel {
-  border-left: 1px solid rgba(177, 177, 177, 0.18);
+  border-left: 1px solid rgba(123, 189, 211, 0.18);
 }
 
 #command-dock .panel-inner,
@@ -91,7 +91,7 @@
 #command-dock .location-toolbar-label::after {
   content: '›';
   margin-left: 0.45rem;
-  color: rgba(187, 187, 187, 0.68);
+  color: rgba(54, 220, 255, 0.68);
   font-size: 0.7rem;
 }
 
@@ -262,8 +262,8 @@
   padding: 0;
   border-radius: 50%;
   box-shadow:
-    0 0 0 0.2rem rgba(170, 170, 170, 0.06),
-    0 0 1rem rgba(170, 170, 170, 0.12);
+    0 0 0 0.2rem rgba(0, 212, 255, 0.06),
+    0 0 1rem rgba(0, 212, 255, 0.12);
 }
 
 #command-dock .gev-mic-orbit {
@@ -293,14 +293,14 @@
   gap: 0.12rem;
   height: 2.2rem;
   padding: 0.2rem 0.1rem;
-  border-bottom: 1px solid rgba(187, 187, 187, 0.34);
+  border-bottom: 1px solid rgba(54, 220, 255, 0.34);
 }
 
 #command-dock .gev-voice-visualizer span {
   width: 0.18rem;
   height: 0.55rem;
-  background: linear-gradient(to top, #9d9d9d, #d2d2d2);
-  box-shadow: 0 0 0.35rem rgba(187, 187, 187, 0.28);
+  background: linear-gradient(to top, #28b9db, #71eaff);
+  box-shadow: 0 0 0.35rem rgba(54, 220, 255, 0.28);
   transform-origin: bottom;
 }
 

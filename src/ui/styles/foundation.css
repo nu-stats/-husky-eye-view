@@ -8,9 +8,9 @@
   --glass-bg: rgba(12, 12, 20, 0.72);
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-border-hover: rgba(255, 255, 255, 0.15);
-  --accent: #aaaaaa;
-  --accent-dim: rgba(170, 170, 170, 0.15);
-  --accent-glow: rgba(170, 170, 170, 0.4);
+  --accent: #00d4ff;
+  --accent-dim: rgba(0, 212, 255, 0.15);
+  --accent-glow: rgba(0, 212, 255, 0.4);
   --text-primary: #e8eaed;
   --text-secondary: rgba(232, 234, 237, 0.5);
   --text-dim: rgba(232, 234, 237, 0.3);
@@ -233,7 +233,7 @@ body.cockpit-mode #cockpit-cloud-effects.active {
 .celestial-ring-outline {
   position: absolute;
   box-sizing: border-box;
-  border: 0.8px solid rgba(205, 205, 205, 0.095);
+  border: 0.8px solid rgba(151, 218, 232, 0.095);
   border-radius: 50%;
   will-change: width, height;
 }
@@ -264,10 +264,10 @@ body.cockpit-mode #cockpit-cloud-effects.active {
 }
 
 .celestial-moon {
-  color: rgba(180, 180, 180, 0.84);
+  color: rgba(55, 211, 239, 0.84);
   text-shadow:
-    0 0 7px rgba(180, 180, 180, 0.65),
-    0 0 17px rgba(180, 180, 180, 0.25);
+    0 0 7px rgba(55, 211, 239, 0.65),
+    0 0 17px rgba(55, 211, 239, 0.25);
 }
 
 #celestial-toggle:disabled {
@@ -415,7 +415,7 @@ body:has(.data-toggle-row[data-layer-id='alpr-cameras'] .data-toggle-btn.active)
     0 8px 32px rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.03) inset,
     0 1px 0 rgba(255, 255, 255, 0.06) inset,
-    0 0 20px rgba(170, 170, 170, 0.08);
+    0 0 20px rgba(0, 212, 255, 0.08);
   backdrop-filter: blur(24px) saturate(1.4);
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
   font-family: var(--font-mono);
@@ -427,8 +427,8 @@ body:has(.data-toggle-row[data-layer-id='alpr-cameras'] .data-toggle-btn.active)
   height: 34px;
   flex: 0 0 auto;
   color: var(--accent);
-  background: rgba(170, 170, 170, 0.06);
-  border: 1px solid rgba(170, 170, 170, 0.28);
+  background: rgba(0, 212, 255, 0.06);
+  border: 1px solid rgba(0, 212, 255, 0.28);
   border-radius: var(--btn-radius);
   font-family: var(--font-mono);
   font-size: 10px;
@@ -439,7 +439,7 @@ body:has(.data-toggle-row[data-layer-id='alpr-cameras'] .data-toggle-btn.active)
 #gev-voice-button:hover {
   color: #ffffff;
   border-color: var(--accent);
-  box-shadow: 0 0 12px rgba(170, 170, 170, 0.22);
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.22);
 }
 
 .gev-voice-readout {
@@ -546,7 +546,7 @@ body:has(.data-toggle-row[data-layer-id='alpr-cameras'] .data-toggle-btn.active)
   display: block;
   width: 52px;
   height: auto;
-  filter: drop-shadow(0 0 12px rgba(200, 16, 46, 0.5));
+  filter: drop-shadow(0 0 12px rgba(0, 246, 255, 0.5));
 }
 
 #title-bar .title-logo::before,
@@ -619,8 +619,7 @@ body:has(.data-toggle-row[data-layer-id='alpr-cameras'] .data-toggle-btn.active)
 
 #title-bar .title-accent,
 .loader-content .title-accent {
-  /* Northeastern grey, matching the logo. */
-  color: #a2aaad;
+  color: var(--accent);
   font-weight: 300;
 }
 

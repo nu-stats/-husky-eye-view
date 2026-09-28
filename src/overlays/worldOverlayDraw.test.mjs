@@ -408,7 +408,7 @@ test('thumbnail painter preserves the shipped CCTV 104x77 geometry and drawing c
   paintThumbnail(ctx, entry, placement, 0.75);
   assert.deepEqual(
     ctx.calls.find(([name]) => name === 'strokeStyle'),
-    ['strokeStyle', 'rgba(207, 207, 207, 0.6)'],
+    ['strokeStyle', 'rgba(107, 232, 255, 0.6)'],
     'CCTV leader uses the source cyan token rather than the generic leader fallback',
   );
   assert.deepEqual(ctx.calls.find(([name]) => name === 'moveTo'), ['moveTo', 200, 184]);

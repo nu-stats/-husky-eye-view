@@ -1,9 +1,3 @@
-import { REGISTERED_LAYER_IDS } from '../data/layerState.js';
-
-// Every registered data layer is voice-controllable. A layer joins the
-// registry to get a share-link token, so new layers reach voice automatically.
-const VOICE_LAYER_IDS = [...REGISTERED_LAYER_IDS];
-
 // Canonical action arguments. Descriptive wording is supplied separately.
 const schemas = [
   {
@@ -128,7 +122,23 @@ const schemas = [
       properties: {
         layerId: {
           type: 'string',
-          enum: VOICE_LAYER_IDS,
+          enum: [
+            'flights',
+            'military',
+            'earthquakes',
+            'satellites',
+            'rocket-launches',
+            'traffic',
+            'cctv',
+            'radio',
+            'bikeshare',
+            'ais-live-vessels',
+            'local-datacenters',
+            'local-dams',
+            'telegeography-submarine-cables',
+            'local-firms',
+            'alpr-cameras',
+          ],
         },
         enabled: {
           type: 'boolean',
@@ -145,7 +155,22 @@ const schemas = [
       properties: {
         layerId: {
           type: 'string',
-          enum: VOICE_LAYER_IDS,
+          enum: [
+            'flights',
+            'military',
+            'earthquakes',
+            'satellites',
+            'traffic',
+            'cctv',
+            'radio',
+            'bikeshare',
+            'ais-live-vessels',
+            'local-datacenters',
+            'local-dams',
+            'telegeography-submarine-cables',
+            'local-firms',
+            'alpr-cameras',
+          ],
         },
       },
     },
@@ -250,7 +275,12 @@ const schemas = [
         },
         layerId: {
           type: 'string',
-          enum: VOICE_LAYER_IDS,
+          enum: [
+            'local-datacenters',
+            'local-dams',
+            'telegeography-submarine-cables',
+            'local-firms',
+          ],
         },
         limit: {
           type: 'number',

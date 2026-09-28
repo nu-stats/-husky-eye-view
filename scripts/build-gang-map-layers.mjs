@@ -3,15 +3,9 @@
 // only) in one file, and the "Famous Shootings" layer in its own file.
 // Every single-point feature (point-only hoods, neighborhoods, nation
 // birthplaces, demolished-project points) and the disputed/dying/unknown hoods
-// category are left out of the gang map. Each famous shooting gets a summary
-// (its description without links) and its nearest trauma center with
-// straight-line distances; run scripts/fetch-trauma-centers.mjs first.
+// category are left out of the gang map.
 // Usage: node scripts/build-gang-map-layers.mjs [public/big_bas_chicagoland_gang_map.geojson]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import {
-  loadTraumaCenters,
-  nearestTraumaProperties,
-} from './lib/nearest-trauma.mjs';
 
 const input = process.argv[2] ?? 'public/big_bas_chicagoland_gang_map.geojson';
 const outDir = 'src/data/local_data/gang_map';
@@ -19,29 +13,12 @@ const SHOOTINGS_LAYER = 'Famous Shootings';
 const EXCLUDED_LAYERS = new Set(['Disputed, Dying & Unknown Hoods']);
 
 const { features } = JSON.parse(readFileSync(input, 'utf8'));
-const traumaCenters = loadTraumaCenters();
 const gangMap = [];
 const shootings = [];
 let skipped = 0;
 for (const feature of features) {
   const layer = feature.properties?.layer;
   if (layer === SHOOTINGS_LAYER) {
-    const [lon, lat] = feature.geometry?.coordinates ?? [];
-    const summary = String(feature.properties?.description ?? '')
-      .split('\n')
-      .map((line) => line.replace(/\u00a0/g, ' ').trim())
-      .filter(
-        (line) =>
-          line && !/^https?:/.test(line) && !/^hood story:?$/i.test(line),
-      )
-      .join(' · ');
-    feature.properties = {
-      ...feature.properties,
-      ...(summary && { summary }),
-      ...(Number.isFinite(lon) && Number.isFinite(lat)
-        ? nearestTraumaProperties(lon, lat, traumaCenters)
-        : {}),
-    };
     shootings.push(JSON.stringify(feature));
     continue;
   }

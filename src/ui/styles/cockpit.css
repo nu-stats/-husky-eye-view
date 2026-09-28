@@ -9,13 +9,13 @@
   gap: 8px;
   min-height: 38px;
   padding: 0 12px;
-  border: 1px solid rgba(176, 176, 176, 0.5);
+  border: 1px solid rgba(0, 220, 255, 0.5);
   border-radius: 8px;
   background: rgba(2, 12, 18, 0.9);
   color: #dceeff;
   font: 600 10px/1 var(--font-mono);
   letter-spacing: 0.14em;
-  box-shadow: 0 0 18px rgba(176, 176, 176, 0.14);
+  box-shadow: 0 0 18px rgba(0, 220, 255, 0.14);
   cursor: pointer;
 }
 
@@ -25,12 +25,12 @@
 }
 #cockpit-entry:hover,
 #cockpit-entry:focus-visible {
-  border-color: #b0b0b0;
+  border-color: #00dcff;
   color: #fff;
   outline: none;
 }
 #cockpit-entry .material-symbols-outlined {
-  color: #b0b0b0;
+  color: #00dcff;
   font-size: 18px;
 }
 #cockpit-entry kbd {
@@ -42,7 +42,7 @@
 }
 
 #cockpit-hud {
-  --cockpit-accent: #b0b0b0;
+  --cockpit-accent: #00dcff;
   --cockpit-side-panel-width: min(340px, 28vw);
   /* HUD bottom offset + tallest scaled telemetry block + 20px clear border. */
   --cockpit-bottom-rail-safe: calc(clamp(84px, 11vh, 118px) + 100px);
@@ -198,7 +198,7 @@ body.cockpit-mode:has(#left-panel-stack > .panel-collapsible:not(.collapsed))
   display: grid;
   justify-items: center;
   gap: 5px;
-  color: color-mix(in srgb, var(--cockpit-accent) 24%, #b0b0b0);
+  color: color-mix(in srgb, var(--cockpit-accent) 24%, #79b8ff);
   opacity: 0.84;
   transform: translate(-50%, -50%) translateZ(24px);
   transition: opacity 180ms ease;
@@ -214,7 +214,7 @@ body.cockpit-mode:has(#left-panel-stack > .panel-collapsible:not(.collapsed))
   width: clamp(56px, 6vw, 78px);
   height: clamp(56px, 6vw, 78px);
   overflow: visible;
-  color: color-mix(in srgb, var(--cockpit-accent) 28%, #b0b0b0);
+  color: color-mix(in srgb, var(--cockpit-accent) 28%, #79b8ff);
   fill: currentColor;
   stroke: color-mix(in srgb, var(--cockpit-accent) 58%, #d8f3ff);
   stroke-width: 0.7px;
@@ -869,10 +869,10 @@ body.cockpit-mode:has(#left-panel-stack > .panel-collapsible:not(.collapsed))
   gap: 6px;
   min-height: 32px;
   padding: 7px 10px;
-  border: 1px solid rgba(200, 200, 200, 0.38);
+  border: 1px solid rgba(116, 219, 255, 0.38);
   border-radius: 6px;
   background: rgba(2, 12, 20, 0.82);
-  color: #e5e5e5;
+  color: #bceeff;
   font: 700 8px/1 var(--font-mono);
   letter-spacing: 0.12em;
   cursor: pointer;
@@ -949,7 +949,7 @@ body.cockpit-mode #view-switcher button {
   display: none;
 }
 .cockpit-context-window[data-state='uncertain'] {
-  border-top-color: rgba(200, 200, 200, 0.72);
+  border-top-color: rgba(116, 219, 255, 0.72);
 }
 /* CONTACT LOST reuses the amber the app already spends on unknown/stale inputs
    (.cockpit-context-cohorts > div.unknown, .cockpit-brief-status[data-state="unavailable"]),
@@ -985,7 +985,7 @@ body.cockpit-mode #view-switcher button {
 .cockpit-context-qualifier {
   grid-column: 1 / -1;
   justify-self: start;
-  color: rgba(200, 200, 200, 0.82);
+  color: rgba(116, 219, 255, 0.82);
   font-size: 7px;
   letter-spacing: 0.16em;
   white-space: nowrap;
@@ -1171,7 +1171,7 @@ body.cockpit-mode #view-switcher button {
   letter-spacing: 0.11em;
 }
 .cockpit-context-window[data-state='uncertain'] #cockpit-context-uncertainty {
-  color: #c8c8c8;
+  color: #74dbff;
 }
 .cockpit-context-window[data-state='lost'] #cockpit-context-uncertainty {
   color: #d5a863;
@@ -1371,11 +1371,11 @@ body.cockpit-mode #view-switcher button {
 .cockpit-utility-control.is-expanded .cockpit-utility-divider {
   background: linear-gradient(
     90deg,
-    rgb(170 170 170 / 28%),
-    rgba(170, 170, 170, 0.18) 58%,
+    rgb(0 212 255 / 28%),
+    rgba(0, 212, 255, 0.18) 58%,
     transparent
   );
-  box-shadow: 0 0 7px rgba(170, 170, 170, 0.22);
+  box-shadow: 0 0 7px rgba(0, 212, 255, 0.22);
 }
 .cockpit-utility-glyph {
   display: grid;
@@ -1461,10 +1461,10 @@ body.cockpit-mode #view-switcher button {
 }
 .cockpit-radio-transport button {
   min-height: 32px;
-  border: 1px solid rgba(188, 188, 188, 0.24);
+  border: 1px solid rgba(65, 220, 231, 0.24);
   border-radius: 6px;
-  background: rgba(188, 188, 188, 0.05);
-  color: #dadada;
+  background: rgba(65, 220, 231, 0.05);
+  color: #9ceaf1;
   cursor: pointer;
 }
 .cockpit-radio-transport button:disabled {

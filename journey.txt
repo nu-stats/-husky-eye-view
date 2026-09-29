@@ -484,6 +484,17 @@ Code changes, so the app explains itself instead of just switching views:
 Code:     src/maps/defaultSources.js, controller.js, imagery.js, src/ui/shellFeedback.js.
 
 
+-------------------------------------------------------------------------------
+STEP 32: Release v0.1.1
+-------------------------------------------------------------------------------
+Asked:    Save this version, push it, and tag it as a release the same way as v0.1.0.
+Done:     Steps 28-31 committed and pushed, then:
+            git tag -d v0.1.1        (the local copy held upstream's own v0.1.1 tag)
+            git tag -a v0.1.1 -m "Husky Eye View v0.1.1"
+            git push origin v0.1.1
+Last step, on the website: Releases -> Draft a new release -> tag v0.1.1 -> Publish.
+
+
 ===============================================================================
 WHERE THINGS STAND (September 29, 2026)
 ===============================================================================
@@ -509,7 +520,8 @@ Data exports:
             mkdb_incidents_geocoded.csv
 
 Git history on main (newest first):
-            (latest)   Boston Neighborhoods, bottom menu rows, ion 401 notices (Steps 28-31)
+            (release)  Record release v0.1.1 in the journey (tagged v0.1.1)
+            d9d8ec33  Boston Neighborhoods, bottom menu rows, ion 401 notices (Steps 28-31)
             0ce4baef  Husky Eye View v0.1.0 (tagged v0.1.0)
             ce938a30  Add development journey
             20b15d96  Voice reaches every data layer; Boston is the default view

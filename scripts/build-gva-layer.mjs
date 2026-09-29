@@ -1,11 +1,14 @@
 // Build the GVA 2015 gun deaths map layer from the geocoded CSV written by
 // scripts/geocode-gva-incidents.mjs:
-//   data/exports/gva_2015_incidents_geocoded.csv -> src/data/local_data/gva_2015/incidents.geojsonl
+//   data/restricted/exports/gva_2015_incidents_geocoded.csv -> data/restricted/gva_2015/incidents.geojsonl
 // Usage: node scripts/build-gva-layer.mjs [input.csv]
+// data/restricted/ is git-ignored; then run scripts/lock-research-data.mjs to
+// refresh the encrypted copy the map loads (data/research/).
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
-const input = process.argv[2] ?? 'data/exports/gva_2015_incidents_geocoded.csv';
-const outDir = 'src/data/local_data/gva_2015';
+const input =
+  process.argv[2] ?? 'data/restricted/exports/gva_2015_incidents_geocoded.csv';
+const outDir = 'data/restricted/gva_2015';
 
 function parseCsv(text) {
   const rows = [];

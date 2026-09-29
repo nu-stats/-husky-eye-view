@@ -180,17 +180,6 @@ for (const side of ['left', 'right']) {
     );
     assert.equal(f.first.getAttribute('aria-hidden'), undefined);
   });
-  test(`${side} constrained layout preserves the preferred panel and requests another pass`, () => {
-    const f = fixture(side);
-    f.expand(f.first, 900);
-    f.expand(f.second, 900);
-    f.options.preferredPanelId = 'second';
-    f.run();
-    assert.equal(f.second.classList.contains('collapsed'), false);
-    assert.equal(f.first.classList.contains('layout-auto-collapsed'), true);
-    assert.deepEqual(f.collapsed, ['first']);
-    assert.equal(f.retries(), 1);
-  });
   test(`${side} hidden HUD restores automatic collapse without altering manual collapse`, () => {
     const f = fixture(side, { hud: { visible: false, variant: 'tactical' } });
     f.first.classList.add('layout-auto-collapsed');
@@ -201,53 +190,146 @@ for (const side of ['left', 'right']) {
   });
 }
 
-test('right layout uses keyboard focus when there is no preferred panel', () => {
-  const f = fixture('right');
+test('left constrained layout preserves the preferred panel and requests another pass', () => {
+  const f = fixture('left');
   f.expand(f.first, 900);
   f.expand(f.second, 900);
-  f.options.documentRef.activeElement = f.second;
+  f.options.preferredPanelId = 'second';
   f.run();
-  assert.equal(f.first.classList.contains('layout-auto-collapsed'), true);
   assert.equal(f.second.classList.contains('collapsed'), false);
+  assert.equal(f.first.classList.contains('layout-auto-collapsed'), true);
+  assert.deepEqual(f.collapsed, ['first']);
+  assert.equal(f.retries(), 1);
 });
 
-test('right layout retains Display allocation during measurement and caps restored scroll', () => {
+/** The bottom row (Display, CCTV, Context) in a 1600x900 window. */
+function bottomRow({ dockRight = 1040, railWidth = 400 } = {}) {
   const f = fixture('right');
+  f.options.windowRef.innerWidth = 1600;
+  f.stack.rect = {
+    top: 800,
+    bottom: 850,
+    height: 50,
+    left: 1100,
+    right: 1100 + railWidth,
+    width: railWidth,
+  };
+  f.options.dock = element('dock', {
+    left: 560,
+    width: dockRight - 560,
+    top: 790,
+    height: 92,
+  });
+  return f;
+}
+
+test('the bottom row sits beside the command dock, bottom-aligned with it', () => {
+  const f = bottomRow();
+  f.run();
+  assert.equal(f.stack.dataset.layoutMode, 'bottom');
+  assert.equal(f.stack.dataset.placement, 'docked');
+  // Dock right edge 1040 + the 10.8px gap; its bottom is 18px above the edge.
+  assert.equal(
+    f.stack.style.getPropertyValue('--bottom-rail-left'),
+    '1050.8px',
+  );
+  assert.equal(f.stack.style.getPropertyValue('--bottom-rail-right'), 'auto');
+  assert.equal(
+    f.stack.style.getPropertyValue('--bottom-rail-offset'),
+    '18.0px',
+  );
+  assert.equal(
+    f.stack.style.getPropertyValue('--right-stack-max-height'),
+    '756.0px',
+  );
+});
+
+test('beside the dock, the row lifts just enough to clear a low obstacle beneath it', () => {
+  const f = bottomRow();
+  // The Power Up chip at the bottom-right sits under the row's right end.
+  const chip = element('key-setup-chip', {
+    left: 1360,
+    width: 226,
+    top: 850,
+    height: 36,
+  });
+  f.options.obstacles = [chip];
+  f.run();
+  assert.equal(f.stack.dataset.placement, 'docked');
+  assert.equal(
+    f.stack.style.getPropertyValue('--bottom-rail-left'),
+    '1050.8px',
+  );
+  assert.equal(
+    f.stack.style.getPropertyValue('--bottom-rail-offset'),
+    '60.8px',
+  );
+});
+
+test('with no room beside the dock the row moves to the corner, above what is beneath it', () => {
+  const f = bottomRow({ dockRight: 1300 });
+  const chip = element('key-setup-chip', {
+    left: 1360,
+    width: 226,
+    top: 850,
+    height: 36,
+  });
+  f.options.obstacles = [chip];
+  f.run();
+  assert.equal(f.stack.dataset.placement, 'corner');
+  assert.equal(f.stack.style.getPropertyValue('--bottom-rail-left'), 'auto');
+  assert.equal(f.stack.style.getPropertyValue('--bottom-rail-right'), '14px');
+  // The wide dock now reaches under the row too, so the row clears its top.
+  assert.equal(
+    f.stack.style.getPropertyValue('--bottom-rail-offset'),
+    '120.8px',
+  );
+});
+
+test('hidden, upper-half and off-to-the-side obstacles do not move the row', () => {
+  const f = bottomRow();
+  const hidden = element('hidden', { left: 1200, top: 850, height: 30 });
+  hidden.computed.display = 'none';
+  const high = element('high', { left: 1200, top: 100, height: 200 });
+  const left = element('left', { left: 0, width: 300, top: 850, height: 30 });
+  f.options.obstacles = [hidden, high, left];
+  f.run();
+  assert.equal(f.stack.dataset.placement, 'docked');
+});
+
+test('the bottom row never collapses or hides panels to make room', () => {
+  const f = bottomRow();
+  f.expand(f.first, 900);
+  f.expand(f.second, 900);
+  f.first.setAttribute('aria-hidden', 'true');
+  f.second.classList.add('collapsed', 'layout-auto-collapsed');
+  f.run();
+  assert.equal(f.first.classList.contains('collapsed'), false);
+  assert.equal(
+    f.second.classList.contains('collapsed'),
+    false,
+    'an older automatic collapse is released',
+  );
+  assert.equal(f.first.getAttribute('aria-hidden'), undefined);
+  assert.equal(f.retries(), 0);
+});
+
+test('an open Display keeps its restored scroll, capped to its content', () => {
+  const f = bottomRow();
   f.first.id = 'pp-toggles';
   f.expand(f.first, 900);
   f.first.clientHeight = 400;
   f.options.displayPanel = f.first;
   f.options.readDisplayScrollTop = () => 800;
-  f.first.style.setProperty('--right-panel-allocated-height', '600px');
-  f.first.writes.length = 0;
   f.run();
   assert.equal(f.first.scrollTop, 500);
-  assert.equal(
-    f.first.writes.some(
-      ([op, name]) =>
-        op === 'remove' && name === '--right-panel-allocated-height',
-    ),
-    false,
-  );
-  f.first.writes.length = 0;
+  f.stack.writes.length = 0;
   f.run();
   assert.equal(
-    f.first.writes.some(
-      ([, name]) => name === '--right-panel-allocated-height',
-    ),
-    false,
-    'stable allocation must not churn the style attribute',
+    f.stack.writes.length,
+    0,
+    'a stable layout must not churn the style attribute',
   );
-});
-
-test('right rail aligns to the current left rail and excludes hidden obstacles', () => {
-  const f = fixture('right');
-  f.options.leftStack.rect.top = 200;
-  const hidden = element('hidden', { left: 1100, top: 100, height: 200 });
-  hidden.computed.display = 'none';
-  f.options.obstacles = [hidden];
-  f.run();
-  assert.equal(f.stack.dataset.safeTop, '200.0');
 });
 
 test('natural height includes visible content, margins and wrapper chrome, excluding hidden rows', () => {

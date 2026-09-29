@@ -106,6 +106,16 @@ export const KEY_SETUP_KEYS = Object.freeze([
     envVars: Object.freeze(['LL2_API_TOKEN']),
     tier: 'free',
   }),
+  Object.freeze({
+    id: 'research-data',
+    title: 'RESEARCH DATASETS',
+    unlocks:
+      'The locked GVA 2015 gun deaths and MKDB mass killings layers. Ask the project owner for this key.',
+    // Issued by the project owner, not a provider: no sign-up link.
+    getUrl: '',
+    envVars: Object.freeze(['HEV_RESEARCH_DATA_KEY']),
+    tier: 'free',
+  }),
 ]);
 
 /** Hostnames a Provider Settings request may arrive under or originate from. */

@@ -25,36 +25,30 @@ import {
   SCOPE_TERMINUS_QUANTUM,
   _resetScopeMaskForTest,
 } from './scopeMask.js';
-import { KEYHOLE_OUTER_RADIUS } from './celestialRing.js';
-
 beforeEach(() => _resetScopeMaskForTest());
 
-test('geometry anchors the visible edge to the shared keyhole radius', () => {
+test('the view fills the window; the mask is only an edge band', () => {
   const geo = scopeMaskGeometry(1440, 860, 0.4);
-  const keyholeR = 860 * 0.5 * KEYHOLE_OUTER_RADIUS;
   assert.ok(geo);
   assert.equal(geo.centerX, 720);
   assert.equal(geo.centerY, 430);
-  // Feather straddles the keyhole edge: inner+outer average = keyhole radius.
-  assert.ok(Math.abs((geo.innerR + geo.outerR) / 2 - keyholeR) < 1e-9);
-  assert.ok(Math.abs((geo.outerR - geo.innerR) - keyholeR * 0.4) < 1e-9);
+  assert.equal(geo.width, 1440, 'the whole window width is in view');
+  assert.equal(geo.height, 860);
+  // The band is a fraction of half the shorter side.
+  assert.ok(Math.abs(geo.featherPx - 430 * 0.4) < 1e-9);
 });
 
-test('zero feather produces a hard edge exactly at the keyhole radius', () => {
-  const geo = scopeMaskGeometry(1000, 800, 0);
-  const keyholeR = 800 * 0.5 * KEYHOLE_OUTER_RADIUS;
-  assert.equal(geo.innerR, keyholeR);
-  assert.equal(geo.outerR, keyholeR);
+test('zero feather means no band at all', () => {
+  assert.equal(scopeMaskGeometry(1000, 800, 0).featherPx, 0);
 });
 
 test('feather ratio is clamped to [0,1] and bad input falls back to 0', () => {
   const wide = scopeMaskGeometry(1000, 800, 7);
   const one = scopeMaskGeometry(1000, 800, 1);
-  assert.equal(wide.innerR, one.innerR);
-  assert.equal(wide.outerR, one.outerR);
+  assert.equal(wide.featherPx, one.featherPx);
   const nan = scopeMaskGeometry(1000, 800, Number.NaN);
   const zero = scopeMaskGeometry(1000, 800, 0);
-  assert.equal(nan.innerR, zero.innerR);
+  assert.equal(nan.featherPx, zero.featherPx);
 });
 
 test('degenerate viewport yields null instead of a broken gradient', () => {
@@ -72,15 +66,13 @@ test('an omitted feather argument uses the module default, whatever it is', () =
   // written this way deliberately.
   const omitted = scopeMaskGeometry(1200, 900);
   const explicit = scopeMaskGeometry(1200, 900, SCOPE_FEATHER_RATIO_DEFAULT);
-  assert.equal(omitted.innerR, explicit.innerR);
-  assert.equal(omitted.outerR, explicit.outerR);
+  assert.equal(omitted.featherPx, explicit.featherPx);
   // And it is not simply ignoring the argument: a different ratio must differ,
-  // and must still derive its band from the keyhole radius.
+  // and must still derive its band from half the shorter side.
   const wider = scopeMaskGeometry(1200, 900, SCOPE_FEATHER_RATIO_DEFAULT + 0.4);
-  assert.notEqual(wider.outerR - wider.innerR, omitted.outerR - omitted.innerR);
-  const keyholeR = 900 * 0.5 * KEYHOLE_OUTER_RADIUS;
-  assert.ok(Math.abs((wider.outerR - wider.innerR)
-    - keyholeR * (SCOPE_FEATHER_RATIO_DEFAULT + 0.4)) < 1e-9);
+  assert.notEqual(wider.featherPx, omitted.featherPx);
+  assert.ok(Math.abs(wider.featherPx
+    - 450 * (SCOPE_FEATHER_RATIO_DEFAULT + 0.4)) < 1e-9);
   // The default's VALUE (hidden feather, owner directive 2026-08-22) is pinned
   // with the rest of the first-run batch in reasonableDefaults.test.mjs.
 });
@@ -120,6 +112,9 @@ function stubScopeMaskDom({ width = 1000, height = 800, dpr = 1 } = {}) {
       fill() { ops.fills += 1; },
       fillRect() { ops.fills += 1; },
       createRadialGradient: () => ({
+        addColorStop(offset, color) { gradientStops.push({ offset, color }); },
+      }),
+      createLinearGradient: () => ({
         addColorStop(offset, color) { gradientStops.push({ offset, color }); },
       }),
       set fillStyle(value) { if (typeof value === 'string') fillStyles.push(value); },
@@ -334,21 +329,28 @@ test('an override pins the terminus and null restores the ramp', () => {
   }
 });
 
-test('the hard-crop (feather 0) path honors the same terminus alpha', () => {
+test('the edge band darkens to the terminus alpha; feather 0 paints nothing', () => {
   const dom = stubScopeMaskDom({ width: 1000, height: 800, dpr: 1 });
   try {
     installScopeMask({ container: dom.container });
     updateScopeTerminusForHeight(SCOPE_TERMINUS_FAR_M + 5_000_000); // true full-globe view
-    setScopeMaskFeather(0); // hard crop — the evenodd rect-minus-circle path
-    // The globe-scale seed paint is legitimately in the history, so assert on
-    // the LAST fill: what the hard crop is painting right now, zoomed in.
-    const beforeDescent = dom.fillStyles().at(-1);
-    assert.equal(beforeDescent, `rgba(5,5,8,${SCOPE_OUTSIDE_ALPHA})`,
-      'at globe scale the hard crop is still the translucent terminus');
+    setScopeMaskFeather(0.2);
+    // Each edge's gradient runs from the terminus color at the edge to clear.
+    const globeStops = dom.gradientStops().slice(-8);
+    assert.deepEqual(
+      globeStops.map((stop) => stop.color),
+      Array.from({ length: 4 }, () => [`rgba(5,5,8,${SCOPE_OUTSIDE_ALPHA})`, 'rgba(5,5,8,0)']).flat(),
+      'four edge bands, translucent terminus at globe scale',
+    );
 
     updateScopeTerminusForHeight(SCOPE_TERMINUS_NEAR_M);
-    assert.equal(dom.fillStyles().at(-1), 'rgba(5,5,8,1)',
-      'a zoomed-in hard crop must paint fully opaque, not the globe-scale 0.94');
+    assert.equal(dom.gradientStops().at(-2).color, 'rgba(5,5,8,1)',
+      'zoomed in, the edge is fully opaque, not the globe-scale 0.94');
+
+    // No band: the view is the whole window and nothing is painted.
+    const fillsBefore = dom.ops.fills;
+    setScopeMaskFeather(0);
+    assert.equal(dom.ops.fills, fillsBefore, 'feather 0 paints nothing');
   } finally {
     setScopeMaskFeather(SCOPE_FEATHER_RATIO_DEFAULT);
     destroyScopeMask();

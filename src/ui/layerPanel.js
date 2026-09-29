@@ -46,6 +46,7 @@ const PANEL_GROUPS = [
       'earthquakes',
       'local-firms',
       'local-chicago-events',
+      'local-tlr',
       'local-famous-shootings',
       'local-gva-2015',
       'local-mkdb',
@@ -106,6 +107,45 @@ function panelLabel(layer) {
 }
 
 /**
+ * Whether a layer is off and waiting on a key (a locked research dataset, or
+ * a keyed feed that reported its key missing).
+ * @param {object} layer Row from the layer manager's getAll().
+ * @returns {boolean}
+ */
+export function layerIsLocked(layer) {
+  return (
+    !layer?.enabled &&
+    layer?.stats?.keyRequired === true &&
+    Boolean(layer?.requiresKeyId)
+  );
+}
+
+/** Per-viewer convenience: which layer groups are folded away. */
+const COLLAPSED_GROUPS_KEY = 'hev.layerGroupsCollapsed';
+
+function readCollapsedGroups() {
+  try {
+    const raw = globalThis.localStorage?.getItem(COLLAPSED_GROUPS_KEY);
+    if (raw == null) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? new Set(parsed.map(String)) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCollapsedGroups(groups) {
+  try {
+    globalThis.localStorage?.setItem(
+      COLLAPSED_GROUPS_KEY,
+      JSON.stringify([...groups]),
+    );
+  } catch {
+    /* storage unavailable: the fold simply is not remembered */
+  }
+}
+
+/**
  * Guidance for a control a missing provider key is holding back.
  *
  * The key registry already owns what each key is called and which environment
@@ -148,6 +188,12 @@ export class LayerPanel {
     this._generation = 0;
     this._removers = [];
     this._destroyed = false;
+    // Panel-only view state: the search text and folded groups. A stored fold
+    // wins; with none, groups without an active layer start folded.
+    this._query = '';
+    this._collapsedGroups = readCollapsedGroups();
+    this._groups = new Map();
+    this._onSignature = '';
   }
   mount(container) {
     if (this._destroyed) return;
@@ -167,12 +213,206 @@ export class LayerPanel {
     if (this._destroyed) return;
     this._destroyed = true;
     this._releaseBindings();
+    this._onBadge?.remove();
+    this._onBadge = null;
     this._toggleContainer = null;
   }
+
+  /**
+   * Search box, the "on now" strip of active layers, and the empty-search
+   * message. Sticky at the top of the scrolling list.
+   */
+  _buildToolbar() {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'data-panel-toolbar';
+    const input = document.createElement('input');
+    input.type = 'search';
+    input.className = 'data-search-input';
+    input.placeholder = 'Find a layer';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.setAttribute('aria-label', 'Find a layer');
+    input.value = this._query;
+    this._bind(input, 'input', () => {
+      this._query = input.value;
+      this._applyFilter();
+    });
+    this._bind(input, 'keydown', (event) => {
+      // Escape clears the search first; it only reaches the app's own
+      // Escape handling once the box is empty.
+      if (event.key !== 'Escape' || !input.value) return;
+      input.value = '';
+      this._query = '';
+      this._applyFilter();
+      event.stopPropagation();
+    });
+    const strip = document.createElement('div');
+    strip.className = 'data-on-strip';
+    strip.setAttribute('aria-label', 'Layers that are on');
+    this._bind(strip, 'click', (event) => {
+      const chip = event.target?.closest?.('.data-on-chip');
+      if (chip) this._revealRow(chip.dataset.onLayer);
+    });
+    const empty = document.createElement('div');
+    empty.className = 'data-search-empty';
+    empty.hidden = true;
+    toolbar.appendChild(input);
+    toolbar.appendChild(strip);
+    this._searchInput = input;
+    this._stripEl = strip;
+    this._emptyEl = empty;
+    return { toolbar, empty };
+  }
+
+  /** "N ON" badge beside the panel title, visible even while it is folded. */
+  _mountOnBadge() {
+    const header = this._toggleContainer
+      ?.closest?.('[data-panel-id]')
+      ?.querySelector?.('.panel-header');
+    const title = header?.querySelector?.('.panel-title');
+    if (!title) return;
+    if (!this._onBadge) {
+      this._onBadge = document.createElement('span');
+      this._onBadge.className = 'data-on-badge';
+      this._onBadge.setAttribute('aria-live', 'polite');
+    }
+    title.after(this._onBadge);
+  }
+
+  _toggleGroup(group) {
+    if (!this._collapsedGroups) this._collapsedGroups = new Set();
+    if (this._collapsedGroups.has(group)) this._collapsedGroups.delete(group);
+    else this._collapsedGroups.add(group);
+    writeCollapsedGroups(this._collapsedGroups);
+    this._applyFilter();
+  }
+
+  /** Show rows matching the search (and not folded away while not searching). */
+  _applyFilter() {
+    const query = this._query.trim().toLowerCase();
+    let matches = 0;
+    for (const [group, entry] of this._groups) {
+      const folded = !query && Boolean(this._collapsedGroups?.has(group));
+      const groupMatch = Boolean(query) && group.toLowerCase().includes(query);
+      let visible = 0;
+      for (const { row, label } of entry.rows) {
+        const match = !query || groupMatch || label.includes(query);
+        row.hidden = !match || folded;
+        if (match) visible++;
+      }
+      matches += visible;
+      entry.heading.hidden = visible === 0;
+      entry.heading.setAttribute('aria-expanded', String(!folded));
+      entry.heading.classList.toggle('folded', folded);
+    }
+    if (this._emptyEl) {
+      this._emptyEl.hidden = matches > 0;
+      this._emptyEl.textContent = query
+        ? `No layer matches "${this._query.trim()}".`
+        : '';
+    }
+  }
+
+  /** Unfold, scroll to and briefly mark a layer's row (from the on-now strip). */
+  _revealRow(layerId) {
+    for (const [group, entry] of this._groups) {
+      const item = entry.rows.find(
+        ({ row }) => row.dataset.layerId === layerId,
+      );
+      if (!item) continue;
+      if (this._collapsedGroups?.has(group)) this._toggleGroup(group);
+      if (item.row.hidden) {
+        this._query = '';
+        if (this._searchInput) this._searchInput.value = '';
+        this._applyFilter();
+      }
+      item.row.scrollIntoView?.({ block: 'nearest' });
+      item.row.classList.toggle('data-row-flash', true);
+      setTimeout(() => item.row.classList.toggle('data-row-flash', false), 900);
+      return;
+    }
+  }
+
+  /**
+   * Mark rows that are on, count them per group and in the panel badge, and
+   * list them in the on-now strip (rebuilt only when the set changes).
+   */
+  _syncOnState(layers = this.getAll()) {
+    if (!this._toggleContainer) return;
+    const on = [];
+    const onByGroup = new Map();
+    const lockedByGroup = new Map();
+    for (const layer of layers) {
+      if (!layer.showInTogglePanel) continue;
+      const row = this._rows?.get(layer.id);
+      if (!row) continue;
+      row.classList.toggle('is-on', Boolean(layer.enabled));
+      const locked = layerIsLocked(layer);
+      row.classList.toggle('is-locked', locked);
+      if (locked)
+        lockedByGroup.set(
+          row.dataset.group,
+          (lockedByGroup.get(row.dataset.group) || 0) + 1,
+        );
+      if (!layer.enabled) continue;
+      on.push(layer);
+      const group = row.dataset.group;
+      onByGroup.set(group, (onByGroup.get(group) || 0) + 1);
+    }
+    // A layer that turns on (by click, voice or a restored link) unfolds its
+    // group so it is never switched on out of sight.
+    const onIds = new Set(on.map((layer) => layer.id));
+    if (this._lastOn) {
+      let unfolded = false;
+      for (const layer of on) {
+        if (this._lastOn.has(layer.id)) continue;
+        const group = this._rows?.get(layer.id)?.dataset.group;
+        if (group && this._collapsedGroups?.delete(group)) unfolded = true;
+      }
+      if (unfolded) {
+        writeCollapsedGroups(this._collapsedGroups);
+        this._applyFilter();
+      }
+    }
+    this._lastOn = onIds;
+    for (const [group, entry] of this._groups) {
+      const count = onByGroup.get(group) || 0;
+      const locked = lockedByGroup.get(group) || 0;
+      entry.count.textContent = [
+        count ? `${count} on` : '',
+        locked ? `${locked} locked` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+    }
+    if (this._onBadge) {
+      this._onBadge.textContent = on.length ? `${on.length} ON` : '';
+      this._onBadge.hidden = on.length === 0;
+    }
+    const signature = on.map((layer) => layer.id).join('|');
+    if (!this._stripEl || signature === this._onSignature) return;
+    this._onSignature = signature;
+    this._stripEl.textContent = '';
+    for (const layer of on) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'data-on-chip';
+      chip.dataset.onLayer = layer.id;
+      chip.title = `${panelLabel(layer)} is on. Show its row.`;
+      chip.textContent = panelLabel(layer);
+      this._stripEl.appendChild(chip);
+    }
+    this._stripEl.hidden = on.length === 0;
+  }
+
   _renderToggles() {
     if (this._destroyed || !this._toggleContainer) return;
     this._releaseBindings();
     this._toggleContainer.innerHTML = '';
+    this._groups = new Map();
+    this._rows = new Map();
+    this._onSignature = '';
+    this._lastOn = null;
 
     const generation = this._generation;
     const layers = this.getAll()
@@ -182,21 +422,50 @@ export class LayerPanel {
           (PANEL_POSITIONS.get(a.id) ?? PANEL_ORDER.length) -
           (PANEL_POSITIONS.get(b.id) ?? PANEL_ORDER.length),
       );
+    const { toolbar, empty } = this._buildToolbar();
+    this._toggleContainer.appendChild(toolbar);
+    this._mountOnBadge();
+    const groupOf = (layer) =>
+      PANEL_ORDER[PANEL_POSITIONS.get(layer.id)]?.label ?? 'Other layers';
+    if (!this._collapsedGroups) {
+      // First visit: fold every group that has nothing switched on.
+      const active = new Set(
+        layers.filter((layer) => layer.enabled).map(groupOf),
+      );
+      this._collapsedGroups = new Set(
+        layers.map(groupOf).filter((group) => !active.has(group)),
+      );
+    }
     let previousGroup = '';
     for (const layer of layers) {
       if (!layer.showInTogglePanel) continue;
-      const group =
-        PANEL_ORDER[PANEL_POSITIONS.get(layer.id)]?.label ?? 'Other layers';
+      const group = groupOf(layer);
       if (group && group !== previousGroup) {
-        const heading = document.createElement('h3');
+        const heading = document.createElement('button');
+        heading.type = 'button';
         heading.className = 'data-layer-group-heading';
-        heading.textContent = group;
+        heading.dataset.group = group;
+        const label = document.createElement('span');
+        label.className = 'data-group-label';
+        label.textContent = group;
+        const count = document.createElement('span');
+        count.className = 'data-group-on';
+        heading.appendChild(label);
+        heading.appendChild(count);
+        this._bind(heading, 'click', () => this._toggleGroup(group));
         this._toggleContainer.appendChild(heading);
+        this._groups.set(group, { heading, count, rows: [] });
       }
       previousGroup = group;
       const row = document.createElement('div');
       row.className = 'data-toggle-row';
       row.dataset.layerId = layer.id;
+      row.dataset.group = group;
+      this._rows.set(layer.id, row);
+      this._groups.get(group)?.rows.push({
+        row,
+        label: panelLabel(layer).toLowerCase(),
+      });
 
       const topRow = document.createElement('div');
       topRow.className = 'data-toggle-top';
@@ -233,6 +502,15 @@ export class LayerPanel {
           toggle.getAttribute('aria-disabled') === 'true'
         )
           return;
+        // A locked layer opens POWER UP, where its key goes, instead.
+        const live = this.getAll().find(({ id }) => id === layer.id);
+        if (live && layerIsLocked(live)) {
+          const powerUp = document.getElementById('key-setup-chip');
+          if (powerUp && !powerUp.hidden) {
+            powerUp.click();
+            return;
+          }
+        }
         toggle.setAttribute('aria-disabled', 'true');
         toggle.setAttribute('aria-busy', 'true');
         try {
@@ -242,9 +520,12 @@ export class LayerPanel {
         } catch (error) {
           console.warn(`[Data] ${layer.id} toggle error:`, error);
         } finally {
-          const current = this.getAll().find(({ id }) => id === layer.id);
-          if (!this._destroyed && current && this._generation === generation)
+          const all = this.getAll();
+          const current = all.find(({ id }) => id === layer.id);
+          if (!this._destroyed && current && this._generation === generation) {
             this._syncToggleButton(toggle, current);
+            this._syncOnState(all);
+          }
         }
       });
 
@@ -308,6 +589,9 @@ export class LayerPanel {
 
       this._toggleContainer.appendChild(row);
     }
+    this._toggleContainer.appendChild(empty);
+    this._applyFilter();
+    this._syncOnState(layers);
   }
 
   /** Qualify a loaded count when it does not mean items currently on screen. */
@@ -470,10 +754,12 @@ export class LayerPanel {
       this.onHiddenRefresh();
       return;
     }
-    for (const layer of this.getAll()) {
-      const row = this._toggleContainer.querySelector(
-        `[data-layer-id="${layer.id}"]`,
-      );
+    const layers = this.getAll();
+    this._syncOnState(layers);
+    for (const layer of layers) {
+      const row =
+        this._rows?.get(layer.id) ||
+        this._toggleContainer.querySelector(`[data-layer-id="${layer.id}"]`);
       if (!row) continue;
 
       const btn = row.querySelector('.data-toggle-btn');
@@ -504,6 +790,9 @@ export class LayerPanel {
     const feedState = layerFeedState(stats);
     const stateLabel = FEED_STATE_LABELS[feedState];
     const source = stats.source || layer.source;
+    if (layerIsLocked(layer) && stats.statusMessage) {
+      return `${source} · ${stats.statusMessage}`;
+    }
     const lifecycleState =
       layer.lifecycleState || (layer.enabled ? 'enabled' : 'disabled');
     if (lifecycleState === 'enabling' || lifecycleState === 'disabling') {
@@ -574,7 +863,9 @@ export class LayerPanel {
       layer.lifecycleState === 'enabling' ||
       layer.lifecycleState === 'disabling';
     const uncertain = Boolean(layer.lifecycleUncertain);
+    const locked = layerIsLocked(layer);
     button.classList.toggle('active', layer.enabled);
+    button.classList.toggle('locked', locked);
     button.classList.toggle('transitioning', transitioning);
     button.classList.toggle('enabling', layer.lifecycleState === 'enabling');
     button.classList.toggle('disabling', layer.lifecycleState === 'disabling');
@@ -602,7 +893,9 @@ export class LayerPanel {
         ? 'UNCERTAIN'
         : layer.enabled
           ? FEED_STATE_LABELS[feedState]
-          : 'OFF';
+          : locked
+            ? 'LOCKED'
+            : 'OFF';
     const keyGuidance = layerKeyRequirementTooltip(layer);
     // Name the missing key on the control itself: a row reading KEY REQUIRED
     // without saying WHICH key leaves a dead control and no next step. Empty

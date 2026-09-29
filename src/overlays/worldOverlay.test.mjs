@@ -608,7 +608,7 @@ test('canvas backing store tracks CSS size and live DPR', () => {
   env.cleanup();
 });
 
-test('shared fade tuning reaches a host-painted card on the next rendered frame', () => {
+test('a keyhole-faded card near the window edge stays fully opaque (the view fills the window)', () => {
   const env = installMockEnvironment({ width: 400, height: 300, dpr: 1 });
   const paintedAlphas = [];
   Object.defineProperty(env.ctx, 'globalAlpha', {
@@ -619,6 +619,8 @@ test('shared fade tuning reaches a host-painted card on the next rendered frame'
   try {
     setKeyholeFadeTuning({ fadeRatio: 0.16, outsideOpacity: 0.05 });
     initWorldOverlay(env.viewer);
+    // x = 370 of 400 px: outside the old height-sized circle (radius 157 px
+    // around the center), but inside the window.
     setOverlayEntries('fade-host', [selectedEntry('CARD', {
       position: new Cesium.Cartesian3(0.85, 0, 0),
       variant: 'card',
@@ -628,12 +630,14 @@ test('shared fade tuning reaches a host-painted card on the next rendered frame'
     env.postRender.raise();
     const firstAlpha = paintedAlphas.at(-1);
 
+    // Retuning the fade re-reads the keyhole on the next frame; an on-screen
+    // card is still inside it.
     setKeyholeFadeTuning({ fadeRatio: 0.4, outsideOpacity: 0.05 });
     env.postRender.raise();
     const nextAlpha = paintedAlphas.at(-1);
 
-    assert.ok(firstAlpha > 0 && firstAlpha < 1, `expected feathered first alpha, got ${firstAlpha}`);
-    assert.ok(nextAlpha > firstAlpha, `${firstAlpha} should change on the next frame, got ${nextAlpha}`);
+    assert.equal(firstAlpha, 1, 'a card inside the window is not faded');
+    assert.equal(nextAlpha, 1, 'and fade tuning does not dim it');
   } finally {
     setKeyholeFadeTuning({ fadeRatio: 0.16, outsideOpacity: 0.05 });
     env.cleanup();

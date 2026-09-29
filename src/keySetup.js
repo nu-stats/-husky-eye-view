@@ -103,13 +103,16 @@ function buildRow(documentRef, key) {
       'Supplied by your environment, Keychain, or launcher — change it where it was set';
     head.append(badge);
   }
-  const get = documentRef.createElement('a');
-  get.className = 'key-setup-get';
-  get.href = key.getUrl;
-  get.target = '_blank';
-  get.rel = 'noopener noreferrer';
-  get.textContent = key.set ? 'MANAGE ↗' : 'GET KEY ↗';
-  head.append(get);
+  // A key issued by the project owner (research data) has no sign-up page.
+  if (key.getUrl) {
+    const get = documentRef.createElement('a');
+    get.className = 'key-setup-get';
+    get.href = key.getUrl;
+    get.target = '_blank';
+    get.rel = 'noopener noreferrer';
+    get.textContent = key.set ? 'MANAGE ↗' : 'GET KEY ↗';
+    head.append(get);
+  }
 
   const unlocks = documentRef.createElement('p');
   unlocks.className = 'key-setup-unlocks';

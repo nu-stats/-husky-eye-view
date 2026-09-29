@@ -1,14 +1,16 @@
 // Build the MKDB (Mass Killing Database) map layer from the tract-matched
 // incident workbook:
 //   data/source/national_tracts_incidents_only.xlsx
-//     -> data/exports/mkdb_incidents_geocoded.csv  (every column + checks)
-//     -> src/data/local_data/mkdb/incidents.geojsonl
+//     -> data/restricted/exports/mkdb_incidents_geocoded.csv  (every column + checks)
+//     -> data/restricted/mkdb/incidents.geojsonl
 // The workbook already carries longitude/latitude per incident. Each point is
 // checked against the U.S. Census geocoder: the census tract at the point must
 // be the tract the row was matched to (2010 tracts for the 2006-2010 and
 // 2011-2015 ACS periods, 2020 tracts for 2017-2021). Answers are cached in
 // data/source/mkdb_tract_check.json, so re-runs are offline.
 // Usage: node scripts/convert-mkdb-incidents.mjs [input.xlsx]
+// data/restricted/ is git-ignored; then run scripts/lock-research-data.mjs to
+// refresh the encrypted copy the map loads (data/research/).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { inflateRawSync } from 'node:zlib';
 import {
@@ -19,8 +21,8 @@ import {
 const input =
   process.argv[2] ?? 'data/source/national_tracts_incidents_only.xlsx';
 const cachePath = 'data/source/mkdb_tract_check.json';
-const csvPath = 'data/exports/mkdb_incidents_geocoded.csv';
-const outDir = 'src/data/local_data/mkdb';
+const csvPath = 'data/restricted/exports/mkdb_incidents_geocoded.csv';
+const outDir = 'data/restricted/mkdb';
 
 /** Read the named entries of a zip archive (an .xlsx is a zip of XML). */
 function readZipEntries(buffer) {
@@ -268,7 +270,7 @@ const csvCell = (value) => {
   const text = String(value ?? '');
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
-mkdirSync('data/exports', { recursive: true });
+mkdirSync('data/restricted/exports', { recursive: true });
 writeFileSync(
   csvPath,
   `${[

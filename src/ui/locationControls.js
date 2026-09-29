@@ -11,6 +11,7 @@ export class LocationControls {
     onPoi,
     onSearch,
     onReset,
+    onHome = () => {},
     doc = document,
     requestFrame = (callback) => requestAnimationFrame(callback),
     cancelFrame = (id) => cancelAnimationFrame(id),
@@ -64,6 +65,8 @@ export class LocationControls {
     });
     for (const button of elements.resetButtons)
       this.bind(button, 'click', onReset);
+    // The Northeastern button beside the globe button.
+    this.bind(elements.homeButton, 'click', onHome);
   }
   bind(element, event, handler, removers = this.removers) {
     if (!element) return;

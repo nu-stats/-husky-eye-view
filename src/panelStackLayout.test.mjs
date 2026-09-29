@@ -160,28 +160,18 @@ test('desktop panel lanes use per-panel allocations and presentation-only auto-c
     'the latest explicitly opened left panel must receive primary allocation',
   );
   assert.match(ui, /this\._panelLayout\._rightStackPreferredPanelId = rightOwnerPanel\.id;/);
-  assert.match(
-    rightRail,
-    /panel\.id === preferredPanelId[\s\S]*?\[\s*preferredExpandedPanel,\s*\.\.\.expandedPanelsInDomOrder/,
-    'the latest explicitly opened right panel must receive primary allocation',
-  );
   assert.match(ui, /panelId === 'radio-panel'[\s\S]*?document\.getElementById\('global-context-panel'\)/);
-  assert.match(rightRail, /focusedExpandedPanel = expandedPanelsInDomOrder\.find\(\s*\(panel\) =>\s*panel\.contains\(documentRef\.activeElement\),?\s*\)/);
   assert.match(ui, /setAttribute\('aria-expanded', String\(!collapsed\)\)/);
   assert.match(leftRail, /--left-panel-allocated-height/);
-  assert.match(rightRail, /--right-panel-allocated-height/);
   assert.match(
     leftRail,
     /expandedPanels[\s\S]*?removeProperty\('--left-panel-allocated-height'\)[\s\S]*?measurePanelNaturalHeight/,
     'left intrinsic measurement must clear the prior allocation first',
   );
-  assert.match(
-    rightRail,
-    /panel !== displayPanel[\s\S]*?removeProperty\('--right-panel-allocated-height'\)[\s\S]*?const naturalHeight/,
-    'right intrinsic measurement must retain Display allocation while clearing other panel allocations',
-  );
+  // The right rail is now a bottom row (Display, CCTV, Context side by side):
+  // panels never share height, so it clears any stacked-layout allocation.
+  assert.match(rightRail, /removeProperty\('--right-panel-allocated-height'\)/);
   assert.match(css, /var\(\s*--left-panel-allocated-height/);
-  assert.match(css, /var\(\s*--right-panel-allocated-height/);
   assert.match(
     css,
     /#left-panel-stack\.layout-focus > \[data-panel-id\]\.collapsed\s*\{\s*display:\s*none;/,

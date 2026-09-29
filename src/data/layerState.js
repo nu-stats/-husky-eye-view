@@ -436,6 +436,11 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
     disposition: 'enabled-only',
   }),
   Object.freeze({
+    id: 'local-tlr',
+    token: 'tl',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
     id: 'local-tract-le-clusters',
     token: '4',
     disposition: 'enabled-only',

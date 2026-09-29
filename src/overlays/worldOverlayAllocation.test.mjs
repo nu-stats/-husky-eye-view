@@ -264,7 +264,13 @@ const WORKLOADS = [
     profile: 'phase6-detection',
     entries: 5_000,
     candidates: 5_000,
-    maxBytesPerFrame: 700_000,
+    // 2026-09-29: the keyhole became the whole window (it was a circle as
+    // tall as the window), so observations that used to fade to the 1%
+    // outside opacity now draw at full strength. Measured 1,370,742 median /
+    // 1,392,065 max B/frame (274 B/observation) against 524–601 KB before;
+    // both ceilings keep ~15% headroom over the new max.
+    maxBytesPerFrame: 1_600_000,
+    maxBytesPerCandidatePerFrame: 320,
     detectionLabelBudget: 56,
     saturated: false,
   },

@@ -33,32 +33,16 @@ const LEFT_STACK_OBSTACLE_SELECTOR = [
   '#param-slider-panel',
 ].join(', ');
 /**
- * Fixed UI regions that can occupy the right control lane. Runtime rectangle
- * filtering keeps the rail clear of whichever HUD variant is currently
- * visible without tying the layout to one screen height.
+ * Fixed UI along the bottom edge that the bottom panel row (Display, CCTV,
+ * Context) must sit above when it is beneath the row. Runtime rectangle
+ * filtering only counts what overlaps the row horizontally.
  */
 const RIGHT_STACK_OBSTACLE_SELECTOR = [
-  '#cockpit-hud .cockpit-topline',
-  '#cockpit-hud .cockpit-topline > div',
-  '#title-bar',
-  '#style-indicator',
-  '#top-center-actions',
-  '#traffic-sync-chip',
-  '#cctv-sync-chip',
-  '#intel-hud .hud-top-left',
-  '#intel-hud .hud-top-right',
-  '#intel-hud .hud-bottom-left',
-  '#intel-hud .hud-bottom-right',
-  '#intel-hud .hud-top-bar',
-  '#intel-hud .hud-bottom-bar',
-  '#intel-hud .hud-left-edge',
-  '#intel-hud .hud-right-edge',
-  '#cockpit-context',
-  '#cockpit-signal-stream',
-  '#cesium-credits .cesium-credit-logoContainer',
-  '#cesium-credits .cesium-credit-textContainer',
+  '#key-setup-chip',
   '#command-dock',
   '#gev-voice-control',
+  '#cesium-credits .cesium-credit-logoContainer',
+  '#cesium-credits .cesium-credit-textContainer',
 ].join(', ');
 export class PanelLayoutController {
   constructor({
@@ -297,13 +281,10 @@ export class PanelLayoutController {
     if (this.destroyed) return;
     layoutRightPanelRail({
       stack: this._rightPanelStack,
+      dock: document.getElementById('command-dock'),
       obstacles: document.querySelectorAll(RIGHT_STACK_OBSTACLE_SELECTOR),
       windowRef: window,
-      hud: this.readHud(),
-      preferredPanelId: this._rightStackPreferredPanelId,
       onCollapse: (panel) => this._syncPanelCollapseButton(panel),
-      onRetry: () => this._scheduleRightPanelLayout(),
-      leftStack: this._leftPanelStack,
       displayPanel: this._ppToggles,
       readDisplayScrollTop: this.readDisplayScrollTop,
     });

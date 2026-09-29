@@ -678,11 +678,13 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
+/* On: Northeastern red, the panel's one accent. Degraded feeds below keep
+   their warning colors. */
 .data-toggle-btn.active {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: var(--accent-dim);
-  box-shadow: 0 0 10px rgba(170, 170, 170, 0.15);
+  color: #fff;
+  border-color: #c8102e;
+  background: #c8102e;
+  box-shadow: none;
 }
 
 .data-toggle-btn.active.feed-stale,

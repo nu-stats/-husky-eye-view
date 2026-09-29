@@ -146,6 +146,7 @@ const chicagoEventsUrl = new URL(
   './local_data/chicago_events/chicago_events.geojsonl',
   import.meta.url,
 ).href;
+const tlrUrl = new URL('./local_data/tlr/tlr.geojsonl', import.meta.url).href;
 // Converted from the public "Big Bas #1 Chicagoland & Illinois Gang Map"
 // (Google My Maps) by scripts/mymaps-to-geojson.mjs + build-gang-map-layers.mjs.
 const gangMapUrl = new URL(
@@ -221,10 +222,9 @@ const housingEra = (p) =>
     : null;
 // Gun Violence Archive 2015 gun deaths, geocoded by
 // scripts/geocode-gva-incidents.mjs and built by scripts/build-gva-layer.mjs.
-const gva2015Url = new URL(
-  './local_data/gva_2015/incidents.geojsonl',
-  import.meta.url,
-).href;
+// Locked research data: served decrypted by server/providers/research.js only
+// when the research key is configured (the repo carries it encrypted).
+const gva2015Url = '/api/research/gva-2015';
 const GVA_DEATHS = Object.freeze([
   { label: '1 killed', color: '#fc9272', min: 1, max: 2 },
   { label: '2 killed', color: '#ef3b2c', min: 2, max: 3 },
@@ -235,8 +235,7 @@ const gvaDeaths = (p) =>
   GVA_DEATHS.find((d) => p.killed >= d.min && p.killed < d.max);
 // Mass Killing Database incidents (4+ killed, 2006–2023), tract-checked and
 // built by scripts/convert-mkdb-incidents.mjs.
-const mkdbUrl = new URL('./local_data/mkdb/incidents.geojsonl', import.meta.url)
-  .href;
+const mkdbUrl = '/api/research/mkdb';
 const MKDB_DEATHS = Object.freeze([
   { label: '4 killed', color: '#d4b9da', min: 4, max: 5 },
   { label: '5 killed', color: '#c994c7', min: 5, max: 6 },
@@ -360,6 +359,23 @@ export function createInfrastructureLayers(services) {
       color: '#ff3b6b', // Magenta-red
       icon: '●',
       source: 'Local',
+      labels: true,
+      labelMax: 50,
+      labelGridPx: 90,
+    },
+    services,
+  );
+
+  // TLR: locations from the "No Limit: Chicago's Deadliest Gang" video, each
+  // linked to its moment in the video (scripts/geocode-tlr-locations.mjs).
+  const tlr = createLocalGeoJsonLayer(
+    {
+      id: 'local-tlr',
+      url: tlrUrl,
+      name: 'TLR',
+      color: '#ff8c1a',
+      icon: '●',
+      source: 'Video locations',
       labels: true,
       labelMax: 50,
       labelGridPx: 90,
@@ -549,6 +565,7 @@ export function createInfrastructureLayers(services) {
       id: 'local-gva-2015',
       name: 'Gun Deaths 2015 (GVA)',
       url: gva2015Url,
+      lockedDataset: 'gva-2015',
       color: '#ef3b2c',
       icon: '●',
       source: 'Gun Violence Archive',
@@ -570,6 +587,7 @@ export function createInfrastructureLayers(services) {
       id: 'local-mkdb',
       name: 'MKDB Mass Killings (2006–2023)',
       url: mkdbUrl,
+      lockedDataset: 'mkdb',
       color: '#df65b0',
       icon: '●',
       source: 'Mass Killing Database',
@@ -635,6 +653,7 @@ export function createInfrastructureLayers(services) {
     datacenters,
     dams,
     chicagoEvents,
+    tlr,
     gangMap,
     gangMapLabels,
     famousShootings,

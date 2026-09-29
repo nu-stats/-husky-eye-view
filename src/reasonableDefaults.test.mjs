@@ -121,26 +121,24 @@ test('the subtle default did not weaken the feather control, and 0 is still reac
     'the slider still offers the whole range');
   const previous = getScopeMaskFeather();
   try {
+    // Since 2026-09-29 the view fills the window and the feather is the width
+    // of the soft band inside its edges, as a fraction of half the shorter side.
     for (const ratio of [0.35, 0.7, 1]) {
       setScopeMaskFeather(ratio);
       const geo = scopeMaskGeometry(1200, 900);
-      const keyholeR = 900 * 0.5 * KEYHOLE_OUTER_RADIUS;
-      assert.ok(Math.abs((geo.outerR - geo.innerR) - keyholeR * ratio) < 1e-9,
-        `feather ${ratio} must still widen the band to that fraction of the keyhole`);
+      assert.ok(Math.abs(geo.featherPx - 450 * ratio) < 1e-9,
+        `feather ${ratio} must still widen the edge band to that fraction`);
     }
-    // The new default is a real, narrow band — not the hard crop, and nowhere
-    // near the retired 35 % halo.
+    // The default is a real, narrow band.
     setScopeMaskFeather(SCOPE_FEATHER_RATIO_DEFAULT);
     const soft = scopeMaskGeometry(1200, 900);
-    const keyholeR = 900 * 0.5 * KEYHOLE_OUTER_RADIUS;
-    assert.ok(Math.abs((soft.outerR - soft.innerR) - keyholeR * SCOPE_FEATHER_RATIO_DEFAULT) < 1e-9,
+    assert.ok(Math.abs(soft.featherPx - 450 * SCOPE_FEATHER_RATIO_DEFAULT) < 1e-9,
       'the default really draws its own band, derived from the ratio');
-    assert.ok(soft.outerR > soft.innerR, 'and it is a band, not a hard edge');
-    // The hard crop the previous default shipped is still one drag away.
+    assert.ok(soft.featherPx > 0, 'and it is a band, not nothing');
+    // No band at all is still one drag away.
     setScopeMaskFeather(0);
-    const hard = scopeMaskGeometry(1200, 900);
-    assert.equal(hard.outerR, hard.innerR,
-      'an explicit 0 is still the hard crop — the path was not removed with the default');
+    assert.equal(scopeMaskGeometry(1200, 900).featherPx, 0,
+      'an explicit 0 removes the band — the path was not removed with the default');
   } finally {
     setScopeMaskFeather(previous);
   }

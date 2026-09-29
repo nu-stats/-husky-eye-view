@@ -138,6 +138,10 @@ function createRealtimeTokenHandler({
       // case where a bogus ?tier= was silently downgraded to standard.
       res.setHeader('X-GEV-Voice-Tier', tier);
       res.setHeader('X-GEV-Voice-Model', model);
+      // expires_at is on OpenAI's clock; the browser measures it against this
+      // so a wrong local clock cannot make a fresh secret look expired.
+      const upstreamDate = response.headers.get('date');
+      if (upstreamDate) res.setHeader('X-GEV-Upstream-Date', upstreamDate);
       if (requestedTier && !isKnownVoiceTier(requestedTier)) {
         res.setHeader('X-GEV-Voice-Tier-Fallback', '1');
       }

@@ -3,9 +3,10 @@ HUSKY EYE VIEW: DEVELOPMENT JOURNEY
 
 Project:  Husky Eye View, a customized fork of God's Eye View (MIT, bilawalsidhu/gods-eye-view),
           running as a Pinokio app at C:\pinokio\api\gods-eye-view.git
-GitHub:   https://github.com/nu-stats/-husky-eye-view   (origin; the name really starts with a hyphen)
+GitHub:   https://github.com/nu-stats/husky-eye-view   (origin; renamed from "-husky-eye-view")
 Upstream: https://github.com/bilawalsidhu/gods-eye-view
 Period:   September 26-29, 2026
+Release:  v0.1.0 (the first tagged release, see Step 27)
 
 The steps below are in the order they happened. Each one lists what was asked, what was done, and
 which files changed. Steps 1 to 12 happened before the restore in Step 13. Steps 14 onward rebuilt
@@ -301,25 +302,152 @@ Done:
   - Pushed to GitHub. The laptop and GitHub match.
 
 
+-------------------------------------------------------------------------------
+STEP 18: This journey file and a new backup                  (commit ce938a30)
+-------------------------------------------------------------------------------
+Done:     journey.txt written and committed. A tarball of the whole project was made:
+            husky-eye-view-2026-09-29.tar.gz (1.7 GB, includes keys, keep private).
+
+
+-------------------------------------------------------------------------------
+STEP 19: Full-window view instead of the circle
+-------------------------------------------------------------------------------
+Asked:    Replace the circular focus with a view that fills the black areas around it.
+Done:     The "keyhole" is now the whole window, with a soft fade along the four edges.
+Code:
+  - src/celestialRing.js: getKeyholeGeometry returns the window's half width and height and a
+    feather size; label fading measures how far a label is past the rectangle's edge.
+  - src/scopeMask.js: paints four edge gradient bands instead of a round mask.
+
+
+-------------------------------------------------------------------------------
+STEP 20: Sleeker Data Layers panel
+-------------------------------------------------------------------------------
+Asked:    Show a design mockup first, then build it; make it easy to see which layers are on.
+Done:
+  - A search box, a strip of chips for the layers that are on, and folding groups that
+    remember whether they are open. Group headings say "N on · N locked".
+  - A red "N ON" badge next to the panel title. Rows that are on get a tint and a red edge.
+  - The "+" on the panel header no longer gets pushed aside when many layers are on.
+Code:     src/ui/layerPanel.js, src/ui/styles/layers.css, src/ui/styles/radio.css.
+
+
+-------------------------------------------------------------------------------
+STEP 21: Display, CCTV and Context menus moved to the bottom
+-------------------------------------------------------------------------------
+Asked:    Move them to the bottom so they don't block the view, next to Visual Presets, with
+          arrows pointing up.
+Done:     They sit in one row just right of the Visual Presets dock, open upward, and show ▲
+          when closed and ▼ when open.
+Code:     src/ui/rightPanelRail.js (rewritten), src/ui/panelLayoutController.js,
+          src/ui/panelChrome.js, the panel templates, layers.css and responsive.css.
+
+
+-------------------------------------------------------------------------------
+STEP 22: GVA and MKDB locked behind a research key
+-------------------------------------------------------------------------------
+Asked:    Show the GVA and MKDB layers in the menu as locked versions.
+Done:
+  - The two datasets are stored encrypted in data/research/*.enc (AES-256-GCM, key derived
+    with scrypt). The server unlocks them at /api/research/<id> only when
+    HEV_RESEARCH_DATA_KEY is set. The key is entered under POWER UP as "RESEARCH DATASETS".
+  - Without the key the rows show LOCKED; clicking one opens POWER UP.
+  - Plaintext files and exports moved to data/restricted/, which git ignores.
+  - Note: older commits on GitHub still contain the plaintext data.
+Code:     server/providers/research.js, scripts/lock-research-data.mjs,
+          src/data/localGeojsonCore.js, src/data/lifecycle.js, src/keySetupCore.mjs, and one
+          line each in pinokio/start.js, install.js and update.js.
+
+
+-------------------------------------------------------------------------------
+STEP 23: Title plate
+-------------------------------------------------------------------------------
+Asked:    Put a box behind "Husky Eye View" so it is always readable, or a better way.
+Done:     A dark frosted-glass plate behind the title (src/ui/styles/foundation.css).
+
+
+-------------------------------------------------------------------------------
+STEP 24: Northeastern campus as home, plus a husky button
+-------------------------------------------------------------------------------
+Asked:    Open on the Northeastern campus (360 Huntington Ave) instead of downtown Boston, and
+          add a husky button next to the globe button that flies back there.
+Done:
+  - src/camera.js: flyToNortheastern() (42.33985, -71.0892, 600 m up, looking north-east)
+    replaced flyToBoston().
+  - A round button with the husky head (public/husky.svg) next to the globe button, wired
+    through locationControls.js, locationNavigation.js and applicationShell.js.
+
+
+-------------------------------------------------------------------------------
+STEP 25: TLR layer
+-------------------------------------------------------------------------------
+Asked:    Make a layer called TLR from video2_locations_with_links.csv (43 places mentioned in
+          a video, with timestamps and links).
+Done:
+  - 39 places geocoded with the Census geocoder, 4 with OpenStreetMap (neighborhoods and
+    Midway Airport). "Kofax/Kolfax" read as Colfax and "Damon" as Damen; ranges placed at
+    their middle; 3 repeated spots nudged about 15 m apart.
+  - Orange pins under Events. Each card has a "Watch at <time>" link into the video and the
+    nearest trauma center. Voice knows it as "TLR".
+  - Export: data/exports/tlr_locations_geocoded.csv.
+Code:     scripts/geocode-tlr-locations.mjs, infrastructure.js, layerState.js (token 'tl').
+
+
+-------------------------------------------------------------------------------
+STEP 26: Voice stopped connecting
+-------------------------------------------------------------------------------
+Problem:  Every voice attempt failed with "Realtime client secret has expired".
+Cause:    This PC's clock is 4 hours ahead of real time. OpenAI's voice pass lasts 10 minutes,
+          so against the wrong clock it looked expired the moment it arrived.
+Fix:      The server passes along OpenAI's own time (X-GEV-Upstream-Date), and the app
+          measures the pass against it. A new test covers a clock hours ahead. Checked live:
+          the pass shows about 10 minutes left and OpenAI accepts the connection.
+          Still worth doing: set Windows to "Set time automatically".
+Code:     server/providers/openai/realtime.js, src/voice/realtimeBackend.js.
+
+
+-------------------------------------------------------------------------------
+STEP 27: Release v0.1.0
+-------------------------------------------------------------------------------
+Asked:    Put the current version on GitHub as release v0.1.0.
+Done:     All the work above committed and pushed, then an annotated tag pushed on its own:
+            git tag -a v0.1.0 -m "Husky Eye View v0.1.0"
+            git push origin v0.1.0
+          The local copy already had upstream's own v0.1.0 tag (their code), so it was deleted
+          first with `git tag -d v0.1.0`. Only the tag was pushed, not `git push --tags`, which
+          would also push upstream's v0.1.1.
+Last step, on the website: Releases -> Draft a new release -> tag v0.1.0 -> Publish. GitHub
+          attaches the source zip and tar.gz itself. The backup tarballs must NOT be attached
+          because they contain keys.
+
+
 ===============================================================================
 WHERE THINGS STAND (September 29, 2026)
 ===============================================================================
-Layers:     41, including every custom layer. All of them are on voice's list, automatically.
-Look:       Northeastern logo, grey interface, opens on downtown Boston.
+Layers:     42, including every custom layer and TLR. All of them are on voice's list,
+            automatically. GVA and MKDB need the research key.
+Look:       Northeastern logo, grey interface, full-window view, menus along the bottom, opens
+            on the Northeastern campus.
 Not back:   Only the speed rewrite from Step 6 (batched drawing, coarse copies, the Speed
             control). The Miami hotspot map and the large pin layers may feel heavier.
-Tests:      All unit tests pass. Format and package-boundary checks are clean.
+Tests:      All 4,200 unit tests pass. Format and package-boundary checks are clean.
 
 Backups:    C:\Users\jstow\Documents\HuskyEyeView-backups\
               husky-eye-view-2026-09-26-before-optimization.tar.gz
               husky-eye-view-2026-09-28-before-restore.tar.gz
-            Both contain pinokio/ENVIRONMENT (API keys), so keep them private.
+              husky-eye-view-2026-09-29.tar.gz
+            All contain pinokio/ENVIRONMENT (API keys), so keep them private.
 
-Data exports (data/exports/):
-            trauma_centers.csv, public_housing_buildings.csv,
-            gva_2015_incidents_geocoded.csv, mkdb_incidents_geocoded.csv
+Data exports:
+            data/exports/: trauma_centers.csv, public_housing_buildings.csv,
+            tlr_locations_geocoded.csv
+            data/restricted/ (not in git): gva_2015_incidents_geocoded.csv,
+            mkdb_incidents_geocoded.csv
 
 Git history on main (newest first):
+            (release)  v0.1.0: panel redesign, bottom menus, research locks, NU home, TLR,
+                       voice clock fix, this journey update
+            ce938a30  Add development journey
             20b15d96  Voice reaches every data layer; Boston is the default view
             81bea6e2  Bring back the layers added after the Sep 26 backup
             0bd481b3  Northeastern logo and grey interface on the restored version

@@ -32,20 +32,17 @@ test('other HUD layouts keep collapsed right-rail launchers visible', () => {
   }), false);
 });
 
-test('desktop Display participates in Tactical exclusivity without changing mobile Display behavior', () => {
+test('the bottom panel row keeps every launcher visible, on desktop and mobile', () => {
+  // Display, CCTV and Context sit side by side along the bottom edge, so an
+  // open panel never needs its siblings hidden: the layout pass clears the
+  // exclusive class and any aria-hidden an older stacked layout left behind.
   const ui = readFileSync(new URL('./ui/rightPanelRail.js', import.meta.url), 'utf8');
   const css = readStylesheet(new URL('../style.css', import.meta.url));
   assert.match(ui, /const isMobile = windowRef\.matchMedia\('\(max-width: 720px\)'\)\.matches/);
-  assert.match(
-    ui,
-    /!panel\.classList\.contains\('collapsed'\)\s*&&\s*\(!isMobile \|\| panel\.id !== 'pp-toggles'\)/,
-  );
-  assert.doesNotMatch(
-    ui,
-    /panel\.id !== 'pp-toggles' && !panel\.classList\.contains\('collapsed'\)/,
-  );
-  assert.match(ui, /if \(exclusive && panel\.classList\.contains\('collapsed'\)\)\s*panel\.setAttribute\('aria-hidden', 'true'\)/);
-  assert.match(css, /#right-context-rail\.layout-exclusive > \[data-panel-id\]\.collapsed \{/);
+  assert.match(ui, /stack\.classList\.remove\('layout-exclusive'\)/);
+  assert.match(ui, /panel\.removeAttribute\('aria-hidden'\)/);
+  assert.doesNotMatch(ui, /setAttribute\('aria-hidden', 'true'\)/);
+  assert.match(css, /#right-context-rail \{[^}]*flex-direction: row;/);
 });
 
 test('explicit Contacts, Space Missions, and Cockpit actions expand Global Context after success', () => {

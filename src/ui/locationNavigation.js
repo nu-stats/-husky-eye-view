@@ -130,6 +130,7 @@ export class LocationNavigation {
         search: this._locationSearch,
         searchToggle: this._searchToggle,
         resetButtons: [this._resetGlobeBtn, this._cockpitResetGlobeBtn],
+        homeButton: this._northeasternBtn,
         statusCity: this._locationMiniCity,
         statusPoi: this._locationMiniPoi,
       },
@@ -139,7 +140,33 @@ export class LocationNavigation {
       onPoi: (id, index) => this._onPoiClick(id, index),
       onSearch: (query) => this._locationLookup.run(query),
       onReset: () => this.resetToGlobeView(),
+      onHome: () => this.flyToNortheastern(),
     });
+  }
+
+  /** Recenter on Northeastern's campus (the husky button by the globe). */
+  flyToNortheastern() {
+    const { flyToNortheasternView } = this.services;
+    if (this._disposed || typeof flyToNortheasternView !== 'function')
+      return false;
+    this._stopOrbit();
+    const result = this._runExplicitNavigation('location', () =>
+      flyToNortheasternView(this.viewer),
+    );
+    if (result === false) return false;
+    this._setActiveLocation(null);
+    this._collapsePOIRow();
+    // Orbit ("O") now circles campus.
+    if (result?.targetPosition) {
+      this._currentTarget = result.targetPosition;
+      this._currentPoi = {
+        name: 'Northeastern University',
+        alt: 600,
+        pitch: -30,
+      };
+    }
+    this._updateLocationMiniStatus();
+    return result;
   }
 
   _beginWorldJumpTransition() {

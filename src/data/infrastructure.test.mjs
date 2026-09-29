@@ -64,6 +64,7 @@ test('infrastructure factory preserves identity and creates independent state wi
       { id: 'local-datacenters', name: 'Datacenters', source: 'Local' },
       { id: 'local-dams', name: 'Dams', source: 'USACE' },
       { id: 'local-chicago-events', name: 'Chicago Events', source: 'Local' },
+      { id: 'local-tlr', name: 'TLR', source: 'Video locations' },
       { id: 'local-gang-map', name: 'Gang Map', source: 'Big Bas My Maps' },
       {
         id: 'local-gang-map-labels',
@@ -157,16 +158,49 @@ test('infrastructure factory preserves identity and creates independent state wi
       },
     ],
   );
+  const locked = new Set(['local-gva-2015', 'local-mkdb']);
   first.forEach((layer, index) => {
     assert.notEqual(layer, second[index]);
     layer.destroy();
-    assert.deepEqual(second[index].getStats(), {
-      count: 0,
-      lastUpdate: null,
-      error: null,
-    });
+    const stats = second[index].getStats();
+    if (locked.has(layer.id)) {
+      // Research datasets start locked until the server says the key opens them.
+      assert.equal(second[index].requiresKeyId, 'research-data');
+      assert.equal(stats.keyRequired, true);
+      assert.equal(stats.status, 'locked');
+      assert.equal(stats.count, 0);
+      assert.equal(stats.error, null);
+    } else {
+      assert.deepEqual(stats, { count: 0, lastUpdate: null, error: null });
+    }
     second[index].destroy();
   });
+});
+
+test('a locked research layer refuses to turn on until the server unlocks it', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  let status = 'locked';
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => ({ configured: true, datasets: { mkdb: status } }),
+    url,
+  });
+  const layer = createInfrastructureLayers(services()).find(
+    ({ id }) => id === 'local-mkdb',
+  );
+  await layer.init();
+  await assert.rejects(layer.enable({}), /RESEARCH DATASETS key in POWER UP/);
+  assert.equal(
+    (await layer.getAreaContext({ longitude: 0, latitude: 0 })).status,
+    'locked',
+  );
+  status = 'unlocked';
+  await layer.init();
+  assert.equal(layer.getStats().keyRequired, undefined);
+  layer.destroy();
 });
 
 test('dataset URLs still name the complete bundled sources', () => {

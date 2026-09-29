@@ -22,3 +22,6 @@ pinokio/.installed
 # Raw nationwide datasets (~2 GB) read by scripts/build-context-layers.mjs;
 # only the per-county chunks it writes to public/context/ are served.
 data/source/
+# Plaintext research datasets (GVA 2015, MKDB): only their encrypted copies in
+# data/research/ are committed (scripts/lock-research-data.mjs).
+data/restricted/

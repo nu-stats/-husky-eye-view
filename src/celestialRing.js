@@ -68,26 +68,42 @@ export function getKeyholeFadeTuning() {
   return { fadeRatio: keyholeFadeRatio, outsideOpacity: keyholeOutsideOpacity };
 }
 
-/** Return the single shared screen-space keyhole circle and label feather. */
+/**
+ * Return the single shared screen-space keyhole and label feather.
+ *
+ * The focus area fills the whole window (halfWidth/halfHeight): labels, cards
+ * and the scope mask treat every on-screen point as inside. `radius` is kept
+ * for the round treatments that circle the globe itself (celestial ring,
+ * full-globe checks), which still size themselves from the window height.
+ */
 export function getKeyholeGeometry(width, height) {
   const w = Number(width);
   const h = Number(height);
   if (!(w > 0) || !(h > 0)) {
-    return { centerX: 0, centerY: 0, radius: 0, featherPx: 0 };
+    return {
+      centerX: 0,
+      centerY: 0,
+      radius: 0,
+      halfWidth: 0,
+      halfHeight: 0,
+      featherPx: 0,
+    };
   }
   const radius = h * 0.5 * KEYHOLE_OUTER_RADIUS;
   return {
     centerX: w * 0.5,
     centerY: h * 0.5,
     radius,
-    featherPx: radius * keyholeFadeRatio,
+    halfWidth: w * 0.5,
+    halfHeight: h * 0.5,
+    featherPx: Math.min(w, h) * 0.5 * keyholeFadeRatio,
   };
 }
 
 /**
- * Compute the radial opacity for a callout's visual center. Text remains fully
- * opaque inside the keyhole and fades linearly to the configured outside-opacity
- * floor through a band derived from the live keyhole radius.
+ * Compute the keyhole opacity for a callout's visual center. Text remains fully
+ * opaque inside the keyhole (the window) and fades linearly to the configured
+ * outside-opacity floor through a band past its edge.
  */
 export function keyholeLabelAlpha(labelX, labelY, width, height) {
   return keyholeLabelAlphaFromGeometry(
@@ -107,14 +123,30 @@ export function keyholeLabelAlphaFromGeometry(labelX, labelY, geometry) {
   )
     return 0;
   const feather = geometry.featherPx;
-  const distance = Math.hypot(
-    labelX - geometry.centerX,
-    labelY - geometry.centerY,
-  );
-  if (distance <= geometry.radius) return 1;
-  if (!(feather > 0) || distance >= geometry.radius + feather)
-    return keyholeOutsideOpacity;
-  const progress = clamp((distance - geometry.radius) / feather, 0, 1);
+  // Rectangular keyhole (the window): distance past the nearest edge.
+  // A geometry without half extents is a circle measured from its center.
+  const rectangular = geometry.halfWidth > 0 && geometry.halfHeight > 0;
+  // Plain sqrt: this runs per label per frame, and variadic Math.hypot
+  // allocates on every call.
+  let overflow;
+  if (rectangular) {
+    const dx = Math.max(
+      0,
+      Math.abs(labelX - geometry.centerX) - geometry.halfWidth,
+    );
+    const dy = Math.max(
+      0,
+      Math.abs(labelY - geometry.centerY) - geometry.halfHeight,
+    );
+    overflow = dx === 0 && dy === 0 ? 0 : Math.sqrt(dx * dx + dy * dy);
+  } else {
+    const dx = labelX - geometry.centerX;
+    const dy = labelY - geometry.centerY;
+    overflow = Math.sqrt(dx * dx + dy * dy) - geometry.radius;
+  }
+  if (overflow <= 0) return 1;
+  if (!(feather > 0) || overflow >= feather) return keyholeOutsideOpacity;
+  const progress = clamp(overflow / feather, 0, 1);
   return 1 - (1 - keyholeOutsideOpacity) * progress;
 }
 

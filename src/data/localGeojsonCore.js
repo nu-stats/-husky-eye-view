@@ -11,6 +11,9 @@ import {
 } from './localLabelSettings.js';
 
 const DEFAULT_LABEL_MAX = 900;
+/** What a locked research layer says until its key is added. */
+export const LOCKED_DATASET_MESSAGE =
+  'Locked: add the RESEARCH DATASETS key in POWER UP to open this layer.';
 const DEFAULT_LABEL_GRID_PX = 132;
 const VISIBILITY_UPDATE_MS = 450;
 // Each source keeps its own bounded cohort; the host sums their ambient-card
@@ -122,7 +125,7 @@ export function localInfrastructureOverlayCopy(properties, layerId) {
     if (river && river.toLocaleLowerCase() !== title.toLocaleLowerCase()) {
       details.push(clampCardLine(river));
     }
-  } else if (layerId === 'local-chicago-events') {
+  } else if (layerId === 'local-chicago-events' || layerId === 'local-tlr') {
     const victim = firstClean([props.victim]);
     if (victim) details.push(clampCardLine(victim));
     const time = firstClean([props.video_time]);
@@ -459,7 +462,11 @@ async function fetchGeoJsonLines(url, signal) {
   const response = await fetch(url, { signal });
   // A 404 returns an HTML body that would otherwise die in JSON.parse one line
   // later, reported as a parse error for a missing file.
-  if (!response.ok) throw new Error(`HTTP ${response.status ?? '?'}`);
+  if (!response.ok) {
+    const error = new Error(`HTTP ${response.status ?? '?'}`);
+    error.status = response.status;
+    throw error;
+  }
   const text = await response.text();
   return text
     .split('\n')
@@ -558,6 +565,10 @@ export function createLocalGeoJsonLayer(
     // Optional panel legend: [{label, color, test(properties)}], counted over
     // the whole dataset.
     legend = null,
+    // A locked research dataset (server/providers/research.js): the layer
+    // stays locked, and refuses to turn on, until the research key opens it.
+    lockedDataset = null,
+    lockStatusUrl = '/api/research/status',
     screenSpaceEventHandlerFactory = (canvas) =>
       new Cesium.ScreenSpaceEventHandler(canvas),
     projectToWindow = (scene, position) =>
@@ -795,16 +806,37 @@ export function createLocalGeoJsonLayer(
     }
   };
 
+  // Locked until the server says the research key opens this dataset.
+  let _locked = Boolean(lockedDataset);
+  const refreshLock = async () => {
+    if (!lockedDataset) return;
+    try {
+      const response = await fetch(lockStatusUrl, { cache: 'no-store' });
+      const status = response.ok ? await response.json() : null;
+      _locked = status?.datasets?.[lockedDataset] !== 'unlocked';
+    } catch {
+      _locked = true;
+    }
+  };
+  // Ask as soon as the layer exists, so the panel shows LOCKED (or not)
+  // before anyone turns it on.
+  if (lockedDataset) void refreshLock();
+
   return {
     id,
     name,
     icon,
     source,
+    ...(lockedDataset && {
+      requiresKeyId: 'research-data',
+      statsBeforeInit: true,
+    }),
     updateInterval: 0,
     statsRefreshInterval: 1000,
 
     init: async (viewer) => {
       // DataLayerManager calls this once
+      await refreshLock();
     },
 
     update: async (viewer) => {
@@ -818,6 +850,15 @@ export function createLocalGeoJsonLayer(
      *   silent zero count as nominal.
      */
     getStats: () => {
+      if (_locked)
+        return {
+          count: 0,
+          lastUpdate: null,
+          error: null,
+          keyRequired: true,
+          status: 'locked',
+          statusMessage: LOCKED_DATASET_MESSAGE,
+        };
       return { count: _count, lastUpdate: _lastUpdate, error: _error };
     },
 
@@ -876,6 +917,12 @@ export function createLocalGeoJsonLayer(
       // A names-only layer mirrors another layer's features; it has no answer.
       if (areaNamesOnly) return null;
       const base = { layerId: id, layerName: name, source };
+      if (_locked)
+        return {
+          ...base,
+          status: 'locked',
+          statusMessage: LOCKED_DATASET_MESSAGE,
+        };
       if (!_enabled) return { ...base, status: 'disabled' };
       if (!_cachedFeatures) {
         await _loadPromise?.catch(() => {});
@@ -925,6 +972,9 @@ export function createLocalGeoJsonLayer(
 
     enable: async (viewer) => {
       if (_destroyed) return;
+      // A key entered in POWER UP since startup takes effect here.
+      if (_locked) await refreshLock();
+      if (_locked) throw new Error(LOCKED_DATASET_MESSAGE);
       _enabled = true;
       _stemGeometryDirty = true;
       _lastVisibilityUpdate = Number.NEGATIVE_INFINITY;
@@ -1208,7 +1258,11 @@ export function createLocalGeoJsonLayer(
             } catch (e) {
               // The dataset ships with the build, so this is a broken install,
               // not a blip — it has to reach the chip, not just the console.
-              if (!_destroyed) _error = localDatasetError(e);
+              // A locked dataset the server refused (no key, or the wrong
+              // one) is locked, not broken.
+              if (lockedDataset && (e?.status === 503 || e?.status === 403))
+                _locked = true;
+              else if (!_destroyed) _error = localDatasetError(e);
               // Roll the partial build back so a later enable() retries from
               // scratch instead of inheriting a half-populated source. Only the
               // post-add window has something in the scene to remove: a failure
@@ -1813,7 +1867,8 @@ function clampCardLine(value) {
 function layerTitle(layerId) {
   if (layerId === 'local-datacenters') return 'Datacenter';
   if (layerId === 'local-dams') return 'Dam';
-  if (layerId === 'local-chicago-events') return 'Event';
+  if (layerId === 'local-chicago-events' || layerId === 'local-tlr')
+    return 'Event';
   if (layerId === 'local-gang-map') return 'Hood';
   if (layerId === 'local-famous-shootings') return 'Shooting';
   if (layerId?.startsWith('local-miami-homicides-')) return 'Homicide';

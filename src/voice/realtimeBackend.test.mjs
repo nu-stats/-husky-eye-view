@@ -81,6 +81,31 @@ test('expired and malformed client secrets are rejected before SDP exchange', as
   );
 });
 
+test('a fresh secret survives a local clock that runs hours ahead of the upstream clock', async () => {
+  const upstreamNow = Date.now() - 4 * 3600_000;
+  const backend = createRealtimeBackend({
+    tokenTransport: async () =>
+      Response.json(
+        {
+          value: 'skewed',
+          expires_at: Math.floor(upstreamNow / 1000) + 600,
+        },
+        {
+          headers: {
+            'X-GEV-Upstream-Date': new Date(upstreamNow).toUTCString(),
+          },
+        },
+      ),
+    connectionTransport: async () => new Response('answer'),
+  });
+  const credential = await backend.requestToken();
+  assert.ok(credential.expiresAt * 1000 > Date.now() + 590_000);
+  assert.equal(
+    await backend.negotiate({ credential, offerSdp: 'offer' }),
+    'answer',
+  );
+});
+
 test('cancellation rejects late token and SDP bodies without promoting a stopped connection', async () => {
   for (const phase of ['token', 'sdp']) {
     const lifetime = new AbortController();

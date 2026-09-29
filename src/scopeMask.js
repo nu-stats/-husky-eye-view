@@ -1,7 +1,12 @@
 import { getKeyholeGeometry } from './celestialRing.js';
 
 /**
- * Scope mask — the app's signature circular viewport treatment, made real.
+ * Scope mask — the viewport edge treatment.
+ *
+ * 2026-09-29 (Husky Eye View): the view fills the whole window instead of a
+ * circle sized to the window height, which left wide black bands on wide
+ * screens. The mask is now a soft darkened band just inside the window edges;
+ * the notes below about the terminus ramp and repaint gating still apply.
  *
  * History (2026-08-08 owner field test): the scope was never implemented.
  * It emerged from six zero-intensity style PostProcessStages whose stacked
@@ -333,30 +338,26 @@ function teardownDevicePixelRatioWatch() {
 }
 
 /**
- * Compute the gradient stops for the scope mask.
+ * Compute the scope mask's frame. The view fills the whole window, so the
+ * mask is only a soft band just inside the window edges, `featherPx` wide,
+ * darkening to the terminus color at the very edge.
  * Pure — unit-tested directly.
  * @param {number} width - Viewport CSS width.
  * @param {number} height - Viewport CSS height.
- * @param {number} featherRatio - Edge feather as a fraction of keyhole radius.
- * @returns {{centerX:number, centerY:number, innerR:number, outerR:number,
- *   maxR:number}|null} Geometry, or null when the viewport is degenerate.
+ * @param {number} featherRatio - Edge band as a fraction of half the shorter side.
+ * @returns {{width:number, height:number, centerX:number, centerY:number,
+ *   featherPx:number}|null} Geometry, or null when the viewport is degenerate.
  */
 export function scopeMaskGeometry(width, height, featherRatio = _featherRatio) {
   const keyhole = getKeyholeGeometry(width, height);
-  if (!(keyhole.radius > 0)) return null;
+  if (!(keyhole.halfWidth > 0) || !(keyhole.halfHeight > 0)) return null;
   const feather = Math.max(0, Math.min(1, Number(featherRatio) || 0));
-  // Feather straddles the keyhole edge so the visible radius stays anchored
-  // to the shared geometry every keyhole consumer (labels, cards) fades on.
-  const half = keyhole.radius * feather * 0.5;
   return {
+    width: keyhole.halfWidth * 2,
+    height: keyhole.halfHeight * 2,
     centerX: keyhole.centerX,
     centerY: keyhole.centerY,
-    innerR: Math.max(0, keyhole.radius - half),
-    outerR: keyhole.radius + half,
-    maxR: Math.hypot(
-      Math.max(keyhole.centerX, width - keyhole.centerX),
-      Math.max(keyhole.centerY, height - keyhole.centerY),
-    ),
+    featherPx: Math.min(keyhole.halfWidth, keyhole.halfHeight) * feather,
   };
 }
 
@@ -393,33 +394,26 @@ function draw() {
   _painted = false; // resize+clear wiped the surface; ink goes on below
   const geo = scopeMaskGeometry(width, height, _featherRatio);
   if (!geo) return;
+  // Zero/near-zero feather: the view is the whole window, nothing to paint.
+  if (geo.featherPx < 1) return;
   const { r, g, b } = SCOPE_OUTSIDE_COLOR;
-  if (geo.outerR - geo.innerR < 1) {
-    // Zero/near-zero feather: a radial gradient with equal radii is
-    // DEGENERATE in Canvas2D (Chromium paints nothing — browser
-    // finding). Draw the hard crop explicitly: rect minus circle, evenodd.
-    // The hard crop honors the same altitude terminus — a hard edge at city
-    // scale must be fully opaque too, not 6% translucent.
-    ctx.fillStyle = `rgba(${r},${g},${b},${_terminusAlpha})`;
-    ctx.beginPath();
-    ctx.rect(0, 0, width, height);
-    ctx.arc(geo.centerX, geo.centerY, Math.max(1, geo.innerR), 0, Math.PI * 2);
-    ctx.fill('evenodd');
-    _painted = true;
-    return;
+  const clear = `rgba(${r},${g},${b},0)`;
+  const edge = `rgba(${r},${g},${b},${_terminusAlpha})`;
+  const band = Math.min(geo.featherPx, width / 2, height / 2);
+  // One soft band per window edge, darkest at the edge. Where two bands meet
+  // in a corner they overlap, which reads as a gentle corner vignette.
+  for (const [x0, y0, x1, y1, rx, ry, rw, rh] of [
+    [0, 0, 0, band, 0, 0, width, band], // top
+    [0, height, 0, height - band, 0, height - band, width, band], // bottom
+    [0, 0, band, 0, 0, 0, band, height], // left
+    [width, 0, width - band, 0, width - band, 0, band, height], // right
+  ]) {
+    const gradient = ctx.createLinearGradient(x0, y0, x1, y1);
+    gradient.addColorStop(0, edge);
+    gradient.addColorStop(1, clear);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(rx, ry, rw, rh);
   }
-  const gradient = ctx.createRadialGradient(
-    geo.centerX,
-    geo.centerY,
-    geo.innerR,
-    geo.centerX,
-    geo.centerY,
-    geo.outerR,
-  );
-  gradient.addColorStop(0, `rgba(${r},${g},${b},0)`);
-  gradient.addColorStop(1, `rgba(${r},${g},${b},${_terminusAlpha})`);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
   _painted = true;
 }
 

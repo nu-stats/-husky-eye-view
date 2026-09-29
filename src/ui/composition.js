@@ -10,6 +10,7 @@ import {
   searchAndFlyTo,
 } from '../locations.js';
 import { interruptCameraMotion } from '../cameraVerbs.js';
+import { flyToNortheasternView } from '../camera.js';
 import { IntelHUD } from '../hud.js';
 import { ShareLinkManager } from '../sharelink.js';
 import { OrbitController } from '../orbit.js';
@@ -69,6 +70,7 @@ export class StyleManager extends ApplicationShell {
         CITY_POIS,
         GLOBE_VIEW,
         flyToGlobeView,
+        flyToNortheasternView,
         flyToPresetLocation,
         flyToPOI,
         searchAndFlyTo,

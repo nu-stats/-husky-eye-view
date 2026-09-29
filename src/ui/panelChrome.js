@@ -290,7 +290,8 @@ export class PanelChrome {
         const owner = btn.closest('[data-panel-id], #param-slider-panel');
         if (owner !== panelEl) return;
         if (isRightRail) {
-          btn.textContent = collapsed ? '◀' : '▶';
+          // These sit in the bottom row and open upward.
+          btn.textContent = collapsed ? '▲' : '▼';
         } else {
           btn.textContent = collapsed ? '+' : '−';
         }

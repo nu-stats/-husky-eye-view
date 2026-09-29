@@ -250,6 +250,8 @@ const LAYER_ALIASES = new Map([
   ['gva', 'local-gva-2015'],
   ['chicago events', 'local-chicago-events'],
   ['chicago homicides', 'local-chicago-events'],
+  ['tlr', 'local-tlr'],
+  ['no limit', 'local-tlr'],
   ['gang map', 'local-gang-map'],
   ['gang territories', 'local-gang-map'],
   ['gangs', 'local-gang-map'],
@@ -2843,6 +2845,13 @@ function focusDataLayerRow(layerId) {
     `#data-toggles [data-layer-id="${CSS.escape(layerId)}"]`,
   );
   if (!row) return null;
+  // A row in a folded group is hidden: unfold the group first.
+  if (row.hidden && row.dataset.group) {
+    const heading = row.parentElement?.querySelector(
+      `.data-layer-group-heading[data-group="${CSS.escape(row.dataset.group)}"]`,
+    );
+    if (heading?.classList.contains('folded')) heading.click();
+  }
   row.scrollIntoView({ block: 'center', behavior: 'smooth' });
   row.classList.remove('gev-voice-focus');
   void row.offsetWidth;

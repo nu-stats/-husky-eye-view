@@ -535,11 +535,23 @@ test('the full-width context rail clears the required credit at every modelled v
       if (decl.prop === 'bottom') anchors.push({ rule, decl });
     }
   }
-  assert.equal(anchors.length, 1, 'the rail has exactly one bottom anchor to reason about');
-  assert.equal(parseMediaCondition(anchors[0].rule.media[0]), 720, 'the rail only goes full-width below 720px');
+  // On desktop the rail is the bottom-right panel row, anchored by the layout
+  // pass; only the <=720px full-width anchor can reach the credit.
+  const narrow = anchors.filter(({ rule }) => rule.media.length);
+  assert.equal(narrow.length, 1, 'the rail has exactly one full-width bottom anchor to reason about');
+  assert.equal(parseMediaCondition(narrow[0].rule.media[0]), 720, 'the rail only goes full-width below 720px');
+  assert.ok(
+    anchors.every(({ rule }) => rule.media.length || rule.order < narrow[0].rule.order),
+    'the desktop anchor must come before the full-width one, so the full-width anchor wins below 720px',
+  );
 
   const failures = [];
   for (const width of WIDTHS.filter((w) => w <= 720)) {
+    assert.equal(
+      resolve(['#right-context-rail'], 'bottom', width, 'context rail').decl,
+      narrow[0].decl,
+      `at ${width}px the full-width anchor must decide the rail's floor`,
+    );
     // `bottom` only governs the floor while the box is not height-capped:
     // top + bottom + a resolved height is over-constrained and drops `bottom`.
     assert.equal(

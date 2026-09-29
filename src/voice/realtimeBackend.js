@@ -41,7 +41,14 @@ export function createRealtimeBackend({
         throw new Error(
           'Realtime token response did not include a client secret',
         );
-      const expiresAt = data?.expires_at ?? data?.client_secret?.expires_at;
+      let expiresAt = data?.expires_at ?? data?.client_secret?.expires_at;
+      // Shift the upstream expiry onto this machine's clock so a skewed
+      // system clock does not reject every freshly minted secret.
+      const upstreamMs = Date.parse(
+        response.headers?.get?.('X-GEV-Upstream-Date') ?? '',
+      );
+      if (Number.isFinite(expiresAt) && Number.isFinite(upstreamMs))
+        expiresAt += Math.round((Date.now() - upstreamMs) / 1000);
       if (
         expiresAt != null &&
         (!Number.isFinite(expiresAt) || expiresAt * 1000 <= Date.now())

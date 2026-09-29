@@ -12,6 +12,7 @@ import {
   isCelestialRingStyleSupported,
   isFullGlobeInsideKeyhole,
   keyholeLabelAlpha,
+  keyholeLabelAlphaFromGeometry,
   normalizeAngle,
   setKeyholeFadeTuning,
 } from './celestialRing.js';
@@ -109,38 +110,71 @@ test('shared keyhole geometry is centered and height-derived', () => {
   assert.equal(portrait.radius, 630);
 });
 
-test('label alpha stays opaque inside and fades monotonically outside', () => {
+test('the keyhole is the whole window: every on-screen point is fully opaque', () => {
+  setKeyholeFadeTuning({ fadeRatio: 0.16, outsideOpacity: 0 });
+  const geometry = getKeyholeGeometry(3440, 1440);
+  assert.equal(geometry.halfWidth, 1720);
+  assert.equal(geometry.halfHeight, 720);
+  // Center, the far left and right of an ultrawide screen (well outside the
+  // old height-sized circle), and every corner.
+  for (const [x, y] of [
+    [1720, 720],
+    [20, 720],
+    [3420, 720],
+    [0, 0],
+    [3440, 0],
+    [0, 1440],
+    [3440, 1440],
+  ]) {
+    assert.equal(keyholeLabelAlpha(x, y, 3440, 1440), 1, `(${x}, ${y})`);
+  }
+  setKeyholeFadeTuning({ fadeRatio: 0.16, outsideOpacity: 0.05 });
+});
+
+test('label alpha fades monotonically past the window edge', () => {
   setKeyholeFadeTuning({ fadeRatio: 0.16, outsideOpacity: 0 });
   const geometry = getKeyholeGeometry(1200, 800);
   const y = geometry.centerY;
+  const edge = geometry.centerX + geometry.halfWidth;
   assert.equal(keyholeLabelAlpha(geometry.centerX, y, 1200, 800), 1);
-  assert.equal(keyholeLabelAlpha(geometry.centerX + geometry.radius, y, 1200, 800), 1);
-  const quarter = keyholeLabelAlpha(
-    geometry.centerX + geometry.radius + geometry.featherPx * 0.25, y, 1200, 800,
-  );
-  const middle = keyholeLabelAlpha(
-    geometry.centerX + geometry.radius + geometry.featherPx * 0.5, y, 1200, 800,
-  );
-  const threeQuarter = keyholeLabelAlpha(
-    geometry.centerX + geometry.radius + geometry.featherPx * 0.75, y, 1200, 800,
-  );
+  assert.equal(keyholeLabelAlpha(edge, y, 1200, 800), 1);
+  const quarter = keyholeLabelAlpha(edge + geometry.featherPx * 0.25, y, 1200, 800);
+  const middle = keyholeLabelAlpha(edge + geometry.featherPx * 0.5, y, 1200, 800);
+  const threeQuarter = keyholeLabelAlpha(edge + geometry.featherPx * 0.75, y, 1200, 800);
   assert.ok(quarter > middle && middle > threeQuarter);
   assert.ok(Math.abs(quarter - 0.75) < 1e-12);
   assert.ok(Math.abs(middle - 0.5) < 1e-12);
   assert.ok(Math.abs(threeQuarter - 0.25) < 1e-12);
-  assert.equal(keyholeLabelAlpha(
-    geometry.centerX + geometry.radius + geometry.featherPx, y, 1200, 800,
-  ), 0);
+  assert.equal(keyholeLabelAlpha(edge + geometry.featherPx, y, 1200, 800), 0);
+  // Past a corner the fade follows the distance from that corner.
+  const cornerX = geometry.centerX + geometry.halfWidth;
+  const cornerY = geometry.centerY + geometry.halfHeight;
+  const diagonal = (geometry.featherPx * 0.5) / Math.SQRT2;
+  assert.ok(
+    Math.abs(
+      keyholeLabelAlpha(cornerX + diagonal, cornerY + diagonal, 1200, 800) - 0.5,
+    ) < 1e-12,
+  );
+  setKeyholeFadeTuning({ fadeRatio: 0.16, outsideOpacity: 0.05 });
 });
 
-test('fade tuning scales with keyhole radius and supports outside opacity', () => {
+test('a geometry without half extents still fades as a circle', () => {
+  setKeyholeFadeTuning({ fadeRatio: 0.16, outsideOpacity: 0 });
+  const circle = { centerX: 100, centerY: 100, radius: 50, featherPx: 10 };
+  assert.equal(keyholeLabelAlphaFromGeometry(150, 100, circle), 1);
+  assert.ok(Math.abs(keyholeLabelAlphaFromGeometry(155, 100, circle) - 0.5) < 1e-12);
+  assert.equal(keyholeLabelAlphaFromGeometry(160, 100, circle), 0);
+  setKeyholeFadeTuning({ fadeRatio: 0.16, outsideOpacity: 0.05 });
+});
+
+test('fade tuning scales with the window and supports outside opacity', () => {
   setKeyholeFadeTuning({ fadeRatio: 0.2, outsideOpacity: 0.3 });
   const small = getKeyholeGeometry(800, 600);
   const large = getKeyholeGeometry(1600, 1200);
   assert.equal(large.featherPx, small.featherPx * 2);
   assert.deepEqual(getKeyholeFadeTuning(), { fadeRatio: 0.2, outsideOpacity: 0.3 });
   assert.equal(keyholeLabelAlpha(
-    small.centerX + small.radius + small.featherPx,
+    small.centerX + small.halfWidth + small.featherPx,
     small.centerY,
     800,
     600,

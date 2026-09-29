@@ -208,7 +208,12 @@ export class LayerLifecycle {
   }
 
   _moduleStats(entry) {
-    if (!entry?.initialized || typeof entry.module?.getStats !== 'function') {
+    // A module may opt in to reporting before its first init (a locked
+    // research layer shows LOCKED in the panel before anyone enables it).
+    if (
+      (!entry?.initialized && entry?.module?.statsBeforeInit !== true) ||
+      typeof entry?.module?.getStats !== 'function'
+    ) {
       return { count: 0, lastUpdate: null };
     }
     try {

@@ -555,9 +555,12 @@ test('Cockpit panel corridors reserve the owned topline readouts', () => {
   const rightObstacles = layout.match(/const RIGHT_STACK_OBSTACLE_SELECTOR = \[([\s\S]*?)\]\.join/);
   assert.ok(leftObstacles && rightObstacles, 'responsive panel obstacle selectors are missing');
   assert.match(leftObstacles[1], /#cockpit-hud \.cockpit-topline/);
-  assert.match(rightObstacles[1], /#cockpit-hud \.cockpit-topline/);
   assert.match(leftObstacles[1], /#cockpit-hud \.cockpit-topline > div/);
-  assert.match(rightObstacles[1], /#cockpit-hud \.cockpit-topline > div/);
+  // The right rail is a bottom row hidden in Cockpit mode (pinned elsewhere in
+  // this file), so it only clears the bottom-edge controls beneath it.
+  assert.match(rightObstacles[1], /#key-setup-chip/);
+  assert.match(rightObstacles[1], /#command-dock/);
+  assert.doesNotMatch(rightObstacles[1], /cockpit-topline|hud-top/);
   const leftLayout = fs.readFileSync(new URL('./ui/leftPanelRail.js', import.meta.url), 'utf8');
   assert.ok(leftLayout, 'left accordion layout pass is missing');
   assert.doesNotMatch(

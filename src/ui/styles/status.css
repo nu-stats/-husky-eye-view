@@ -53,6 +53,14 @@
   font-size: 18px;
 }
 
+/* The Northeastern button: the husky fills the round button like a badge. */
+#top-center-actions .nu-husky-icon {
+  display: block;
+  width: 26px;
+  height: 26px;
+  pointer-events: none;
+}
+
 #tilt-map-view[aria-pressed='true'] {
   border-color: var(--accent);
   color: var(--accent);

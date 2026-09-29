@@ -1,42 +1,56 @@
-import {
-  allocatePanelStackHeights,
-  panelStackAutoCollapseIndices,
-} from '../panelStackLayout.js';
-import {
-  resolveHudRailLayout,
-  shouldHideCollapsedRightPanels,
-} from './panelRailGeometry.js';
+/**
+ * Display, CCTV and Context live in one row at the bottom of the screen and
+ * open upward, so they stay out of the view. The row sits right beside the
+ * command dock (next to Visual Presets), bottom-aligned with it. When the
+ * window is too narrow for that, it moves to the bottom-right corner, clear of
+ * anything beneath it (the Power Up chip, or the dock itself). Each pass also
+ * decides how tall an open panel may grow above the row.
+ */
+
+/** Lowest the row sits: level with the Power Up chip's own 0.9rem inset. */
+const BOTTOM_ROW_MIN_OFFSET_PX = 14;
+/** Room kept free above an open panel, as a fraction of the window height. */
+const BOTTOM_ROW_TOP_RESERVE = 0.14;
+
+function hiddenByAncestor(element, getComputedStyle) {
+  for (let node = element; node; node = node.parentElement) {
+    const style = getComputedStyle(node);
+    if (
+      style.display === 'none' ||
+      style.visibility === 'hidden' ||
+      Number(style.opacity) === 0
+    )
+      return true;
+  }
+  return false;
+}
+
+function setIfChanged(element, name, value) {
+  if (element.style.getPropertyValue(name) !== value)
+    element.style.setProperty(name, value);
+}
 
 /**
- * Measure and place the right panel rail for one synchronous layout pass.
- * The caller owns scheduling, obstacle selection, disclosure preferences and
- * persistence. Auto-collapse is presentation only and reports through callbacks.
+ * Measure and place the bottom panel row for one synchronous layout pass.
+ * The caller owns scheduling, obstacle selection and persistence.
  * @param {object} options Live DOM and caller policy.
  * @param {HTMLElement} options.stack Rail element.
+ * @param {HTMLElement} [options.dock] Command dock the row sits beside.
  * @param {Iterable<HTMLElement>} options.obstacles Caller-selected obstacle nodes.
  * @param {Window} options.windowRef Viewport and style reader.
- * @param {{visible: boolean, variant: string}} options.hud Current HUD presentation.
- * @param {string} options.preferredPanelId Most recently opened panel.
  * @param {Function} options.onCollapse Update a panel's disclosure chrome.
- * @param {Function} options.onRetry Request another pass after automatic collapse.
- * @param {Function} [options.getComputedStyle] Optional DOM style reader override.
- * @param {HTMLElement} options.leftStack Rail supplying the shared top baseline.
- * @param {HTMLElement} options.displayPanel Panel whose allocation owns its scroll.
+ * @param {HTMLElement} options.displayPanel Panel whose scroll is restored.
  * @param {Function} options.readDisplayScrollTop Read the caller's scroll restoration value.
- * @param {Document} [options.documentRef] Document supplying current keyboard focus.
+ * @param {Function} [options.getComputedStyle] Optional DOM style reader override.
  */
 export function layoutRightPanelRail({
   stack,
-  obstacles,
+  dock = null,
+  obstacles = [],
   windowRef,
-  hud,
-  preferredPanelId,
-  onCollapse,
-  onRetry,
-  leftStack,
+  onCollapse = () => {},
   displayPanel,
-  readDisplayScrollTop,
-  documentRef = stack?.ownerDocument,
+  readDisplayScrollTop = () => 0,
   getComputedStyle = (element) => windowRef.getComputedStyle(element),
 }) {
   if (!stack) return;
@@ -44,218 +58,101 @@ export function layoutRightPanelRail({
   const panels = [...stack.children].filter((panel) =>
     panel.matches('[data-panel-id]'),
   );
-  if (!hud.visible || hud.variant !== 'tactical') {
-    for (const panel of panels.filter((item) =>
-      item.classList.contains('layout-auto-collapsed'),
-    )) {
+  // Side by side, panels never compete for height, so none is collapsed to
+  // make room and every launcher stays in reach. Release anything an older
+  // stacked layout collapsed or hid.
+  for (const panel of panels) {
+    if (panel.classList.contains('layout-auto-collapsed')) {
       panel.classList.remove('collapsed', 'layout-auto-collapsed');
       onCollapse(panel);
     }
+    panel.removeAttribute('aria-hidden');
+    if (panel.style.getPropertyValue('--right-panel-allocated-height'))
+      panel.style.removeProperty('--right-panel-allocated-height');
   }
-  const isMobile = windowRef.matchMedia('(max-width: 720px)').matches;
-  const hasExpandedPanel = panels.some(
-    (panel) =>
-      !panel.classList.contains('collapsed') &&
-      (!isMobile || panel.id !== 'pp-toggles'),
-  );
-  const exclusive = shouldHideCollapsedRightPanels({
-    hudVariant: hud.variant,
-    hasExpandedPanel,
-  });
-  stack.classList.toggle('layout-exclusive', exclusive);
-  for (const panel of panels) {
-    if (exclusive && panel.classList.contains('collapsed'))
-      panel.setAttribute('aria-hidden', 'true');
-    else panel.removeAttribute('aria-hidden');
-  }
+  stack.classList.remove('layout-exclusive');
 
+  const isMobile = windowRef.matchMedia('(max-width: 720px)').matches;
   if (isMobile) {
     stack.classList.remove('layout-focus');
     stack.style.removeProperty('--right-stack-safe-top');
     stack.style.removeProperty('--right-stack-max-height');
-    for (const panel of panels)
-      panel.style.removeProperty('--right-panel-allocated-height');
+    stack.style.removeProperty('--bottom-rail-offset');
+    stack.style.removeProperty('--bottom-rail-left');
+    stack.style.removeProperty('--bottom-rail-right');
     stack.dataset.layoutMode = 'mobile';
     return;
   }
+  stack.classList.remove('layout-focus');
 
   const viewportHeight = Math.max(1, windowRef.innerHeight);
-  const safeGap = Math.max(8, viewportHeight * 0.012);
-  const stackRect = stack.getBoundingClientRect();
-  const leftStackTop = leftStack?.getBoundingClientRect().top;
-  const alignedTop = Number.isFinite(leftStackTop)
-    ? leftStackTop
-    : viewportHeight * 0.26;
-  const obstacleRects = [];
-
+  const viewportWidth = Math.max(1, windowRef.innerWidth || 0);
+  const gap = Math.max(8, viewportHeight * 0.012);
+  const rail = stack.getBoundingClientRect();
+  const rects = [];
   for (const obstacle of obstacles) {
-    if (stack.contains(obstacle)) continue;
-    let hiddenByAncestor = false;
-    for (let element = obstacle; element; element = element.parentElement) {
-      const style = getComputedStyle(element);
-      if (
-        style.display === 'none' ||
-        style.visibility === 'hidden' ||
-        Number(style.opacity) === 0
-      ) {
-        hiddenByAncestor = true;
-        break;
-      }
-    }
-    if (hiddenByAncestor) continue;
+    if (obstacle === dock || stack.contains(obstacle)) continue;
     const rect = obstacle.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) continue;
-    obstacleRects.push({
-      left: rect.left,
-      right: rect.right,
-      top: rect.top,
-      bottom: rect.bottom,
-    });
+    if (hiddenByAncestor(obstacle, getComputedStyle)) continue;
+    rects.push(rect);
   }
 
-  const visiblePanels = panels.filter(
-    (panel) => !exclusive || !panel.classList.contains('collapsed'),
-  );
-
-  const displayScrollTop = readDisplayScrollTop();
-  // Measure intrinsic content, not the allocation written by the previous
-  // layout pass. Display is the exception: its own scrollHeight already
-  // exposes every control, and removing its live allocation can reset the
-  // user's scroll position while HUD or preset content is settling.
-  for (const panel of visiblePanels) {
-    if (!panel.classList.contains('collapsed') && panel !== displayPanel) {
-      panel.style.removeProperty('--right-panel-allocated-height');
+  // Beside the dock whenever the row fits between it and the window edge,
+  // bottom-aligned with it; anything low beneath the row there (the Power Up
+  // chip) lifts the row just enough to clear it.
+  let placement = null;
+  const dockRect =
+    dock && !hiddenByAncestor(dock, getComputedStyle)
+      ? dock.getBoundingClientRect()
+      : null;
+  if (dockRect && dockRect.width > 0 && dockRect.height > 0) {
+    const left = dockRect.right + gap;
+    const right = left + rail.width;
+    if (right <= viewportWidth - BOTTOM_ROW_MIN_OFFSET_PX) {
+      let offset = Math.max(0, viewportHeight - dockRect.bottom);
+      for (const rect of rects) {
+        if (rect.right <= left || rect.left >= right) continue;
+        if (rect.top < viewportHeight * 0.5) continue;
+        offset = Math.max(offset, viewportHeight - rect.top + gap);
+      }
+      placement = { mode: 'docked', left, offset };
     }
   }
-  const gap = parseFloat(getComputedStyle(stack).rowGap) || 0;
-  const naturalHeight =
-    visiblePanels.reduce(
-      (total, panel) =>
-        total +
-        Math.max(
-          panel.getBoundingClientRect().height,
-          panel.scrollHeight || 0,
-          panel.classList.contains('collapsed') ? 42 : 0,
-        ),
-      0,
-    ) +
-    gap * Math.max(0, visiblePanels.length - 1);
-  const layout = resolveHudRailLayout({
-    viewportHeight,
-    panelHeight: naturalHeight,
-    laneLeft: stackRect.left,
-    laneRight: stackRect.right,
-    obstacles: obstacleRects,
-    baseTop: alignedTop,
-    baseBottom: viewportHeight * 0.96,
-    gap: safeGap,
-    align: 'start',
-  });
-  if (!layout) return;
-  const { safeTop, safeBottom, maxHeight: availableHeight } = layout;
-  const stabilityBand = viewportHeight * 0.01;
-  const wasFocused = stack.classList.contains('layout-focus');
-  const shouldFocus = wasFocused
-    ? naturalHeight > availableHeight - stabilityBand * 2
-    : naturalHeight > availableHeight - stabilityBand;
-  const layoutTop = shouldFocus ? safeTop : layout.top;
-  const collapsedHeight = visiblePanels.reduce(
-    (total, panel) =>
-      panel.classList.contains('collapsed')
-        ? total + panel.getBoundingClientRect().height
-        : total,
-    0,
-  );
-  const expandedPanelsInDomOrder = visiblePanels.filter(
-    (panel) => !panel.classList.contains('collapsed'),
-  );
-  const focusedExpandedPanel = expandedPanelsInDomOrder.find((panel) =>
-    panel.contains(documentRef.activeElement),
-  );
-  const preferredExpandedPanel =
-    expandedPanelsInDomOrder.find((panel) => panel.id === preferredPanelId) ||
-    focusedExpandedPanel;
-  // Match the left lane: allocation order follows the latest explicit
-  // disclosure, not DOM order. A focused panel is the fallback owner so
-  // temporary presentation collapse never strands keyboard focus.
-  const expandedPanels = preferredExpandedPanel
-    ? [
-        preferredExpandedPanel,
-        ...expandedPanelsInDomOrder.filter(
-          (panel) => panel !== preferredExpandedPanel,
-        ),
-      ]
-    : expandedPanelsInDomOrder;
-  const expandedAvailableHeight = Math.max(
-    0,
-    safeBottom -
-      layoutTop -
-      collapsedHeight -
-      gap * Math.max(0, visiblePanels.length - 1),
-  );
-  const expandedHeights = allocatePanelStackHeights({
-    naturalHeights: expandedPanels.map((panel) =>
-      Math.max(panel.getBoundingClientRect().height, panel.scrollHeight || 0),
-    ),
-    availableHeight: expandedAvailableHeight,
-  });
-  const autoCollapseIndices = hud.visible
-    ? panelStackAutoCollapseIndices({
-        naturalHeights: expandedPanels.map((panel) =>
-          Math.max(
-            panel.getBoundingClientRect().height,
-            panel.scrollHeight || 0,
-          ),
-        ),
-        allocatedHeights: expandedHeights,
-        collapseLaterPanels: shouldFocus && hud.variant === 'tactical',
-      })
-    : [];
-  if (autoCollapseIndices.length) {
-    for (const index of autoCollapseIndices) {
-      const panel = expandedPanels[index];
-      panel.classList.add('collapsed', 'layout-auto-collapsed');
-      onCollapse(panel);
+  if (!placement) {
+    // Bottom-right corner, above anything beneath the row there.
+    const railLeft = viewportWidth - BOTTOM_ROW_MIN_OFFSET_PX - rail.width;
+    let offset = BOTTOM_ROW_MIN_OFFSET_PX;
+    for (const rect of [...rects, ...(dockRect ? [dockRect] : [])]) {
+      if (rect.right <= railLeft || rect.top < viewportHeight * 0.5) continue;
+      offset = Math.max(offset, viewportHeight - rect.top + gap);
     }
-    onRetry();
-    return;
+    placement = { mode: 'corner', left: null, offset };
   }
-  // Write-if-changed. This pass runs on the 500 ms stats cadence, and an
-  // unconditional REMOVE-then-SET of an unchanged allocation is two style
-  // mutations per tick on `#pp-toggles` (the one panel the measure-strip
-  // above deliberately skips) — churn that reads as a genuine panel move to
-  // the world-overlay host's occluder observer and defeats parked-idle
-  // render savings. Only a real allocation change may touch the attribute.
-  expandedPanels.forEach((panel, index) => {
-    const next = `${expandedHeights[index].toFixed(1)}px`;
-    if (
-      panel.style.getPropertyValue('--right-panel-allocated-height') !== next
-    ) {
-      panel.style.setProperty('--right-panel-allocated-height', next);
-    }
-  });
-  for (const panel of panels) {
-    if (expandedPanels.includes(panel)) continue;
-    panel.style.removeProperty('--right-panel-allocated-height');
-  }
-
-  stack.style.setProperty(
-    '--right-stack-safe-top',
-    `${layoutTop.toFixed(1)}px`,
+  const { offset } = placement;
+  const topReserve = Math.max(96, viewportHeight * BOTTOM_ROW_TOP_RESERVE);
+  const maxHeight = Math.max(160, viewportHeight - offset - topReserve);
+  setIfChanged(stack, '--bottom-rail-offset', `${offset.toFixed(1)}px`);
+  setIfChanged(
+    stack,
+    '--bottom-rail-left',
+    placement.left == null ? 'auto' : `${placement.left.toFixed(1)}px`,
   );
-  stack.style.setProperty(
-    '--right-stack-max-height',
-    `${Math.max(0, safeBottom - layoutTop).toFixed(1)}px`,
+  setIfChanged(
+    stack,
+    '--bottom-rail-right',
+    placement.left == null ? `${BOTTOM_ROW_MIN_OFFSET_PX}px` : 'auto',
   );
-  stack.classList.toggle('layout-focus', shouldFocus);
-  stack.dataset.layoutMode = shouldFocus ? 'focus' : 'normal';
-  stack.dataset.safeTop = layoutTop.toFixed(1);
-  stack.dataset.safeBottom = safeBottom.toFixed(1);
-  stack.dataset.availableHeight = availableHeight.toFixed(1);
-  stack.dataset.requiredHeight = naturalHeight.toFixed(1);
-  stack.dataset.expandedCount = String(expandedPanels.length);
+  setIfChanged(stack, '--right-stack-max-height', `${maxHeight.toFixed(1)}px`);
+  if (stack.style.getPropertyValue('--right-stack-safe-top'))
+    stack.style.removeProperty('--right-stack-safe-top');
+  stack.dataset.layoutMode = 'bottom';
+  stack.dataset.placement = placement.mode;
+  stack.dataset.bottomOffset = offset.toFixed(1);
+  stack.dataset.availableHeight = maxHeight.toFixed(1);
 
-  if (displayPanel && expandedPanels.includes(displayPanel)) {
+  if (displayPanel && !displayPanel.classList.contains('collapsed')) {
+    const displayScrollTop = readDisplayScrollTop();
     const maxScrollTop = Math.max(
       0,
       displayPanel.scrollHeight - displayPanel.clientHeight,

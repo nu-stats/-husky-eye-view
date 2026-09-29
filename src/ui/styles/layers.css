@@ -107,31 +107,240 @@
   border-radius: 999px;
 }
 
-.data-layer-group-heading {
-  margin: 8px 10px 2px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 1.4px;
-  text-transform: uppercase;
+/* Search and the on-now strip ride at the top of the scrolling list. */
+.data-panel-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 2px 0 8px;
+  background: rgba(14, 14, 22, 0.94);
 }
 
-.data-layer-group-heading:first-child {
-  margin-top: 0;
-  padding-top: 4px;
-  border-top: 0;
+.data-search-input {
+  width: 100%;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 10px 0 30px;
+  color: var(--text-primary);
+  font: 400 12px var(--font-sans);
+  background: rgba(255, 255, 255, 0.05)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a2aaad' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E")
+    no-repeat 10px center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.data-search-input::placeholder {
+  color: var(--text-dim);
+}
+
+.data-search-input:focus {
+  border-color: rgba(162, 170, 173, 0.7);
+}
+
+.data-search-input::-webkit-search-cancel-button {
+  filter: grayscale(1);
+}
+
+.data-on-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.data-on-strip[hidden] {
+  display: none;
+}
+
+/* One chip per layer that is on; a click scrolls to its row. */
+.data-on-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 8px 3px 7px;
+  overflow: hidden;
+  color: #f1d3d8;
+  font: 400 11px var(--font-sans);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: rgba(200, 16, 46, 0.14);
+  border: 1px solid rgba(200, 16, 46, 0.45);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.data-on-chip::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #c8102e;
+}
+
+.data-on-chip:hover,
+.data-on-chip:focus-visible {
+  background: rgba(200, 16, 46, 0.24);
+  border-color: rgba(200, 16, 46, 0.8);
+  outline: none;
+}
+
+/* "3 ON" bubble on the panel's top-right corner, visible even while it is
+   folded. Out of the header's flow, so the title and "+" keep their room. */
+.data-on-badge {
+  position: absolute;
+  z-index: 3;
+  top: -7px;
+  right: 12px;
+  padding: 1px 6px;
+  color: #fff;
+  font: 500 9px var(--font-mono);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  background: #c8102e;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+#data-panel .panel-header > .panel-collapse-btn {
+  flex: none;
+}
+
+#data-panel .panel-header > .panel-divider {
+  min-width: 0;
+}
+
+.data-on-badge[hidden] {
+  display: none;
+}
+
+.data-search-empty {
+  padding: 10px;
+  color: var(--text-dim);
+  font: 400 12px var(--font-sans);
+}
+
+.data-search-empty[hidden] {
+  display: none;
+}
+
+/* Group headings fold their rows. */
+.data-layer-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 6px 0 0;
+  padding: 8px 6px 4px;
+  color: var(--text-secondary);
+  font: 500 10px var(--font-mono);
+  letter-spacing: 1.4px;
+  text-align: left;
+  text-transform: uppercase;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.data-layer-group-heading[hidden] {
+  display: none;
+}
+
+.data-layer-group-heading::before {
+  content: '';
+  flex: none;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  transform: rotate(90deg);
+  transition: transform var(--transition-fast);
+}
+
+.data-layer-group-heading.folded::before {
+  transform: none;
+}
+
+.data-layer-group-heading:hover,
+.data-layer-group-heading:focus-visible {
+  color: var(--text-primary);
+  outline: none;
+}
+
+.data-group-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.data-group-on {
+  color: #e8828f;
+  letter-spacing: 1px;
 }
 
 .data-toggle-row {
-  padding: 8px 10px 6px;
+  padding: 7px 10px 6px;
   border-radius: 8px;
-  transition: background var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .data-toggle-row:hover {
   background: rgba(255, 255, 255, 0.03);
+}
+
+/* A layer that is on reads at a glance: tinted row, red edge, bright name. */
+.data-toggle-row.is-on {
+  background: rgba(200, 16, 46, 0.07);
+  box-shadow: inset 2px 0 0 #c8102e;
+}
+
+.data-toggle-row:not(.is-on) .data-icon {
+  opacity: 0.5;
+}
+
+.data-toggle-row:not(.is-on) .data-name {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+/* Source and freshness only matter while a layer is on. */
+.data-toggle-row:not(.is-on) .data-toggle-meta {
+  display: none;
+}
+
+/* Locked (waiting on a key): quiet name, dashed LOCKED button, and the
+   meta line saying where the key goes. */
+.data-toggle-row.is-locked .data-toggle-meta {
+  display: block;
+}
+
+.data-toggle-row.is-locked .data-name {
+  color: var(--text-dim);
+}
+
+.data-toggle-btn.locked {
+  color: var(--text-secondary);
+  border-style: dashed;
+  border-color: rgba(162, 170, 173, 0.55);
+  background: transparent;
+}
+
+.data-toggle-row.data-row-flash {
+  outline: 1px solid rgba(162, 170, 173, 0.8);
+  outline-offset: -1px;
 }
 
 /* Selected-only, provenance-first proximity results. This is intentionally a
@@ -142,23 +351,30 @@
   max-width: 100%;
   min-height: 0;
 }
+/* Display, CCTV and Context sit in one row along the bottom-right edge, out
+   of the view, and each opens upward. The layout pass writes
+   --bottom-rail-offset (clearing the Power Up chip, and the command dock on a
+   narrow window) and --right-stack-max-height (the room above the row). */
 #right-context-rail {
-  --right-display-collapsed-width: var(--left-collapsed-width);
-  --right-context-collapsed-width: var(--left-collapsed-width);
+  --right-display-collapsed-width: 128px;
+  --right-context-collapsed-width: 128px;
+  --right-collapsed-width: 128px;
   position: fixed;
   z-index: 110;
-  top: var(--right-stack-safe-top, 26vh);
-  right: var(--right-rail-x);
-  width: 330px;
+  top: auto;
+  left: var(--bottom-rail-left, auto);
+  right: var(--bottom-rail-right, 0.9rem);
+  bottom: var(--bottom-rail-offset, 3.4rem);
+  width: auto;
+  max-width: calc(100vw - 1.8rem);
   max-height: var(--right-stack-max-height, 70vh);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-end;
+  justify-content: flex-end;
   gap: 8px;
   pointer-events: none;
-  transition:
-    top var(--transition-fast),
-    max-height var(--transition-fast);
+  transition: bottom var(--transition-fast);
 }
 #right-context-rail > #pp-toggles,
 #right-context-rail > #cctv-panel,
@@ -169,14 +385,19 @@
   pointer-events: auto;
 }
 #right-context-rail #global-context-panel {
-  width: 100%;
-  max-height: 100%;
+  width: var(--panel-expanded-width);
   pointer-events: auto;
 }
 #right-context-rail #cctv-panel {
-  width: 100%;
-  max-height: 100%;
+  width: var(--panel-expanded-width);
   pointer-events: auto;
+}
+#right-context-rail > #pp-toggles:not(.collapsed) {
+  max-height: var(--right-stack-max-height, 70vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(170, 170, 170, 0.4) transparent;
 }
 #right-context-rail #cctv-panel.collapsed {
   width: var(--right-display-collapsed-width);
@@ -199,17 +420,17 @@
   box-sizing: border-box;
 }
 #right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner {
-  max-height: 100%;
+  max-height: var(--right-stack-max-height, 70vh);
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
 #right-context-rail .global-context-panel-inner {
-  max-height: 100%;
+  max-height: var(--right-stack-max-height, 70vh);
 }
 #right-context-rail
   #global-context-panel:not(.collapsed)
   .global-context-panel-inner {
-  max-height: 100%;
+  max-height: var(--right-stack-max-height, 70vh);
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
@@ -980,10 +1201,11 @@
   opacity: 0.5;
   cursor: wait;
 }
+/* Opens upward: the Context launcher sits on the bottom edge. */
 .context-radio-mini {
   position: absolute;
   z-index: 5;
-  top: calc(100% + 20px);
+  bottom: calc(100% + 20px);
   right: -38px;
   display: none;
   width: 244px;

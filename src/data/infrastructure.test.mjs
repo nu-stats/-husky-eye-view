@@ -156,6 +156,11 @@ test('infrastructure factory preserves identity and creates independent state wi
         name: 'MKDB Mass Killings (2006–2023)',
         source: 'Mass Killing Database',
       },
+      {
+        id: 'local-boston-neighborhoods',
+        name: 'Boston Neighborhoods',
+        source: 'Neighborhood areas',
+      },
     ],
   );
   const locked = new Set(['local-gva-2015', 'local-mkdb']);

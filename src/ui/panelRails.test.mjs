@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  layoutBottomPanelRow,
   layoutLeftPanelRail,
   layoutRightPanelRail,
   measurePanelNaturalHeight,
@@ -214,6 +215,11 @@ function bottomRow({ dockRight = 1040, railWidth = 400 } = {}) {
     right: 1100 + railWidth,
     width: railWidth,
   };
+  // Collapsed launchers at the narrowest slot width.
+  for (const panel of [f.first, f.second]) {
+    panel.rect.width = 128;
+    panel.rect.right = panel.rect.left + 128;
+  }
   f.options.dock = element('dock', {
     left: 560,
     width: dockRight - 560,
@@ -246,9 +252,10 @@ test('the bottom row sits beside the command dock, bottom-aligned with it', () =
 
 test('beside the dock, the row lifts just enough to clear a low obstacle beneath it', () => {
   const f = bottomRow();
-  // The Power Up chip at the bottom-right sits under the row's right end.
+  // The Power Up chip at the bottom-right sits under the row's right end
+  // (two 128px slots and an 8px gap: 1050.8 to 1314.8).
   const chip = element('key-setup-chip', {
-    left: 1360,
+    left: 1300,
     width: 226,
     top: 850,
     height: 36,
@@ -267,7 +274,7 @@ test('beside the dock, the row lifts just enough to clear a low obstacle beneath
 });
 
 test('with no room beside the dock the row moves to the corner, above what is beneath it', () => {
-  const f = bottomRow({ dockRight: 1300 });
+  const f = bottomRow({ dockRight: 1400 });
   const chip = element('key-setup-chip', {
     left: 1360,
     width: 226,
@@ -295,6 +302,74 @@ test('hidden, upper-half and off-to-the-side obstacles do not move the row', () 
   f.options.obstacles = [hidden, high, left];
   f.run();
   assert.equal(f.stack.dataset.placement, 'docked');
+});
+
+test('opening a panel pops it up over its slot without moving the row or its neighbours', () => {
+  const f = bottomRow();
+  const rowVars = () =>
+    ['--bottom-rail-left', '--bottom-rail-offset', '--bottom-rail-width'].map(
+      (name) => f.stack.style.getPropertyValue(name),
+    );
+  f.run();
+  const closed = rowVars();
+  assert.deepEqual(closed, ['1050.8px', '18.0px', '264px']);
+  assert.equal(f.first.style.getPropertyValue('--slot-left'), '0px');
+  assert.equal(f.second.style.getPropertyValue('--slot-left'), '136px');
+  // A 500px panel opened from the second slot (1186.8) would run past the
+  // window's 14px inset, so it is nudged left just enough.
+  f.expand(f.second, 700);
+  f.second.rect.width = 500;
+  f.run();
+  assert.deepEqual(rowVars(), closed);
+  assert.equal(f.first.style.getPropertyValue('--slot-left'), '0px');
+  assert.equal(f.second.style.getPropertyValue('--slot-left'), '136px');
+  assert.equal(f.second.style.getPropertyValue('--popup-shift'), '-100.8px');
+  assert.equal(f.first.style.getPropertyValue('--popup-shift'), '');
+  f.second.classList.add('collapsed');
+  f.run();
+  assert.equal(f.second.style.getPropertyValue('--popup-shift'), '');
+});
+
+test('a wider launcher gets a wider slot and keeps it while its panel is open', () => {
+  const f = bottomRow();
+  // "DATA LAYERS" and its arrow need 161px collapsed.
+  f.first.rect.width = 161;
+  f.run();
+  assert.equal(f.second.style.getPropertyValue('--slot-left'), '169px');
+  assert.equal(f.stack.style.getPropertyValue('--bottom-rail-width'), '297px');
+  f.expand(f.first, 700);
+  f.first.rect.width = 280;
+  f.run();
+  assert.equal(f.second.style.getPropertyValue('--slot-left'), '169px');
+  assert.equal(f.stack.style.getPropertyValue('--bottom-rail-width'), '297px');
+});
+
+test('the left row sits left of the dock, clears the map credits and keeps pop-ups off the dock', () => {
+  const f = bottomRow();
+  const runLeft = () => layoutBottomPanelRow({ ...f.options, side: 'left' });
+  // A credit line under the row's left end.
+  f.options.obstacles = [
+    element('credits', { left: 24, width: 380, top: 862, height: 20 }),
+  ];
+  runLeft();
+  assert.equal(f.stack.dataset.placement, 'docked');
+  // Dock left edge 560 - the 10.8px gap - the 264px row.
+  assert.equal(f.stack.style.getPropertyValue('--bottom-rail-left'), '285.2px');
+  assert.equal(f.stack.style.getPropertyValue('--bottom-rail-right'), 'auto');
+  assert.equal(
+    f.stack.style.getPropertyValue('--bottom-rail-offset'),
+    '48.8px',
+  );
+  assert.equal(
+    f.stack.style.getPropertyValue('--left-stack-max-height'),
+    '725.2px',
+  );
+  // A 360px panel from the second slot would reach over the dock, so it is
+  // nudged left until its right edge meets the row's (549.2).
+  f.expand(f.second, 600);
+  f.second.rect.width = 360;
+  runLeft();
+  assert.equal(f.second.style.getPropertyValue('--popup-shift'), '-232.0px');
 });
 
 test('the bottom row never collapses or hides panels to make room', () => {

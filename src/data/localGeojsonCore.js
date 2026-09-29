@@ -1870,6 +1870,7 @@ function layerTitle(layerId) {
   if (layerId === 'local-chicago-events' || layerId === 'local-tlr')
     return 'Event';
   if (layerId === 'local-gang-map') return 'Hood';
+  if (layerId === 'local-boston-neighborhoods') return 'Neighborhood';
   if (layerId === 'local-famous-shootings') return 'Shooting';
   if (layerId?.startsWith('local-miami-homicides-')) return 'Homicide';
   if (layerId === 'local-trauma-centers') return 'Trauma center';

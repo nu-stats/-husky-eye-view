@@ -430,8 +430,38 @@ test('a failed recovery reports its error and leaves switching settled', async (
   const result = await env.controller.setStack('first');
   assert.equal(result.status, 'ready');
   assert.equal(result.lastError, 'recovery offline');
-  assert.deepEqual(errors, ['first offline', 'recovery offline']);
+  assert.deepEqual(errors, [
+    'first offline Showing recovery instead.',
+    'recovery offline',
+  ]);
   assert.equal(env.changes.at(-1).status, 'error');
   assert.equal(env.imagery.length, 0);
+  env.controller.destroy();
+});
+
+test('a terrain fallback keeps the map and tells the user why', async () => {
+  const errors = [];
+  const warning =
+    'Cesium ion rejected the token (HTTP 401), so terrain is using the free fallback.';
+  const env = fixture(
+    {
+      defaultId: 'first',
+      sources: [
+        {
+          descriptor: descriptor('first'),
+          imagery: async () => ({ errorEvent: null }),
+          terrain: {
+            id: 'world',
+            create: async () => ({ provider: { id: 'keyless' }, warning }),
+          },
+        },
+      ],
+    },
+    { onError: (message) => errors.push(message) },
+  );
+  const result = await env.controller.setStack('first');
+  assert.equal(result.activeId, 'first');
+  assert.equal(result.lastError, warning);
+  assert.deepEqual(errors, [warning]);
   env.controller.destroy();
 });

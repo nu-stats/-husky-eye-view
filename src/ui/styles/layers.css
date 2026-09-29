@@ -1528,3 +1528,57 @@
   .data-count {
   display: none;
 }
+
+/* Bottom menu rows (Display, CCTV, Context right of the command dock; Data
+   Layers and Scenes left of it). Each launcher keeps a fixed slot, and an
+   open panel pops up over its own slot, so opening one never moves the rest.
+   The layout pass writes the row placement (--bottom-rail-*), each slot
+   (--slot-left), any sideways nudge (--popup-shift) and the popup height
+   limits (--right-stack-max-height / --left-stack-max-height). */
+#right-context-rail.bottom-row,
+#left-panel-stack.bottom-row {
+  position: fixed;
+  top: auto;
+  left: var(--bottom-rail-left, auto);
+  right: var(--bottom-rail-right, auto);
+  bottom: var(--bottom-rail-offset, 3.4rem);
+  width: var(--bottom-rail-width, 400px);
+  height: 50px;
+  max-width: none;
+  max-height: none;
+  display: block;
+  pointer-events: none;
+}
+#right-context-rail.bottom-row
+  > [data-panel-id]:is(#pp-toggles, #cctv-panel, #global-context-panel),
+#left-panel-stack.bottom-row > [data-panel-id]:is(#data-panel, #scene-panel) {
+  position: absolute;
+  top: auto;
+  right: auto;
+  bottom: 0;
+  left: var(--slot-left, 0px);
+  /* A launcher is as wide as its label and arrow need, never under 128px. */
+  width: max-content;
+  min-width: 128px;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  flex: none;
+  pointer-events: auto;
+}
+#right-context-rail.bottom-row
+  > [data-panel-id]:is(#pp-toggles, #cctv-panel, #global-context-panel):not(
+    .collapsed
+  ),
+#left-panel-stack.bottom-row
+  > [data-panel-id]:is(#data-panel, #scene-panel):not(.collapsed) {
+  left: calc(var(--slot-left, 0px) + var(--popup-shift, 0px));
+  width: var(--panel-expanded-width);
+  min-width: 0;
+  z-index: 2;
+}
+#left-panel-stack.bottom-row > #data-panel:not(.collapsed) .data-panel-inner,
+#left-panel-stack.bottom-row > #scene-panel:not(.collapsed) .scene-panel-inner {
+  height: auto;
+  max-height: var(--left-stack-max-height, 70vh);
+}

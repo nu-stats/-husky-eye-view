@@ -421,16 +421,80 @@ Last step, on the website: Releases -> Draft a new release -> tag v0.1.0 -> Publ
           because they contain keys.
 
 
+-------------------------------------------------------------------------------
+STEP 28: Boston Neighborhoods layer
+-------------------------------------------------------------------------------
+Asked:    Add boston_neighborhoods.geojson (Potential Years of Life Lost maps) as a layer under
+          a new "Boston" heading in Data Layers.
+Done:
+  - The file is in Massachusetts State Plane coordinates (NAD83, US feet, EPSG:2249), so
+    every point was converted to latitude/longitude with the Lambert conformal conic
+    formulas. Checked against landmarks: City Hall falls in Downtown, Old North Church in
+    the North End, Harvard Stadium in Allston, 360 Huntington in Fenway.
+  - 69 neighborhood areas, labeled by name and shaded by the 16 groups in the file's Nbhd
+    column (with a legend). Clicking an area shows its group and size. Voice: "Boston
+    neighborhoods".
+  - Open question for the data owner: several groupings look shifted (Fenway with Roxbury,
+    Kenmore with Allston-Brighton, Codman Square with Mattapan). Kept as given.
+Code:     scripts/convert-boston-neighborhoods.mjs -> src/data/local_data/boston/,
+          infrastructure.js, layerState.js (token 'bn'), layerPanel.js ("Boston" group).
+
+
+-------------------------------------------------------------------------------
+STEP 29: Data Layers and Scenes moved to the bottom; menus no longer jump
+-------------------------------------------------------------------------------
+Asked:    Move Data Layers and Scenes to the bottom like the other menus. Opening CCTV made all
+          the bottom menus rise, which was wrong. Use arrows instead of "+" on Data Layers and
+          Scenes, and the Data Layers arrow was cut off at the right.
+Done:
+  - Data Layers and Scenes form a row left of the Location/Visual Presets bar; Display,
+    CCTV and Context stay on its right. Both rows open upward.
+  - Each menu button keeps a fixed spot sized to its label and arrow. An open panel pops up
+    over its own button, so opening one never moves the others. Left-side panels are
+    nudged so they don't cover the Location/Visual Presets bar.
+  - All five menus use ▲ (closed) / ▼ (open).
+Code:     src/ui/rightPanelRail.js (layoutBottomPanelRow for both sides),
+          panelLayoutController.js, panelChrome.js, layers.css, layer-panels.html.
+
+
+-------------------------------------------------------------------------------
+STEP 30: Text looked too big in Chrome
+-------------------------------------------------------------------------------
+Cause:    Chrome had a saved zoom of 175% for 127.0.0.1 (the app's address). Not an app bug.
+Fix:      In Chrome on the app page press Ctrl+0 (or the magnifier icon -> Reset).
+
+
+-------------------------------------------------------------------------------
+STEP 31: Switching from Google 3D to Bing, Esri or OSM gave "Request has failed: 401"
+-------------------------------------------------------------------------------
+Cause:    The Cesium ion token was rejected by Cesium's servers (revoked or deleted on the
+          ion account). Bing comes through ion, and Esri/OSM loaded their terrain through
+          ion whenever a token was set, so all three failed.
+Fix for the user (any time this happens):
+          1. https://ion.cesium.com/tokens -> create a new token -> copy it.
+          2. In the app: POWER UP -> CESIUM ION -> paste it.
+          3. Stop and start the app in Pinokio, reload the page.
+Code changes, so the app explains itself instead of just switching views:
+  - Esri and OSM fall back to free terrain when ion refuses, and a notice says so, with
+    the fix.
+  - Bing shows "Cesium ion rejected the token (HTTP 401). Fix: ... Showing Google 3D
+    instead."
+  - Any map that falls back to another says which one it is showing.
+  - Notices with a fix stay on screen up to 10 seconds (they used to vanish after 2).
+Code:     src/maps/defaultSources.js, controller.js, imagery.js, src/ui/shellFeedback.js.
+
+
 ===============================================================================
 WHERE THINGS STAND (September 29, 2026)
 ===============================================================================
-Layers:     42, including every custom layer and TLR. All of them are on voice's list,
-            automatically. GVA and MKDB need the research key.
-Look:       Northeastern logo, grey interface, full-window view, menus along the bottom, opens
-            on the Northeastern campus.
+Layers:     43, including every custom layer, TLR and Boston Neighborhoods. All of them are
+            on voice's list, automatically. GVA and MKDB need the research key.
+Look:       Northeastern logo, grey interface, full-window view, two menu rows along the
+            bottom beside the Location/Visual Presets bar, opens on the Northeastern campus.
+Needs:      A new Cesium ion token (Step 31) for Bing maps and full terrain.
 Not back:   Only the speed rewrite from Step 6 (batched drawing, coarse copies, the Speed
             control). The Miami hotspot map and the large pin layers may feel heavier.
-Tests:      All 4,200 unit tests pass. Format and package-boundary checks are clean.
+Tests:      All 4,206 unit tests pass. Format and package-boundary checks are clean.
 
 Backups:    C:\Users\jstow\Documents\HuskyEyeView-backups\
               husky-eye-view-2026-09-26-before-optimization.tar.gz
@@ -445,8 +509,8 @@ Data exports:
             mkdb_incidents_geocoded.csv
 
 Git history on main (newest first):
-            (release)  v0.1.0: panel redesign, bottom menus, research locks, NU home, TLR,
-                       voice clock fix, this journey update
+            (latest)   Boston Neighborhoods, bottom menu rows, ion 401 notices (Steps 28-31)
+            0ce4baef  Husky Eye View v0.1.0 (tagged v0.1.0)
             ce938a30  Add development journey
             20b15d96  Voice reaches every data layer; Boston is the default view
             81bea6e2  Bring back the layers added after the Sep 26 backup

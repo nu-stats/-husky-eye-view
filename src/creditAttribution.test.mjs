@@ -205,6 +205,7 @@ const RECOGNIZED = new Set([
   // rail
   '#right-context-rail',
   '#right-context-rail.layout-focus',
+  '#right-context-rail.bottom-row',
   // tray
   '#command-dock .dock-popover-content',
   '#command-dock #location-bar .dock-popover-content',
@@ -407,13 +408,15 @@ test('the model refuses every cascade construct it cannot resolve', () => {
       }
       if (decl.prop === 'height' || decl.prop === 'max-height') {
         // A capped height can override `bottom` and invalidate the measured
-        // dock/credit constants. Two exemptions, each earned by a test below:
+        // dock/credit constants. Three exemptions, each earned by a test below:
         // the rail's own max-height (resolved to `none` across the whole
-        // modelled band by the rail clearance test) and `.layout-focus`
-        // (proven inapplicable at <=720px by the mobile-mode test).
+        // modelled band by the rail clearance test), and `.layout-focus` and
+        // `.bottom-row` (both proven inapplicable at <=720px by the
+        // mobile-mode test).
         const railOwn = part === '#right-context-rail' && decl.prop === 'max-height';
         const railFocus = part === '#right-context-rail.layout-focus';
-        if (!railOwn && !railFocus) complaints.push(`${decl.prop}: ${decl.value} on "${part}"`);
+        const railRow = part === '#right-context-rail.bottom-row';
+        if (!railOwn && !railFocus && !railRow) complaints.push(`${decl.prop}: ${decl.value} on "${part}"`);
       }
       if (decl.prop === 'transform' && /translateY|translate3d|matrix|scale\(/.test(decl.value)) {
         const identity = decl.value === 'translateY(0) scale(1)';
@@ -477,17 +480,23 @@ test('the inputs behind the measured constants are unchanged', () => {
 });
 
 test('the full-width rail cannot inherit a height that overrides its floor', () => {
-  // `#right-context-rail.layout-focus { height: … }` is a base rule with more
+  // `#right-context-rail.layout-focus { height: … }` and
+  // `#right-context-rail.bottom-row { height: … }` are base rules with more
   // specificity than the <=720px floor, and height + top + bottom is
-  // over-constrained. It is safe only because the rail's layout pass switches
-  // to a mobile mode at the SAME breakpoint and removes both the class and the
-  // custom property. Pin that, or the exemption above is unearned.
+  // over-constrained. They are safe only because the rail's layout pass drops
+  // `.layout-focus` on every pass and, at the SAME breakpoint, switches to a
+  // mobile mode that removes `.bottom-row` and the height custom property.
+  // Pin that, or the exemptions above are unearned.
   const rail = fs.readFileSync(path.join(ROOT, 'src', 'ui', 'rightPanelRail.js'), 'utf8');
+  const start = rail.indexOf('export function layoutBottomPanelRow');
   const gate = rail.indexOf("windowRef.matchMedia('(max-width: 720px)')");
-  assert.ok(gate > 0, 'the rail layout pass no longer keys off (max-width: 720px)');
+  assert.ok(start > 0 && gate > start, 'the rail layout pass no longer keys off (max-width: 720px)');
+  assert.match(rail.slice(start, gate), /stack\.classList\.remove\([^)]*'layout-focus'/);
+  assert.match(rail, /const heightVar = `--\$\{side\}-stack-max-height`;/);
+  assert.match(rail, /return layoutBottomPanelRow\(\{ \.\.\.options, side: 'right' \}\);/);
   const mobileBranch = rail.slice(gate, rail.indexOf("layoutMode = 'mobile'", gate) + 40);
-  assert.match(mobileBranch, /stack\.classList\.remove\('layout-focus'\)/);
-  assert.match(mobileBranch, /stack\.style\.removeProperty\('--right-stack-max-height'\)/);
+  assert.match(mobileBranch, /stack\.classList\.remove\('bottom-row'\)/);
+  assert.match(mobileBranch, /removeIfSet\(stack, heightVar\)/);
 });
 
 // ── Clearance ───────────────────────────────────────────────────────────────

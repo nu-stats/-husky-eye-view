@@ -252,6 +252,8 @@ const LAYER_ALIASES = new Map([
   ['chicago homicides', 'local-chicago-events'],
   ['tlr', 'local-tlr'],
   ['no limit', 'local-tlr'],
+  ['boston neighborhoods', 'local-boston-neighborhoods'],
+  ['boston neighbourhoods', 'local-boston-neighborhoods'],
   ['gang map', 'local-gang-map'],
   ['gang territories', 'local-gang-map'],
   ['gangs', 'local-gang-map'],

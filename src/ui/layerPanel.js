@@ -69,6 +69,10 @@ const PANEL_GROUPS = [
     ids: ['local-gang-map', 'local-gang-map-labels'],
   },
   {
+    label: 'Boston',
+    ids: ['local-boston-neighborhoods'],
+  },
+  {
     label: 'Neighborhood Data (US)',
     ids: [
       'local-holc-redlining',

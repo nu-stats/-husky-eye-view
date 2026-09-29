@@ -278,10 +278,12 @@ export class PanelChrome {
   }
 
   _syncPanelCollapseButton(panelEl) {
-    const isRightRail = [
+    const inBottomRow = [
       'pp-toggles',
       'cctv-panel',
       'global-context-panel',
+      'data-panel',
+      'scene-panel',
     ].includes(panelEl?.id);
     const collapsed = panelEl.classList.contains('collapsed');
     panelEl
@@ -289,8 +291,8 @@ export class PanelChrome {
       .forEach((btn) => {
         const owner = btn.closest('[data-panel-id], #param-slider-panel');
         if (owner !== panelEl) return;
-        if (isRightRail) {
-          // These sit in the bottom row and open upward.
+        if (inBottomRow) {
+          // These sit in the bottom rows and open upward.
           btn.textContent = collapsed ? '▲' : '▼';
         } else {
           btn.textContent = collapsed ? '+' : '−';

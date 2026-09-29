@@ -244,6 +244,37 @@ const MKDB_DEATHS = Object.freeze([
 ]);
 const mkdbDeaths = (p) =>
   MKDB_DEATHS.find((d) => p.killed >= d.min && p.killed < d.max);
+// Boston's 69 neighborhood statistical areas, reprojected from Massachusetts
+// State Plane by scripts/convert-boston-neighborhoods.mjs. Each area is shaded
+// by the neighborhood group the source file assigns it (its `Nbhd` field).
+const bostonNeighborhoodsUrl = new URL(
+  './local_data/boston/neighborhoods.geojsonl',
+  import.meta.url,
+).href;
+const BOSTON_NEIGHBORHOOD_GROUPS = Object.freeze(
+  [
+    ['Allston-Brighton', '#1f77b4'],
+    ['Back Bay', '#aec7e8'],
+    ['Beacon Hill', '#ff7f0e'],
+    ['Charlestown', '#ffbb78'],
+    ['Dorchester', '#2ca02c'],
+    ['East Boston', '#98df8a'],
+    ['Fenway', '#d62728'],
+    ['Financial District', '#ff9896'],
+    ['Hyde Park', '#9467bd'],
+    ['Mattapan', '#c5b0d5'],
+    ['Mission Hill', '#8c564b'],
+    ['Roslindale', '#c49c94'],
+    ['Roxbury', '#e377c2'],
+    ['South Boston', '#f7b6d2'],
+    ['South End', '#bcbd22'],
+    ['West Roxbury', '#17becf'],
+  ].map(([label, color]) => ({
+    label,
+    color,
+    test: (p) => p.neighborhood === label,
+  })),
+);
 
 // Hoods without a gang line and non-hood areas keep one color per source
 // My Maps layer.
@@ -649,6 +680,26 @@ export function createInfrastructureLayers(services) {
     services,
   );
 
+  const bostonNeighborhoods = createLocalGeoJsonLayer(
+    {
+      id: 'local-boston-neighborhoods',
+      name: 'Boston Neighborhoods',
+      url: bostonNeighborhoodsUrl,
+      color: '#a2aaad',
+      icon: '⬢',
+      source: 'Neighborhood areas',
+      labels: true,
+      labelMax: 80,
+      labelGridPx: 120,
+      labeledAreas: true,
+      featureColor: (p) =>
+        BOSTON_NEIGHBORHOOD_GROUPS.find((g) => g.test(p))?.color ||
+        NO_DATA_COLOR,
+      legend: BOSTON_NEIGHBORHOOD_GROUPS,
+    },
+    services,
+  );
+
   return [
     datacenters,
     dams,
@@ -668,5 +719,6 @@ export function createInfrastructureLayers(services) {
     publicHousing,
     gva2015,
     mkdb,
+    bostonNeighborhoods,
   ];
 }

@@ -116,14 +116,17 @@ export class MapSourceController {
     } catch (error) {
       if (gen !== this._switchGen) return this.getState();
       const message = error?.message || String(error);
-      this._lastError = message;
-      this._onError?.(message, stack);
       const recovery = this.getStack(this._registry.recoveryId);
-      if (
+      const recovers =
         recovery &&
         recovery.id !== stack.id &&
-        this.isStackAvailable(recovery.id)
-      ) {
+        this.isStackAvailable(recovery.id);
+      // Say where the view went instead of silently switching maps.
+      this._lastError = recovers
+        ? `${message} Showing ${recovery.label} instead.`
+        : message;
+      this._onError?.(this._lastError, stack);
+      if (recovers) {
         try {
           const activation = await this._activate(recovery, gen);
           if (gen !== this._switchGen) return this.getState();
@@ -213,6 +216,11 @@ export class MapSourceController {
       if (result.terrain) this.viewer.scene.setTerrain(result.terrain);
       else this.viewer.terrainProvider = result.provider;
       this._terrainMode = terrain.id;
+      // The map still works, but say why its terrain fell back.
+      if (result.warning) {
+        this._lastError = result.warning;
+        this._onError?.(result.warning, stack);
+      }
     }
     return resolution;
   }

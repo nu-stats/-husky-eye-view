@@ -183,9 +183,12 @@ export class ShellFeedback {
     this._toast.textContent = message;
     this._toast.classList.add('visible');
     clearTimeout(this._toastTimer);
+    // Short notices flash; longer ones (a problem plus its fix) stay long
+    // enough to read.
+    const readMs = Math.min(10000, Math.max(2000, String(message).length * 65));
     this._toastTimer = setTimeout(() => {
       this._toast.classList.remove('visible');
-    }, 2000);
+    }, readMs);
   }
   destroy() {
     if (this.destroyed) return;

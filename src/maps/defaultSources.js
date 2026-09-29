@@ -5,6 +5,7 @@ import {
   createOsmImagery,
   createEsriImagery,
   createIonImagery,
+  ION_TOKEN_FIX,
   ESRI_ATTRIBUTION_HTML,
 } from './imagery.js';
 import { createWorldTerrain, createKeylessTerrain } from './terrain.js';
@@ -21,7 +22,23 @@ export function createDefaultMapSources({
   const terrain = {
     id: hasIon ? 'world' : 'keyless',
     create: hasIon
-      ? (request) => createWorldTerrain(ionToken, request)
+      ? async (request) => {
+          try {
+            return await createWorldTerrain(ionToken, request);
+          } catch (error) {
+            if (request?.signal?.aborted) throw error;
+            // A revoked or mistyped ion token must not take the keyless
+            // Esri and OSM maps down with it, but the user is told why the
+            // terrain changed and how to fix it.
+            const status = Number(error?.statusCode);
+            const warning =
+              status === 401 || status === 403
+                ? `Cesium ion rejected the token (HTTP ${status}), so terrain is using the free fallback. ${ION_TOKEN_FIX}`
+                : 'Cesium World Terrain is unavailable, so terrain is using the free fallback.';
+            console.warn('[MapStack]', warning, error);
+            return { ...(await createKeylessTerrain()), warning };
+          }
+        }
       : createKeylessTerrain,
   };
   return {

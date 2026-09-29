@@ -1,5 +1,8 @@
 export { layoutLeftPanelRail } from './leftPanelRail.js';
-export { layoutRightPanelRail } from './rightPanelRail.js';
+export {
+  layoutBottomPanelRow,
+  layoutRightPanelRail,
+} from './rightPanelRail.js';
 export { measurePanelNaturalHeight } from './panelMeasurement.js';
 export {
   resolveHudRailLayout,

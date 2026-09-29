@@ -1,5 +1,9 @@
 /** Own rail measurement, layout scheduling and dock tray observation. */
-import { layoutLeftPanelRail, layoutRightPanelRail } from './panelRails.js';
+import {
+  layoutBottomPanelRow,
+  layoutLeftPanelRail,
+  layoutRightPanelRail,
+} from './panelRails.js';
 const COCKPIT_LAYOUT_SETTLE_MS = 240;
 /**
  * Fixed UI regions that can occupy the left accordion's vertical lane.
@@ -33,9 +37,10 @@ const LEFT_STACK_OBSTACLE_SELECTOR = [
   '#param-slider-panel',
 ].join(', ');
 /**
- * Fixed UI along the bottom edge that the bottom panel row (Display, CCTV,
- * Context) must sit above when it is beneath the row. Runtime rectangle
- * filtering only counts what overlaps the row horizontally.
+ * Fixed UI along the bottom edge that the bottom panel rows (Display, CCTV,
+ * Context on the right; Data Layers and Scenes on the left) must sit above
+ * when it is beneath a row. Runtime rectangle filtering only counts what
+ * overlaps a row horizontally.
  */
 const RIGHT_STACK_OBSTACLE_SELECTOR = [
   '#key-setup-chip',
@@ -308,7 +313,9 @@ export class PanelLayoutController {
         if (inner) this._leftStackResizeObserver.observe(inner);
       });
       document
-        .querySelectorAll(LEFT_STACK_OBSTACLE_SELECTOR)
+        .querySelectorAll(
+          `${LEFT_STACK_OBSTACLE_SELECTOR}, ${RIGHT_STACK_OBSTACLE_SELECTOR}`,
+        )
         .forEach((element) => {
           this._leftStackResizeObserver.observe(element);
         });
@@ -410,6 +417,17 @@ export class PanelLayoutController {
 
   _syncLeftPanelAdaptiveLayout() {
     if (this.destroyed) return;
+    // Data Layers and Scenes form a bottom row left of the command dock; on a
+    // phone-width window the row steps aside for the stacked layout below.
+    layoutBottomPanelRow({
+      stack: this._leftPanelStack,
+      side: 'left',
+      dock: document.getElementById('command-dock'),
+      obstacles: document.querySelectorAll(RIGHT_STACK_OBSTACLE_SELECTOR),
+      windowRef: window,
+      onCollapse: (panel) => this._syncPanelCollapseButton(panel),
+    });
+    if (this._leftPanelStack.dataset.layoutMode === 'bottom') return;
     layoutLeftPanelRail({
       stack: this._leftPanelStack,
       obstacles: document.querySelectorAll(LEFT_STACK_OBSTACLE_SELECTOR),

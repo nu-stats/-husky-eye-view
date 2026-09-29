@@ -25,5 +25,27 @@ export function createEsriImagery() {
 export function createIonImagery(style, accessToken) {
   accessToken = String(accessToken || '').trim();
   if (!accessToken) throw new Error('Ion imagery requires an explicit token');
-  return Cesium.IonImageryProvider.fromAssetId(style, { accessToken });
+  return Cesium.IonImageryProvider.fromAssetId(style, { accessToken }).catch(
+    (error) => {
+      throw ionAccessError(error);
+    },
+  );
 }
+
+/**
+ * Name the fix when Cesium ion refuses the token (revoked, deleted or
+ * mistyped), instead of surfacing a bare "Request has failed" status.
+ * @param {unknown} error Failure from an ion request.
+ * @returns {unknown} A readable Error for 401/403, otherwise the original.
+ */
+export function ionAccessError(error) {
+  const status = Number(error?.statusCode);
+  if (status !== 401 && status !== 403) return error;
+  return new Error(
+    `Cesium ion rejected the token (HTTP ${status}). ${ION_TOKEN_FIX}`,
+  );
+}
+
+/** What to do when ion refuses the token. */
+export const ION_TOKEN_FIX =
+  'Fix: make a new token at ion.cesium.com/tokens and paste it into POWER UP → CESIUM ION.';

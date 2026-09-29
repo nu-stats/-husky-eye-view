@@ -119,6 +119,47 @@ test('cancellation after ion metadata prevents terrain construction', async () =
   }
 });
 
+test('a rejected ion token falls back to keyless terrain and names the fix for Bing', async () => {
+  const originalImagery = Cesium.IonImageryProvider.fromAssetId;
+  const originalResource = Cesium.IonResource.fromAssetId;
+  const originalTerrain = Cesium.CesiumTerrainProvider.fromUrl;
+  const originalWarn = console.warn;
+  const denied = () =>
+    Promise.reject(
+      Object.assign(new Error('Request has failed.'), { statusCode: 401 }),
+    );
+  try {
+    console.warn = () => {};
+    Cesium.IonImageryProvider.fromAssetId = denied;
+    Cesium.IonResource.fromAssetId = denied;
+    Cesium.CesiumTerrainProvider.fromUrl = async (resource) => ({ resource });
+    const sources = createDefaultMapSources({ cesiumToken: 'revoked' });
+    const esri = sources.sources.find(
+      ({ descriptor }) => descriptor.id === 'esri-imagery',
+    );
+    // Esri and OSM stay usable: terrain comes from the keyless mesh instead.
+    const terrain = await esri.terrain.create();
+    assert.equal(
+      terrain.provider.resource,
+      'https://terrain.reearth.land/cesium-mesh/ellipsoid',
+    );
+    // ...and the user is told why, with the fix.
+    assert.match(
+      terrain.warning,
+      /^Cesium ion rejected the token \(HTTP 401\), so terrain is using the free fallback\. Fix: make a new token at ion\.cesium\.com\/tokens and paste it into POWER UP → CESIUM ION\.$/,
+    );
+    await assert.rejects(
+      createIonImagery(Cesium.IonWorldImageryStyle.AERIAL, 'revoked'),
+      /^Error: Cesium ion rejected the token \(HTTP 401\)\. Fix: make a new token at ion\.cesium\.com\/tokens and paste it into POWER UP → CESIUM ION\.$/,
+    );
+  } finally {
+    console.warn = originalWarn;
+    Cesium.IonImageryProvider.fromAssetId = originalImagery;
+    Cesium.IonResource.fromAssetId = originalResource;
+    Cesium.CesiumTerrainProvider.fromUrl = originalTerrain;
+  }
+});
+
 test('credentialed source factories reject an omitted token instead of consuming an SDK default', async () => {
   assert.throws(
     () => createIonImagery(Cesium.IonWorldImageryStyle.AERIAL, ''),

@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌐 God's Eye View
+# 🌐 Husky Eye View---Derived from God's Eye View
 
 [![CI](https://github.com/bilawalsidhu/gods-eye-view/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bilawalsidhu/gods-eye-view/actions/workflows/ci.yml)
 

@@ -12,6 +12,7 @@ const FEED_STATE_LABELS = Object.freeze({
   unavailable: 'UNAVAILABLE',
 });
 
+const RESEARCH_GROUP = 'Research Data';
 // Presentation order is independent of catalog registration and startup order.
 const PANEL_GROUPS = [
   {
@@ -48,9 +49,13 @@ const PANEL_GROUPS = [
       'local-chicago-events',
       'local-tlr',
       'local-famous-shootings',
-      'local-gva-2015',
-      'local-mkdb',
     ],
+  },
+  {
+    // Key-locked datasets get their own group that never starts folded, so
+    // they stay in sight whether or not the research key is set.
+    label: RESEARCH_GROUP,
+    ids: ['local-gva-2015', 'local-mkdb'],
   },
   {
     label: 'Miami-Dade Homicides',
@@ -437,7 +442,9 @@ export class LayerPanel {
         layers.filter((layer) => layer.enabled).map(groupOf),
       );
       this._collapsedGroups = new Set(
-        layers.map(groupOf).filter((group) => !active.has(group)),
+        layers
+          .map(groupOf)
+          .filter((group) => !active.has(group) && group !== RESEARCH_GROUP),
       );
     }
     let previousGroup = '';

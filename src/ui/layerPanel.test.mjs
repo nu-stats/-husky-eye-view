@@ -3,18 +3,41 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
-test('panel presentation places Transit between Street Traffic and Bike Share in Movement', () => {
+function panelOrder() {
   const source = readFileSync(
     new URL('./layerPanel.js', import.meta.url),
     'utf8',
   );
   const declarations = source.slice(
-    source.indexOf('const PANEL_GROUPS ='),
+    source.indexOf('const RESEARCH_GROUP ='),
     source.indexOf('const PANEL_POSITIONS ='),
   );
-  const order = JSON.parse(
-    runInNewContext(`${declarations}\nJSON.stringify(PANEL_ORDER)`),
+  return {
+    source,
+    order: JSON.parse(
+      runInNewContext(`${declarations}\nJSON.stringify(PANEL_ORDER)`),
+    ),
+  };
+}
+
+test('locked research datasets keep their own group that never starts folded', () => {
+  const { source, order } = panelOrder();
+  assert.deepEqual(
+    order.filter(({ label }) => label === 'Research Data').map(({ id }) => id),
+    ['local-gva-2015', 'local-mkdb'],
   );
+  // Right after Events, where they used to live.
+  const labels = [...new Set(order.map(({ label }) => label))];
+  assert.equal(labels.indexOf('Research Data'), labels.indexOf('Events') + 1);
+  // First-visit folding skips the group, so the locked rows are in sight.
+  assert.match(
+    source,
+    /filter\(\(group\) => !active\.has\(group\) && group !== RESEARCH_GROUP\)/,
+  );
+});
+
+test('panel presentation places Transit between Street Traffic and Bike Share in Movement', () => {
+  const { order } = panelOrder();
   assert.deepEqual(
     order.filter(({ label }) => label === 'Movement').map(({ id }) => id),
     [

@@ -23,6 +23,78 @@ const CHUNK_CACHE_LIMIT = 90;
 const FILL_ALPHA = 0.4;
 /** Longest getAreaContext waits for areas still loading. */
 const AREA_CONTEXT_WAIT_MS = 6000;
+/**
+ * A camera that never stops (Cockpit, a tracked follow, a route flight, a
+ * continuous orbit) never emits moveEnd, so the view is also rechecked at
+ * most this often while frames render, and reloaded once it has moved on.
+ */
+const MOTION_CHECK_MS = 1500;
+const MOTION_MIN_TRAVEL_M = 1500;
+const MOTION_HEADING_CHANGE_RAD = Cesium.Math.toRadians(25);
+const EARTH_RADIUS_M = 6_371_000;
+/** Cameras pitched shallower than this look at the horizon, not the ground. */
+const SHALLOW_PITCH_RAD = Cesium.Math.toRadians(-25);
+
+/**
+ * Ground box for a horizon-up view (no ground rectangle): the area around the
+ * camera plus the stretch it is looking toward, so a cockpit sees the ground
+ * ahead of the aircraft, not only beneath it.
+ * @param {{longitude:number, latitude:number, height:number, heading:number}} pose
+ *   Degrees, meters, heading in radians.
+ * @returns {{west:number,south:number,east:number,north:number}} Degrees.
+ */
+export function horizonViewBox({ longitude, latitude, height, heading }) {
+  const aheadM = Math.min(80_000, Math.max(8_000, (height || 0) * 6));
+  const d = aheadM / EARTH_RADIUS_M;
+  const lat1 = Cesium.Math.toRadians(latitude);
+  const lon1 = Cesium.Math.toRadians(longitude);
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(d) +
+      Math.cos(lat1) * Math.sin(d) * Math.cos(heading || 0),
+  );
+  const lon2 =
+    lon1 +
+    Math.atan2(
+      Math.sin(heading || 0) * Math.sin(d) * Math.cos(lat1),
+      Math.cos(d) - Math.sin(lat1) * Math.sin(lat2),
+    );
+  const aheadLon = Cesium.Math.toDegrees(lon2);
+  const aheadLat = Cesium.Math.toDegrees(lat2);
+  const pad = 0.35;
+  return {
+    west: Math.min(longitude, aheadLon) - pad,
+    east: Math.max(longitude, aheadLon) + pad,
+    south: Math.min(latitude, aheadLat) - pad,
+    north: Math.max(latitude, aheadLat) + pad,
+  };
+}
+
+/**
+ * Whether a moving camera has left the view last loaded: it traveled a
+ * quarter of its height (at least 1.5 km), turned 25°, or changed height by
+ * half again.
+ * @param {{longitude:number, latitude:number, height:number, heading:number}} previous
+ * @param {{longitude:number, latitude:number, height:number, heading:number}} next
+ * @returns {boolean}
+ */
+export function viewPoseMoved(previous, next) {
+  if (!previous || !next) return false;
+  const rad = Math.PI / 180;
+  const dLat = (next.latitude - previous.latitude) * rad;
+  const dLon =
+    (next.longitude - previous.longitude) *
+    rad *
+    Math.cos(((next.latitude + previous.latitude) / 2) * rad);
+  const travelM = Math.hypot(dLat, dLon) * EARTH_RADIUS_M;
+  if (travelM >= Math.max(MOTION_MIN_TRAVEL_M, 0.25 * Math.abs(next.height)))
+    return true;
+  const turn = Math.abs(
+    ((next.heading - previous.heading + 3 * Math.PI) % (2 * Math.PI)) - Math.PI,
+  );
+  if (turn >= MOTION_HEADING_CHANGE_RAD) return true;
+  const low = Math.max(1, Math.min(previous.height, next.height));
+  return Math.max(previous.height, next.height) / low >= 1.5;
+}
 
 /** Polygon rings of a Polygon/MultiPolygon geometry, as [outer, ...holes][]. */
 function polygonsOf(geometry) {
@@ -162,6 +234,9 @@ export function createChunkedAreaLayer(
   let pending = 0;
   let clickHandler = null;
   let moveEndRemover = null;
+  let frameRemover = null;
+  let lastViewPose = null;
+  let lastMotionCheckMs = 0;
   let rowControlsListener = null;
   /** chunk id -> Cesium.GeoJsonDataSource currently in the scene */
   const drawn = new Map();
@@ -272,6 +347,27 @@ export function createChunkedAreaLayer(
     }
   }
 
+  /** Camera position and heading in degrees/meters/radians, or null. */
+  function currentPose() {
+    const carto = viewer?.camera?.positionCartographic;
+    if (!carto) return null;
+    return {
+      longitude: Cesium.Math.toDegrees(carto.longitude),
+      latitude: Cesium.Math.toDegrees(carto.latitude),
+      height: carto.height,
+      heading: viewer.camera.heading ?? 0,
+    };
+  }
+
+  /** Recheck a camera that keeps moving (see MOTION_CHECK_MS). */
+  function onFrame() {
+    const now = Date.now();
+    if (now - lastMotionCheckMs < MOTION_CHECK_MS) return;
+    lastMotionCheckMs = now;
+    if (!enabled || destroyed || pending > 0) return;
+    if (viewPoseMoved(lastViewPose, currentPose())) refresh();
+  }
+
   /** The latest reconcile, so readers can wait for the view to finish loading. */
   let currentRefresh = Promise.resolve();
   function refresh() {
@@ -283,6 +379,7 @@ export function createChunkedAreaLayer(
   async function reconcileView() {
     if (!enabled || destroyed || !viewer) return;
     const gen = ++generation;
+    lastViewPose = currentPose();
     const height = viewer.camera.positionCartographic?.height;
     if (!(height <= maxHeightM)) {
       status = 'zoom-in';
@@ -301,10 +398,16 @@ export function createChunkedAreaLayer(
       return;
     }
     if (gen !== generation || !enabled) return;
-    const rect = viewer.camera.computeViewRectangle?.(
-      viewer.scene.globe?.ellipsoid ?? Cesium.Ellipsoid.WGS84,
-    );
-    const carto = viewer.camera.positionCartographic;
+    // A near-level camera (a cockpit, a street-level look) gets no useful
+    // ground rectangle from Cesium: it reports a fixed ~9°-wide box that even
+    // reaches behind the camera. Such views use the ground-ahead box instead.
+    const shallow = (viewer.camera.pitch ?? -Math.PI / 2) > SHALLOW_PITCH_RAD;
+    const rect = shallow
+      ? undefined
+      : viewer.camera.computeViewRectangle?.(
+          viewer.scene.globe?.ellipsoid ?? Cesium.Ellipsoid.WGS84,
+        );
+    const pose = currentPose();
     const view = rect
       ? {
           west: Cesium.Math.toDegrees(rect.west),
@@ -312,13 +415,9 @@ export function createChunkedAreaLayer(
           east: Cesium.Math.toDegrees(rect.east),
           north: Cesium.Math.toDegrees(rect.north),
         }
-      : {
-          // Horizon-up views have no ground rectangle: use a box under the camera.
-          west: Cesium.Math.toDegrees(carto.longitude) - 0.5,
-          south: Cesium.Math.toDegrees(carto.latitude) - 0.5,
-          east: Cesium.Math.toDegrees(carto.longitude) + 0.5,
-          north: Cesium.Math.toDegrees(carto.latitude) + 0.5,
-        };
+      : // Horizon-up views have no ground rectangle: use the ground around
+        // the camera and ahead of it.
+        horizonViewBox(pose);
     const wanted = new Set(chunksInView(list, view, maxChunks));
     for (const chunkId of [...drawn.keys()]) {
       if (!wanted.has(chunkId)) releaseChunk(chunkId);
@@ -435,6 +534,8 @@ export function createChunkedAreaLayer(
       moveEndRemover ||= viewer.camera.moveEnd.addEventListener(() => {
         refresh();
       });
+      frameRemover ||=
+        viewer.scene?.preRender?.addEventListener?.(onFrame) || null;
       await refresh();
     },
 
@@ -443,6 +544,8 @@ export function createChunkedAreaLayer(
       generation += 1;
       moveEndRemover?.();
       moveEndRemover = null;
+      frameRemover?.();
+      frameRemover = null;
       releaseAll();
       clearSelectedEntityContextForLayer(id);
       removeEntityContextsForLayer(id);
@@ -457,6 +560,8 @@ export function createChunkedAreaLayer(
       generation += 1;
       moveEndRemover?.();
       moveEndRemover = null;
+      frameRemover?.();
+      frameRemover = null;
       releaseAll();
       removeEntityContextsForLayer(id);
       clickHandler?.destroy();

@@ -544,17 +544,53 @@ Code:     src/data/splatCaptures.js, constructCatalog.js, layerState.js (token '
           layerPanel.js, gevActions.js, public/splats/.
 
 
+-------------------------------------------------------------------------------
+STEP 36: The project's layers show in the cockpit view
+-------------------------------------------------------------------------------
+Asked:    See active layers such as life expectancy from the cockpit (investigate first),
+          then: only the project's own layers, not CCTV, fires, military, ALPR, cables.
+Found (checked on the test server):
+  - Cockpit lives inside the Contacts mode, which switched off every layer that wasn't
+    part of Contacts when it started.
+  - Area layers (life expectancy, HOLC, clusters, Boston, Miami hotspots) only loaded
+    the view when the camera stopped, and the cockpit camera never stops.
+  - For a near-level camera, Cesium reports a meaningless ~9°-wide view box (it even
+    reaches behind the camera), so those layers loaded counties far away.
+Done:
+  - Contacts/cockpit keeps the project's own map layers (the local-* layers, except
+    the live FIRMS fires) on. The inherited live layers are still set aside. A layer
+    turned on or off inside the cockpit keeps that state after leaving.
+  - Area layers re-check the view every ~1.5 s while the camera moves, and near-level
+    views load the ground around and ahead of the camera.
+  - Checked: a camera flying nonstop Boston -> Chicago loaded the counties under it
+    all the way; in a real cockpit (American 3264 over Chicago) the life-expectancy
+    tracts showed ahead of the aircraft.
+  - Cockpit zoom: not available yet (the cockpit resets the camera every frame); a
+    field-of-view "binocular" zoom is possible.
+Code:     src/contextModePolicy.js (contextKeepsLayer), src/ui/contextTransactions.js,
+          src/data/chunkedAreaLayer.js (viewPoseMoved, horizonViewBox).
+
+
+-------------------------------------------------------------------------------
+STEP 37: Release v0.1.2
+-------------------------------------------------------------------------------
+Done:     Steps 33-36 committed and pushed, then:
+            git tag -a v0.1.2 -m "Husky Eye View v0.1.2"
+            git push origin v0.1.2
+Last step, on the website: Releases -> Draft a new release -> tag v0.1.2 -> Publish.
+
+
 ===============================================================================
 WHERE THINGS STAND (September 29, 2026)
 ===============================================================================
-Layers:     43, including every custom layer, TLR and Boston Neighborhoods. All of them are
+Layers:     44, including every custom layer, TLR, Boston Neighborhoods and 3D Captures. All of them are
             on voice's list, automatically. GVA and MKDB need the research key.
 Look:       Northeastern logo, grey interface, full-window view, two menu rows along the
             bottom beside the Location/Visual Presets bar, opens on the Northeastern campus.
 Needs:      A new Cesium ion token (Step 31) for Bing maps and full terrain.
 Not back:   Only the speed rewrite from Step 6 (batched drawing, coarse copies, the Speed
             control). The Miami hotspot map and the large pin layers may feel heavier.
-Tests:      All 4,206 unit tests pass. Format and package-boundary checks are clean.
+Tests:      All 4,222 unit tests pass. Format and package-boundary checks are clean.
 
 Backups:    C:\Users\jstow\Documents\HuskyEyeView-backups\
               husky-eye-view-2026-09-26-before-optimization.tar.gz
@@ -569,7 +605,11 @@ Data exports:
             mkdb_incidents_geocoded.csv
 
 Git history on main (newest first):
-            (release)  Record release v0.1.1 in the journey (tagged v0.1.1)
+            (release)  Cockpit shows the project's layers (tagged v0.1.2)
+            62d03624  Add a 3D Captures layer for Gaussian splats
+            0c6cb16b  Lock the research layers in every browser session
+            973f2652  Show the locked research layers in their own Research Data group
+            d5c2c089  Record release v0.1.1 in the journey (tagged v0.1.1)
             d9d8ec33  Boston Neighborhoods, bottom menu rows, ion 401 notices (Steps 28-31)
             0ce4baef  Husky Eye View v0.1.0 (tagged v0.1.0)
             ce938a30  Add development journey

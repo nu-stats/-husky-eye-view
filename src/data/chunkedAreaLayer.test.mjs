@@ -4,7 +4,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as Cesium from 'cesium';
-import { chunksInView, createChunkedAreaLayer } from './chunkedAreaLayer.js';
+import {
+  chunksInView,
+  createChunkedAreaLayer,
+  horizonViewBox,
+  viewPoseMoved,
+} from './chunkedAreaLayer.js';
 
 class MockEvent {
   constructor() {
@@ -91,6 +96,7 @@ async function createHarness({ heightM = 20_000, layerOptions = {} } = {}) {
     };
   };
   const moveEnd = new MockEvent();
+  const preRender = new MockEvent();
   const added = [];
   let clickAction = null;
   let pickResult = null;
@@ -119,6 +125,7 @@ async function createHarness({ heightM = 20_000, layerOptions = {} } = {}) {
       canvas: {},
       pick: () => pickResult,
       requestRender() {},
+      preRender,
     },
   };
   const layer = createChunkedAreaLayer(
@@ -157,6 +164,7 @@ async function createHarness({ heightM = 20_000, layerOptions = {} } = {}) {
     added,
     selected,
     moveEnd,
+    preRender,
     setPick: (entity) => {
       pickResult = entity ? { id: entity } : null;
     },
@@ -168,6 +176,76 @@ async function createHarness({ heightM = 20_000, layerOptions = {} } = {}) {
     },
   };
 }
+
+test('a camera that never stops (cockpit, follow) still reloads the view it has moved to', async () => {
+  const env = await createHarness();
+  try {
+    await env.layer.enable(env.viewer);
+    assert.deepEqual(env.layer.getDrawnChunkIds(), ['17031']);
+    // Fly to Los Angeles without ever raising moveEnd, like the cockpit camera.
+    env.viewer.camera.positionCartographic = Cesium.Cartographic.fromDegrees(
+      -118.3,
+      34.2,
+      20_000,
+    );
+    env.viewer.camera.computeViewRectangle = () =>
+      Cesium.Rectangle.fromDegrees(-118.6, 33.9, -118.0, 34.5);
+    env.preRender.raise();
+    for (let i = 0; i < 50; i++) {
+      if (env.layer.getDrawnChunkIds()[0] === '06037') break;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    assert.deepEqual(env.layer.getDrawnChunkIds(), ['06037']);
+    await env.layer.disable(env.viewer);
+    assert.equal(env.preRender.listeners.size, 0, 'no frame work while off');
+  } finally {
+    env.cleanup();
+  }
+});
+
+test('a horizon view loads the ground ahead of the camera, not only beneath it', () => {
+  // 10 km up, west of Cook County (bbox west edge -88.3).
+  const pose = { longitude: -89.0, latitude: 41.8, height: 10_000 };
+  const east = horizonViewBox({ ...pose, heading: Math.PI / 2 });
+  const west = horizonViewBox({ ...pose, heading: -Math.PI / 2 });
+  assert.deepEqual(chunksInView(INDEX, east, 10), ['17031']);
+  assert.deepEqual(chunksInView(INDEX, west, 10), []);
+  // Looking east, the box reaches about 60 km ahead (6 × height).
+  assert.ok(east.east > -88.0 && east.east < -87.8, String(east.east));
+  assert.ok(east.west <= -89.0 - 0.3, 'the ground beneath stays included');
+});
+
+test('a near-level camera ignores Cesium’s meaningless wide rectangle and loads what is ahead', async () => {
+  const env = await createHarness();
+  try {
+    // West of Cook County, 10 km up, looking east almost level, like a cockpit.
+    env.viewer.camera.positionCartographic = Cesium.Cartographic.fromDegrees(
+      -89.0,
+      41.8,
+      10_000,
+    );
+    env.viewer.camera.pitch = Cesium.Math.toRadians(-6);
+    env.viewer.camera.heading = Math.PI / 2;
+    // A wide box whose center is far off (the old code drew Los Angeles).
+    env.viewer.camera.computeViewRectangle = () =>
+      Cesium.Rectangle.fromDegrees(-125, 30, -95, 45);
+    await env.layer.enable(env.viewer);
+    assert.deepEqual(env.layer.getDrawnChunkIds(), ['17031']);
+  } finally {
+    env.cleanup();
+  }
+});
+
+test('viewPoseMoved: travel, turning or climbing counts; jitter does not', () => {
+  const at = { longitude: -87.65, latitude: 41.85, height: 10_000, heading: 0 };
+  assert.equal(viewPoseMoved(at, { ...at }), false);
+  assert.equal(viewPoseMoved(at, { ...at, longitude: -87.649 }), false);
+  // A quarter of the 10 km height is 2.5 km; 0.04° of longitude is ~3.3 km.
+  assert.equal(viewPoseMoved(at, { ...at, longitude: -87.61 }), true);
+  assert.equal(viewPoseMoved(at, { ...at, heading: 0.5 }), true);
+  assert.equal(viewPoseMoved(at, { ...at, height: 16_000 }), true);
+  assert.equal(viewPoseMoved(null, at), false);
+});
 
 test('only the counties in view are fetched and drawn', async () => {
   const env = await createHarness();

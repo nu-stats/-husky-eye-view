@@ -9,6 +9,29 @@ const CONTEXT_DEPENDENCIES = Object.freeze({
   'space-missions': new Set(['rocket-launches', 'satellites']),
 });
 const CONTEXT_COMPANIONS = new Set(['radio']);
+/** Local layers that are live feeds (FIRMS fires), not this project's map data. */
+const LIVE_LOCAL_LAYERS = new Set(['local-firms']);
+
+/**
+ * This project's own map-data layers (life expectancy, HOLC, Boston, TLR,
+ * research data, 3D captures…) describe the ground, not the live traffic
+ * picture, so Contacts, and the cockpit inside it, keeps them on instead of
+ * isolating them. The inherited live layers (CCTV, fires, ALPR, cables…)
+ * are still set aside. While Contacts runs, kept layers are bookkept like
+ * companions: turning one off there stays off after the mode exits, and
+ * turning one on there survives the exit.
+ * @param {string|null} mode Committed or entering Context mode.
+ * @param {string} layerId Layer identifier.
+ * @returns {boolean}
+ */
+export function contextKeepsLayer(mode, layerId) {
+  return (
+    mode === 'flights' &&
+    typeof layerId === 'string' &&
+    layerId.startsWith('local-') &&
+    !LIVE_LOCAL_LAYERS.has(layerId)
+  );
+}
 /** Return whether an origin represents a direct user choice on this route. */
 export function isExplicitUserIntentOrigin(origin, layerId = null) {
   return origin === 'user' || origin === 'voice';
@@ -269,7 +292,12 @@ export function recordContextSessionUserChange({
   ) {
     return false;
   }
-  const isCompanion = CONTEXT_COMPANIONS.has(change.layerId);
+  // The mode's own dependencies keep their rule (they leave with the mode);
+  // every other layer kept on through Contacts is bookkept like a companion.
+  const isCompanion =
+    CONTEXT_COMPANIONS.has(change.layerId) ||
+    (contextKeepsLayer(effectiveContextMode, change.layerId) &&
+      !contextAllowedLayerIds(effectiveContextMode).has(change.layerId));
   if (change.enabled) {
     if (CONTEXT_ENTRY_LAYER_IDS.includes(change.layerId)) return false;
     if (change.adoptedFromSelection) {

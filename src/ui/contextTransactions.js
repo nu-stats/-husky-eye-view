@@ -1,5 +1,6 @@
 import {
   contextAllowedLayerIds,
+  contextKeepsLayer,
   mergeContextTransitionErrors,
 } from '../contextModePolicy.js';
 
@@ -242,6 +243,7 @@ export async function _clearLayersOutsideContextMode(
     // isolated too, or it settles ON inside the exclusive mode.
     if (
       !allowed.has(layerId) &&
+      !contextKeepsLayer(mode, layerId) &&
       this._dataManager.isEffectivelyEnabled(layerId)
     ) {
       pending.push({

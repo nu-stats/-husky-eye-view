@@ -1,0 +1,342 @@
+HUSKY EYE VIEW: DEVELOPMENT JOURNEY
+===================================
+
+Project:  Husky Eye View, a customized fork of God's Eye View (MIT, bilawalsidhu/gods-eye-view),
+          running as a Pinokio app at C:\pinokio\api\gods-eye-view.git
+GitHub:   https://github.com/nu-stats/-husky-eye-view   (origin; the name really starts with a hyphen)
+Upstream: https://github.com/bilawalsidhu/gods-eye-view
+Period:   September 26-29, 2026
+
+The steps below are in the order they happened. Each one lists what was asked, what was done, and
+which files changed. Steps 1 to 12 happened before the restore in Step 13. Steps 14 onward rebuilt
+most of that work on top of the restored version.
+
+
+-------------------------------------------------------------------------------
+STEP 1: Voice connection error (HTTP 429)
+-------------------------------------------------------------------------------
+Problem:  Voice (the OpenAI Realtime microphone feature) failed with HTTP 429.
+Cause:    The OpenAI account had no credits. It was not a code bug.
+Fix:      The user added billing credits and updated the key. The key was confirmed working.
+          API keys live only in pinokio/ENVIRONMENT, which git ignores, and were never printed.
+
+
+-------------------------------------------------------------------------------
+STEP 2: Gang names independent of gang territories
+-------------------------------------------------------------------------------
+Asked:    Show the gang names even when the gang territories layer is off.
+Done:     A second layer, "local-gang-map-labels", reads the same gang map file but draws only
+          the names.
+Code:
+  - src/data/localGeojsonCore.js: new `areaNamesOnly` option (names only, no polygons, no
+    details card). A shared loader (createSharedGeoJsonLinesSource / `featureSource`) lets
+    both layers download and parse the file once.
+  - src/data/infrastructure.js: the gangMap and gangMapLabels layers share `gangMapSource`.
+  - src/data/layerState.js and src/ui/layerPanel.js: registry token and a "Chicago Gangs" panel
+    group.
+
+
+-------------------------------------------------------------------------------
+STEP 3: Logo with the Northeastern husky
+-------------------------------------------------------------------------------
+Asked:    Put Paws, the Northeastern husky, in the center of the logo's eye.
+Done:     public/logo.svg now has a husky head drawn as the pupil, which follows the eye's gaze
+          animation, plus two static paw prints in the corners.
+
+
+-------------------------------------------------------------------------------
+STEP 4: Where the Famous Shootings data came from
+-------------------------------------------------------------------------------
+Answer:   It came from the "Famous Shootings" folder of the public "Big Bas #1 Chicagoland &
+          Illinois Gang Map" (Google My Maps), converted by scripts/mymaps-to-geojson.mjs and
+          scripts/build-gang-map-layers.mjs.
+
+
+-------------------------------------------------------------------------------
+STEP 5: Three new neighborhood layers
+-------------------------------------------------------------------------------
+Asked:    Add layers from nation_county_le, nation_county_le_cluster and
+          nation_tracts_le_cluster (one county life expectancy layer, two cluster layers).
+Done:     Life Expectancy (counties), Life Expectancy Clusters (counties) and Life Expectancy
+          Clusters (tracts). These joined the existing HOLC and tract life expectancy layers in
+          "Neighborhood Data (US)".
+Code:
+  - scripts/build-context-layers.mjs: builders `county-le`, `county-clusters` and
+    `tract-clusters` split each source GeoJSON into one chunk file per county under
+    public/context/<layer>/, plus an index.json of bounding boxes.
+  - src/data/chunkedAreaLayer.js: loads only the chunks in view. Counties use COUNTY_LAYER_OPTIONS
+    (drawn nationwide up to 8,000 km, 60 chunks).
+  - Colors: USALEEP quintile bins for life expectancy, and Local Moran's I types (HH/LL/HL/LH)
+    for clusters.
+  - Share-link tokens '2', '3', '4'.
+
+
+-------------------------------------------------------------------------------
+STEP 6: Speed optimization (later undone in Step 13)
+-------------------------------------------------------------------------------
+Asked:    Suggest ways to make the layers load faster, then "do what you think will make
+          things optimized the quickest". Make a .tar.gz backup first, and delete the extra
+          2 GB GeoJSON.
+Backup:   C:\Users\jstow\Documents\HuskyEyeView-backups\
+            husky-eye-view-2026-09-26-before-optimization.tar.gz   (240 MB)
+Done:
+  - chunkedAreaLayer.js was rewritten to draw one batched GroundPrimitive per chunk instead of
+    thousands of separate polygons. This was the main cause of the slowness.
+  - Simplified "coarse/" copies of each chunk are drawn when zoomed out (coarseHeightM).
+    Chunks load nearest-first.
+  - HOLC: redlining areas split across tracts were merged back together (39,732 shapes down to
+    8,432; 26 MB down to 6.8 MB).
+  - Raw source GeoJSONs moved to data/source/ (git-ignored), because the dev server's file
+    watcher crashed on the huge files in public/.
+  - New Speed control (src/ui/renderSpeedControls.js) for lowering render resolution and
+    antialiasing on large screens.
+
+
+-------------------------------------------------------------------------------
+STEP 7: Miami-Dade homicides
+-------------------------------------------------------------------------------
+Asked:    Add a layer from miami_dade_homicides.geojson that looks exactly like Chicago Events
+          but keeps the decade colors, with a separate layer per decade (decades rather than
+          5-year periods). Then add a hotspot map colored off-white to orange.
+Done:
+  - Six pin layers, "Miami Homicides 1956-1959" through "2000-2011", each in its decade color,
+    with Chicago-Events-style pins, stems and clickable cards.
+  - "Miami Homicide Hotspots": a kernel density map (quartic kernel, 800 m radius, 200 m cells)
+    in six bands from off-white (#fff5eb) to orange (#f16913). The bands are split at
+    percentiles, and the top band is the densest 3%. 667 incidents stacked on fallback
+    geocodes are left out.
+Code:
+  - scripts/convert-miami-dade-homicides.mjs (one file per decade; age codes 888/999 treated as
+    unknown). scripts/build-miami-homicide-hotspots.mjs.
+  - Pin layers gained a `legend` option (panel legend with counts) and card text for the
+    homicide layers.
+  - Tokens '5' to '0' and 'mh'. New panel group "Miami-Dade Homicides".
+
+
+-------------------------------------------------------------------------------
+STEP 8: Voice connected to the neighborhood layers
+-------------------------------------------------------------------------------
+Asked:    Voice worked, but couldn't reach the new layers. Add the life expectancy and cluster
+          layers (then also HOLC and the Miami hotspots) to voice, like flights and satellites.
+Code:
+  - src/voice/actionSchemas.js: the layers added to the set_layer_visibility,
+    show_data_layers_menu and get_entity_context lists.
+  - src/voice/gevActions.js: spoken names ("life expectancy", "redlining", "holc" and others)
+    in LAYER_ALIASES.
+  - server/providers/openai/toolDescriptions.js: plain-language names for each layer id.
+  - Three tests pin a checksum of the exact voice tool list; these were recomputed.
+
+
+-------------------------------------------------------------------------------
+STEP 9: Trauma centers, public housing, trauma distances, Northeastern colors
+-------------------------------------------------------------------------------
+Asked:    (1) A CSV of every U.S. trauma unit, one row per hospital with x/y, plus a layer.
+          (2) The same for public housing, with construction year.
+          (3) Distance to the nearest trauma unit on Chicago Events and Famous Shootings.
+          (4) Logo in Northeastern grey, red, black and white; "View" in grey; every blue
+              highlight on the page and controls in grey.
+Downloads (approved by the user): FEMA's copy of HIFLD Hospitals, and the HUD
+          Public_Housing_Buildings service.
+Done:
+  - Trauma Centers layer: 2,352 open hospitals with a trauma designation, colored by level
+    (I-V, pediatric, other). Export: data/exports/trauma_centers.csv.
+  - Public Housing layer: one pin per development, 6,223 in all (from 178,364 buildings),
+    colored by the decade of first construction; future years blanked. Export:
+    data/exports/public_housing_buildings.csv (31 MB).
+  - Chicago Events and Famous Shootings pins record their nearest trauma center of any level
+    and the nearest adult Level I, as straight-line miles/km. The pin card shows them.
+  - Logo: black eye, grey #a2aaad outline, Northeastern red #c8102e iris, white globe, husky
+    with grey eyes. Red glows behind the logo. "View" in #a2aaad.
+  - About 400 blue/cyan interface colors converted to greys of the same brightness (a script
+    matched each color's luminance). Data colors were left alone.
+Code:
+  - scripts/fetch-trauma-centers.mjs, scripts/fetch-public-housing.mjs,
+    scripts/lib/nearest-trauma.mjs, plus trauma additions in convert-chicago-events.mjs and
+    build-gang-map-layers.mjs.
+  - src/ui/localSelectionCard.js: nearest-trauma lines and an "Open source record" link
+    (https links only).
+  - Styles in src/ui/styles/*.css, src/hud.js, src/overlays/worldOverlayTokens.js (interface
+    lines only), src/ui/sceneSharing.js, src/scenes/interactions.js.
+  - Tokens 'tc' and 'ph'. New panel group "Health & Housing (US)". Share-link tokens may now
+    be two characters.
+
+
+-------------------------------------------------------------------------------
+STEP 10: GVA 2015 gun deaths, plus the Git guide
+-------------------------------------------------------------------------------
+Asked:    Geocode gva_release_2015_raw_incidents.csv, add it as its own layer, and write clear
+          instructions (also in a .txt file) for uploading to Git, downloading at work, and
+          sharing.
+Done:
+  - 11,621 incidents geocoded in order: the Census geocoder first, then a retry with the
+    Queens postal town, then Overpass street intersections, then Nominatim at street, city
+    and county level. Each row records its geocode_source and geocode_precision. Export:
+    data/exports/gva_2015_incidents_geocoded.csv.
+  - Layer "Gun Deaths 2015 (GVA)", colored by number killed (1 / 2 / 3-4 / 5+). Token 'gv'.
+  - HUSKY_EYE_VIEW_GIT_GUIDE.txt at the repo root.
+Code:
+  - scripts/geocode-gva-incidents.mjs, scripts/build-gva-layer.mjs.
+
+
+-------------------------------------------------------------------------------
+STEP 11: Voice said public housing and life expectancy were "not supported"
+-------------------------------------------------------------------------------
+Causes:   (1) Public housing, trauma centers and GVA weren't on voice's list.
+          (2) Voice's instructions never said how to answer questions about these layers.
+          (3) Answers asked right after a fly-to were read at the old location.
+Code:
+  - server/providers/openai/instructions.js: a new rule that these layers are supported, with
+    the steps: turn the layer on, fly to the place and wait, then call get_entity_context.
+  - Pin layers gained getAreaContext (nearest sites with distances, the count within 5 km, and
+    the legend).
+  - Area layers gained getAreaContext (the area under the point, its neighbors, and the
+    legend). It forces a reload for the current view and waits up to 6 seconds.
+  - gevActions.js:
+      - waitForCameraFlight(), so answers wait for the camera to land.
+      - areaLayerContexts(), which runs every enabled layer's getAreaContext.
+      - If the screen-center pick is implausibly far away, it uses the ground under the
+        camera instead.
+  - Verified: after flying from Chicago to Roxbury, voice read tract life expectancy, public
+    housing within 5 km and the nearest trauma center.
+
+
+-------------------------------------------------------------------------------
+STEP 12: Boston default, every layer on voice, MKDB layer
+-------------------------------------------------------------------------------
+Asked:    Make Boston the default view instead of Austin. Put every layer, including future
+          ones, on voice's list. Then geocode national_tracts_incidents_only.xlsx and add it as
+          a layer called mkdb.
+Done:
+  - src/camera.js: flyToBoston() (downtown Boston, 42.3601, -71.0589) replaced flyToAustin();
+    src/app/controls.js calls it.
+  - Voice's layer lists are now REGISTERED_LAYER_IDS from src/data/layerState.js, so any
+    registered layer is automatically voice-enabled. A test checks this.
+  - gevActions.js resolveLayerId(): panel names like "Chicago Events" resolve to their layer.
+  - The three checksum tests skip the registry-generated layer list, so adding a layer no
+    longer means updating checksums.
+  - Fixed a bug where the GVA pin card showed "killed, injured" with no numbers.
+  - MKDB (Mass Killing Database): the workbook already held coordinates for all 562 incidents
+    (2006-2023). Every point was checked against the Census geocoder: 555 fall in their
+    listed tract, and 7 in the neighboring tract of the same county. Layer "MKDB Mass
+    Killings (2006-2023)", colored by number killed (4 / 5 / 6-9 / 10+). Token 'mk'. The card
+    shows the toll, weapon, circumstance, narrative and tract context (poverty, income,
+    race and ethnicity).
+Code:
+  - scripts/convert-mkdb-incidents.mjs: reads the .xlsx with a small built-in zip reader, runs
+    the tract check (cached), and writes data/exports/mkdb_incidents_geocoded.csv and the
+    layer file.
+  - scripts/package-boundaries.json: layerState.js allowed in the voice schema packages.
+
+
+-------------------------------------------------------------------------------
+STEP 13: Restore of the older version
+-------------------------------------------------------------------------------
+Asked:    Use the backup to restore the older version.
+Done:
+  1. Safety backup of the current state first:
+       husky-eye-view-2026-09-28-before-restore.tar.gz (1.7 GB, includes .git and data/)
+  2. Unpacked the Sep 26 backup and mirrored it over the app with robocopy /MIR.
+  3. Kept as-is: .git (commits and remotes), node_modules, pinokio/ENVIRONMENT (keys),
+     Pinokio logs and caches, data/ (exports and raw sources), HUSKY_EYE_VIEW_GIT_GUIDE.txt.
+  4. Verified: all 6,763 files match the backup, tests pass, and the app starts (Austin, 30
+     layers).
+
+
+-------------------------------------------------------------------------------
+STEP 14: GitHub push errors
+-------------------------------------------------------------------------------
+Problems and fixes:
+  - origin pointed to github.com/nu_stats/... (underscore), but the account is "nu-stats"
+    (hyphen), and GitHub usernames can't contain underscores.
+  - The GitHub repo was created as "-husky-eye-view", with a leading hyphen. Pointing git at
+    "husky-eye-view" (no hyphen) gave "repository not found" because that repo doesn't exist.
+  - Fix: `git remote set-url origin https://github.com/nu-stats/-husky-eye-view.git`.
+  - Safety checks before pushing to the public repo: no API keys are in any commit (the
+    "sk-..." matches are upstream placeholders), and no file is over GitHub's 100 MB limit.
+    The repo is public, so the exported datasets (including MKDB) are public too.
+
+
+-------------------------------------------------------------------------------
+STEP 15: Logo and grey interface on the restored version     (commit 0bd481b3)
+-------------------------------------------------------------------------------
+Asked:    Redo the logo as it was (red, black and grey), and change the blue text in the
+          window to grey. Then save this version to git.
+Done:
+  - public/logo.svg taken from the safety backup.
+  - foundation.css: red glow behind the title logo, "View" in #a2aaad.
+    controls.css: red glow behind the loading-screen logo.
+  - Re-ran the grey conversion script (404 colors), plus 4 cyan values written in CSS
+    space syntax.
+  - Four tests that check exact colors updated from the backup.
+
+
+-------------------------------------------------------------------------------
+STEP 16: All the post-backup layers back                     (commit 81bea6e2)
+-------------------------------------------------------------------------------
+Asked:    Add back every layer that was added before but is missing from this version:
+          trauma units, public housing, GVA and the mass killing layer.
+Done:     11 layers restored and checked in the app: Trauma Centers (2,352), Public Housing
+          (6,223), GVA 2015 (11,621), MKDB (562), six Miami decade layers (14,015 in total)
+          and Miami Homicide Hotspots (6,169 cells). Chicago Events and Famous Shootings got
+          back their nearest-trauma data.
+How:      Files that only added to the restored version were copied from the safety backup
+          whole: localGeojsonCore.js, layerState.js, layerPanel.js, localSelectionCard.js,
+          their tests, the data folders and the build scripts. The speed-rewritten
+          chunkedAreaLayer.js was NOT copied; the restored one got `fillAlpha` and
+          `sourceNote` options by hand instead. The layer definitions were spliced into
+          infrastructure.js by exact line range.
+
+
+-------------------------------------------------------------------------------
+STEP 17: Voice and Boston back                               (commit 20b15d96, pushed)
+-------------------------------------------------------------------------------
+Asked:    Fix voice and the Boston default view.
+Done:
+  - Copied from the safety backup: camera.js, app/controls.js, the voice files (actionSchemas,
+    gevActions, instructions, toolDescriptions) and their tests.
+  - Ported getAreaContext into the restored area layer, with new tests.
+  - Verified: a fresh start opens on Boston. Voice turned on layers by name, flew to Roxbury
+    and read back tract life expectancy (75.1 years), 35 public housing developments within
+    5 km, and the nearest trauma center (Boston Medical Center, 1.1 km).
+  - Pushed to GitHub. The laptop and GitHub match.
+
+
+===============================================================================
+WHERE THINGS STAND (September 29, 2026)
+===============================================================================
+Layers:     41, including every custom layer. All of them are on voice's list, automatically.
+Look:       Northeastern logo, grey interface, opens on downtown Boston.
+Not back:   Only the speed rewrite from Step 6 (batched drawing, coarse copies, the Speed
+            control). The Miami hotspot map and the large pin layers may feel heavier.
+Tests:      All unit tests pass. Format and package-boundary checks are clean.
+
+Backups:    C:\Users\jstow\Documents\HuskyEyeView-backups\
+              husky-eye-view-2026-09-26-before-optimization.tar.gz
+              husky-eye-view-2026-09-28-before-restore.tar.gz
+            Both contain pinokio/ENVIRONMENT (API keys), so keep them private.
+
+Data exports (data/exports/):
+            trauma_centers.csv, public_housing_buildings.csv,
+            gva_2015_incidents_geocoded.csv, mkdb_incidents_geocoded.csv
+
+Git history on main (newest first):
+            20b15d96  Voice reaches every data layer; Boston is the default view
+            81bea6e2  Bring back the layers added after the Sep 26 backup
+            0bd481b3  Northeastern logo and grey interface on the restored version
+            3ca0bd2d  Husky Eye View: custom layers, voice, logo and data
+            e1e7897f  Husky Eye View: custom layers, voice, logo and data
+
+Adding a layer later:
+            1. Build its data file under src/data/local_data/ (pins) or public/context/
+               (chunked areas).
+            2. Add it in src/data/infrastructure.js.
+            3. Give it a registry entry and share-link token in src/data/layerState.js.
+               That alone makes it voice-enabled.
+            4. Put it in a panel group in src/ui/layerPanel.js.
+            5. Update the layer counts in the tests.
+            6. Optionally, add spoken names in LAYER_ALIASES (src/voice/gevActions.js).
+
+Useful commands (run from the project folder):
+            node scripts/run-unit-tests.mjs         run all tests
+            node scripts/format.mjs --check         check formatting
+            git push                                upload to GitHub

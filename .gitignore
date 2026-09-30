@@ -26,5 +26,5 @@ data/source/
 # data/research/ are committed (scripts/lock-research-data.mjs).
 data/restricted/
 
-# Downloaded Gaussian splat samples (not ours to redistribute here)
-public/splats/
+# Downloaded Gaussian splat sample (CesiumJS test data; see public/splats/README.md)
+public/splats/cesium-tower/

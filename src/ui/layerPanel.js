@@ -78,6 +78,10 @@ const PANEL_GROUPS = [
     ids: ['local-boston-neighborhoods'],
   },
   {
+    label: '3D Captures',
+    ids: ['local-3d-captures'],
+  },
+  {
     label: 'Neighborhood Data (US)',
     ids: [
       'local-holc-redlining',

@@ -527,6 +527,23 @@ Code:     server/providers/research.js, src/keySetup.js, src/keySetupCore.mjs,
           src/data/localGeojsonCore.js, scripts/lock-research-data.mjs.
 
 
+-------------------------------------------------------------------------------
+STEP 35: Gaussian splats (3D Captures)
+-------------------------------------------------------------------------------
+Asked:    Can the app turn photos into 3D (Gaussian splatting)? Then: add a layer for splats.
+Found:    The app never generated 3D itself; its 3D city is Google's Photorealistic 3D Tiles.
+          But its CesiumJS (1.138) can render Gaussian splats delivered as 3D Tiles
+          (glTF with KHR_gaussian_splatting + KHR_gaussian_splatting_compression_spz_2).
+          Tested with Cesium's own sample (a broadcast tower in Minnesota, ~287,000 splats,
+          downloaded with permission, git-ignored).
+Done:     A "3D Captures" group with a "3D Captures (splats)" layer. It loads every capture
+          listed in public/splats/captures.json and gives each a FLY TO button. Missing
+          files are skipped. Voice: "splats" / "3D captures". How to add a capture:
+          public/splats/README.md.
+Code:     src/data/splatCaptures.js, constructCatalog.js, layerState.js (token '3d'),
+          layerPanel.js, gevActions.js, public/splats/.
+
+
 ===============================================================================
 WHERE THINGS STAND (September 29, 2026)
 ===============================================================================

@@ -19,6 +19,7 @@ import { createApplicationFirms } from './layers/firms.js';
 import { createApplicationEarthquakes } from './layers/earthquakes.js';
 import { createApplicationCables } from './layers/submarineCables.js';
 import { createInfrastructureLayers } from '../data/infrastructure.js';
+import { createSplatCapturesLayer } from '../data/splatCaptures.js';
 import { localGeoJsonServices } from './localGeojsonServices.js';
 import { createBhoteKoshiEventLayer } from '../data/bhoteKoshiEvent.js';
 import { createBhoteKoshiLocatorLayer } from '../data/bhoteKoshiLocator.js';
@@ -129,6 +130,7 @@ export function createApplicationCatalog({
           installations,
         }),
         ...createInfrastructureLayers(localGeoJsonServices),
+        createSplatCapturesLayer(),
         createApplicationCables({ source: sources.cables }),
         createApplicationFirms({
           surface,

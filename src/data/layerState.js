@@ -339,6 +339,11 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
     optionOwner: 'flights',
   }),
   Object.freeze({
+    id: 'local-3d-captures',
+    token: '3d',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
     id: 'local-boston-neighborhoods',
     token: 'bn',
     disposition: 'enabled-only',

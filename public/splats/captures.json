@@ -1,0 +1,7 @@
+[
+  {
+    "name": "Sample tower",
+    "tileset": "/splats/cesium-tower/tileset.json",
+    "credit": "CesiumJS test data (Apache-2.0); not committed, download separately"
+  }
+]

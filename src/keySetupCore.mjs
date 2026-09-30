@@ -115,6 +115,9 @@ export const KEY_SETUP_KEYS = Object.freeze([
     getUrl: '',
     envVars: Object.freeze(['HEV_RESEARCH_DATA_KEY']),
     tier: 'free',
+    // Kept in the browser for this session only, never written to the
+    // server's configuration, so the layers start locked in every session.
+    browserSession: true,
   }),
 ]);
 
@@ -334,10 +337,14 @@ export function admitKeySetupRequest({
   return { ok: true };
 }
 
-/** @returns {Set<string>} every env var the panel is allowed to write. */
+/**
+ * @returns {Set<string>} every env var the panel is allowed to write. Keys
+ * held only in a browser session are never written to the server.
+ */
 export function knownKeySetupEnvVars() {
   const names = new Set();
   for (const entry of KEY_SETUP_KEYS) {
+    if (entry.browserSession) continue;
     for (const envVar of entry.envVars) names.add(envVar);
   }
   return names;
@@ -377,7 +384,10 @@ export function isKeySetupExternallyManaged({
 export function keySetupStatus(env = {}) {
   const keys = KEY_SETUP_KEYS.filter((entry) => !entry.hidden).map((entry) => {
     const values = entry.envVars.map((name) => String(env[name] ?? '').trim());
-    const set = values.every((value) => value.length > 0);
+    // A browser-session key is never on the server; the panel reports it from
+    // the browser's own session instead.
+    const set =
+      !entry.browserSession && values.every((value) => value.length > 0);
     return {
       id: entry.id,
       title: entry.title,
@@ -386,13 +396,17 @@ export function keySetupStatus(env = {}) {
       envVars: [...entry.envVars],
       tier: entry.tier,
       clientExposed: Boolean(entry.clientExposed),
+      ...(entry.browserSession && { browserSession: true }),
       set,
     };
   });
+  // An owner-issued session key is optional and never on the server, so it
+  // does not count toward the chip's "keys waiting".
+  const counted = keys.filter((key) => !key.browserSession);
   return {
     keys,
-    setCount: keys.filter((key) => key.set).length,
-    total: keys.length,
+    setCount: counted.filter((key) => key.set).length,
+    total: counted.length,
   };
 }
 

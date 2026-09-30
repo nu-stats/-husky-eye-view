@@ -14,6 +14,25 @@ const DEFAULT_LABEL_MAX = 900;
 /** What a locked research layer says until its key is added. */
 export const LOCKED_DATASET_MESSAGE =
   'Locked: add the RESEARCH DATASETS key in POWER UP to open this layer.';
+/**
+ * The research key lives only in this browser session: POWER UP (keySetup.js)
+ * stores it under this sessionStorage slot and announces changes with the
+ * event below, and locked layers send it to the server in this header.
+ */
+export const RESEARCH_KEY_SESSION_SLOT = 'hev.researchKey';
+export const RESEARCH_KEY_HEADER = 'X-HEV-Research-Key';
+export const RESEARCH_KEY_EVENT = 'hev:research-key-changed';
+
+/** Request headers carrying this session's research key, if one is set. */
+function researchKeyHeaders() {
+  let key = '';
+  try {
+    key = globalThis.sessionStorage?.getItem(RESEARCH_KEY_SESSION_SLOT) || '';
+  } catch {
+    // Storage blocked: the layer simply stays locked.
+  }
+  return key ? { [RESEARCH_KEY_HEADER]: key } : {};
+}
 const DEFAULT_LABEL_GRID_PX = 132;
 const VISIBILITY_UPDATE_MS = 450;
 // Each source keeps its own bounded cohort; the host sums their ambient-card
@@ -458,8 +477,8 @@ export function localDatasetError(error) {
  * @param {AbortSignal} [signal]
  * @returns {Promise<object[]>}
  */
-async function fetchGeoJsonLines(url, signal) {
-  const response = await fetch(url, { signal });
+async function fetchGeoJsonLines(url, signal, headers) {
+  const response = await fetch(url, headers ? { signal, headers } : { signal });
   // A 404 returns an HTML body that would otherwise die in JSON.parse one line
   // later, reported as a parse error for a missing file.
   if (!response.ok) {
@@ -806,12 +825,15 @@ export function createLocalGeoJsonLayer(
     }
   };
 
-  // Locked until the server says the research key opens this dataset.
+  // Locked until the server says this session's research key opens it.
   let _locked = Boolean(lockedDataset);
   const refreshLock = async () => {
     if (!lockedDataset) return;
     try {
-      const response = await fetch(lockStatusUrl, { cache: 'no-store' });
+      const response = await fetch(lockStatusUrl, {
+        cache: 'no-store',
+        headers: researchKeyHeaders(),
+      });
       const status = response.ok ? await response.json() : null;
       _locked = status?.datasets?.[lockedDataset] !== 'unlocked';
     } catch {
@@ -819,8 +841,20 @@ export function createLocalGeoJsonLayer(
     }
   };
   // Ask as soon as the layer exists, so the panel shows LOCKED (or not)
-  // before anyone turns it on.
-  if (lockedDataset) void refreshLock();
+  // before anyone turns it on, and again whenever POWER UP changes the key.
+  const onResearchKeyChanged = () => {
+    void refreshLock().then(() => {
+      try {
+        _rowControlsListener?.();
+      } catch {
+        /* the panel re-renders on its own cadence too */
+      }
+    });
+  };
+  if (lockedDataset) {
+    void refreshLock();
+    globalThis.addEventListener?.(RESEARCH_KEY_EVENT, onResearchKeyChanged);
+  }
 
   return {
     id,
@@ -1009,7 +1043,11 @@ export function createLocalGeoJsonLayer(
               if (!features) {
                 features = await (featureSource
                   ? featureSource.load(_loadController.signal)
-                  : fetchGeoJsonLines(url, _loadController.signal));
+                  : fetchGeoJsonLines(
+                      url,
+                      _loadController.signal,
+                      lockedDataset ? researchKeyHeaders() : undefined,
+                    ));
                 if (_destroyed) return;
                 _cachedFeatures = features;
               }
@@ -1547,6 +1585,11 @@ export function createLocalGeoJsonLayer(
     destroy: (viewer) => {
       if (_destroyed) return;
       _destroyed = true;
+      if (lockedDataset)
+        globalThis.removeEventListener?.(
+          RESEARCH_KEY_EVENT,
+          onResearchKeyChanged,
+        );
       _loadController?.abort();
       // Defensively disable first so listeners and selection state are
       // torn down even if destroy is called while the layer is enabled.

@@ -506,6 +506,27 @@ Fix:      A separate "Research Data" group right after Events, holding both laye
 Code:     src/ui/layerPanel.js (RESEARCH_GROUP), layerPanel.test.mjs.
 
 
+-------------------------------------------------------------------------------
+STEP 34: Research layers locked in every session, even on this computer
+-------------------------------------------------------------------------------
+Asked:    The research layers were open on this computer, because the key was saved in
+          the app settings. The user chose: ask for the key each session.
+Done:
+  - The key was backed up to Documents\HuskyEyeView-backups\research-data-key.txt
+    (checked: it opens both datasets) and removed from pinokio/ENVIRONMENT and the
+    Pinokio launchers.
+  - The server never stores the key. It opens the data only when the browser sends the
+    key with the request (X-HEV-Research-Key header).
+  - POWER UP -> RESEARCH DATASETS keeps the key in the browser for that session only,
+    with a FORGET button to lock again. It is never written to the server and does
+    not count toward "keys waiting".
+  - Checked: no key -> LOCKED and cannot turn on; wrong key -> still locked; right
+    key -> both open.
+  - scripts/lock-research-data.mjs now reads the key from that private file.
+Code:     server/providers/research.js, src/keySetup.js, src/keySetupCore.mjs,
+          src/data/localGeojsonCore.js, scripts/lock-research-data.mjs.
+
+
 ===============================================================================
 WHERE THINGS STAND (September 29, 2026)
 ===============================================================================

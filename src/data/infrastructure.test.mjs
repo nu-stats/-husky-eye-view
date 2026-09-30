@@ -208,6 +208,44 @@ test('a locked research layer refuses to turn on until the server unlocks it', a
   layer.destroy();
 });
 
+test('a locked layer sends this browser session’s research key, and only that', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalStorage = globalThis.sessionStorage;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalStorage === undefined) delete globalThis.sessionStorage;
+    else globalThis.sessionStorage = originalStorage;
+  });
+  const seen = [];
+  let sessionKey = null;
+  globalThis.sessionStorage = {
+    getItem: (slot) => (slot === 'hev.researchKey' ? sessionKey : null),
+  };
+  globalThis.fetch = async (url, init = {}) => {
+    const key = init.headers?.['X-HEV-Research-Key'] ?? null;
+    seen.push({ url, key });
+    return {
+      ok: true,
+      json: async () => ({
+        configured: Boolean(key),
+        datasets: { mkdb: key === 'k1' ? 'unlocked' : 'locked' },
+      }),
+    };
+  };
+  const layer = createInfrastructureLayers(services()).find(
+    ({ id }) => id === 'local-mkdb',
+  );
+  await layer.init();
+  assert.equal(layer.getStats().status, 'locked', 'no session key yet');
+  assert.equal(seen.at(-1).key, null);
+  sessionKey = 'k1';
+  await layer.init();
+  assert.equal(seen.at(-1).url, '/api/research/status');
+  assert.equal(seen.at(-1).key, 'k1');
+  assert.equal(layer.getStats().keyRequired, undefined, 'unlocked');
+  layer.destroy();
+});
+
 test('dataset URLs still name the complete bundled sources', () => {
   for (const [file, count] of [
     ['datacenters', 4351],

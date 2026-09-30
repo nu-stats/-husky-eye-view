@@ -61,6 +61,53 @@ export function stripKeylessBasemapFromHash(hash) {
 
 const TIER_DOTS = Object.freeze({ metered: '🔴', free: '🟡' });
 
+/**
+ * Browser-session keys (the research datasets key) never go to the server:
+ * they live in this tab's sessionStorage, under the slot the locked layers
+ * read (RESEARCH_KEY_SESSION_SLOT / RESEARCH_KEY_EVENT in
+ * data/localGeojsonCore.js), so a new session starts locked.
+ */
+export const SESSION_KEY_SLOTS = Object.freeze({
+  HEV_RESEARCH_DATA_KEY: 'hev.researchKey',
+});
+export const SESSION_KEY_EVENT = 'hev:research-key-changed';
+
+function sessionStore() {
+  try {
+    return globalThis.sessionStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether this browser session holds a value for a session key's env var. */
+export function hasSessionKey(envVar) {
+  const slot = SESSION_KEY_SLOTS[envVar];
+  try {
+    return Boolean(slot && sessionStore()?.getItem(slot));
+  } catch {
+    return false;
+  }
+}
+
+/** Store (or, with '', forget) a session key and tell the locked layers. */
+export function writeSessionKey(envVar, value) {
+  const slot = SESSION_KEY_SLOTS[envVar];
+  if (!slot) return false;
+  try {
+    if (value) sessionStore()?.setItem(slot, value);
+    else sessionStore()?.removeItem(slot);
+  } catch {
+    return false;
+  }
+  try {
+    globalThis.dispatchEvent?.(new Event(SESSION_KEY_EVENT));
+  } catch {
+    // No event support: layers still re-check the lock when turned on.
+  }
+  return true;
+}
+
 /** Build one key row. All content is our own registry text, set via textContent. */
 function buildRow(documentRef, key) {
   const row = documentRef.createElement('section');
@@ -131,10 +178,26 @@ function buildRow(documentRef, key) {
       input.spellcheck = false;
       input.dataset.envVar = envVar;
       input.setAttribute('aria-label', envVar);
-      input.placeholder = key.set
-        ? `${envVar} saved — paste to replace`
-        : `paste ${envVar}`;
+      if (key.browserSession) {
+        input.dataset.session = 'true';
+        input.placeholder = key.set
+          ? 'entered for this session — paste to replace'
+          : 'paste key — kept for this browser session only';
+      } else {
+        input.placeholder = key.set
+          ? `${envVar} saved — paste to replace`
+          : `paste ${envVar}`;
+      }
       fields.append(input);
+    }
+    if (key.browserSession && key.set) {
+      const forget = documentRef.createElement('button');
+      forget.type = 'button';
+      forget.className = 'key-setup-remove';
+      forget.dataset.keySetupForget = JSON.stringify(key.envVars);
+      forget.textContent = 'FORGET';
+      forget.title = `Forget the ${key.title} key and lock its layers again`;
+      fields.append(forget);
     }
     if (key.managed === 'file') {
       const remove = documentRef.createElement('button');
@@ -209,7 +272,15 @@ export async function initKeySetup({
 
   const render = (nextStatus) => {
     if (disposed) return;
-    status = nextStatus;
+    // Session keys are reported from this browser, never from the server.
+    status = {
+      ...nextStatus,
+      keys: (nextStatus?.keys || []).map((key) =>
+        key.browserSession
+          ? { ...key, set: key.envVars.every((name) => hasSessionKey(name)) }
+          : key,
+      ),
+    };
     chipLabel.textContent = keySetupChipLabel(status);
     // Fully powered is the owner's clean screen: the chip retires. The dialog
     // stays reachable this session (and via ?setup=1) to swap or verify keys.
@@ -324,14 +395,36 @@ export async function initKeySetup({
   const onApply = async () => {
     if (disposed || busy) return;
     const inputs = [...root.querySelectorAll('input[data-env-var]')];
-    const updates = collectKeyUpdates(
-      inputs.map((input) => ({
-        envVar: input.dataset.envVar,
-        value: input.value,
-      })),
-    );
-    if (!Object.keys(updates).length) {
+    const collect = (session) =>
+      collectKeyUpdates(
+        inputs
+          .filter((input) => (input.dataset.session === 'true') === session)
+          .map((input) => ({
+            envVar: input.dataset.envVar,
+            value: input.value,
+          })),
+      );
+    const updates = collect(false);
+    const sessionUpdates = collect(true);
+    if (!Object.keys(updates).length && !Object.keys(sessionUpdates).length) {
       say('Paste at least one key first.');
+      return;
+    }
+    // Session keys stay in this browser: no server write, no restart.
+    for (const [envVar, value] of Object.entries(sessionUpdates)) {
+      if (!/^[\x21-\x7e]{1,512}$/.test(value)) {
+        say('That key has spaces or unusual characters; paste it again.');
+        return;
+      }
+      writeSessionKey(envVar, value);
+    }
+    for (const input of inputs)
+      if (input.dataset.session === 'true') input.value = '';
+    if (!Object.keys(updates).length) {
+      render(status);
+      say(
+        'Key entered for this browser session only. It is not saved; the layers lock again in a new session.',
+      );
       return;
     }
     await submitUpdates(updates, 'Saved to');
@@ -342,6 +435,18 @@ export async function initKeySetup({
   applyButton?.addEventListener('click', onApply);
   // Remove buttons are rendered per row; delegate so re-renders stay wired.
   rowsHost?.addEventListener('click', (event) => {
+    const forget = event.target?.closest?.('[data-key-setup-forget]');
+    if (forget && !disposed) {
+      try {
+        for (const envVar of JSON.parse(forget.dataset.keySetupForget || '[]'))
+          writeSessionKey(envVar, '');
+      } catch {
+        return;
+      }
+      render(status);
+      say('Key forgotten; its layers are locked again.');
+      return;
+    }
     const button = event.target?.closest?.('[data-key-setup-remove]');
     if (disposed || !button || busy) return;
     let envVars = [];

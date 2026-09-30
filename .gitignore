@@ -25,3 +25,6 @@ data/source/
 # Plaintext research datasets (GVA 2015, MKDB): only their encrypted copies in
 # data/research/ are committed (scripts/lock-research-data.mjs).
 data/restricted/
+
+# Downloaded Gaussian splat samples (not ours to redistribute here)
+public/splats/

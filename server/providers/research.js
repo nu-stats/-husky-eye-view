@@ -3,12 +3,14 @@
  *
  * The repository only carries these layers encrypted (data/research/*.enc),
  * so a public copy of the code does not publish the data. This middleware
- * decrypts a dataset for the map only when the research key configured in
- * POWER UP (HEV_RESEARCH_DATA_KEY) is the one it was locked with.
+ * decrypts a dataset for the map only when the request carries the research
+ * key it was locked with, in the X-HEV-Research-Key header. The key is never
+ * saved on the server: POWER UP keeps it in the browser for that session
+ * only, so the layers are locked again whenever a new session starts.
  *
  *   GET /api/research/status -> {configured, datasets: {id: 'unlocked'|'locked'}}
  *   GET /api/research/<id>   -> GeoJSON Lines, or
- *                               503 {error:'no_key'}  no key configured
+ *                               503 {error:'no_key'}  no key sent
  *                               403 {error:'bad_key'} key does not open it
  *
  * File format: "HEVR1" | salt (16) | iv (12) | GCM tag (16) | ciphertext of
@@ -36,6 +38,9 @@ const ROOT = path.resolve(
   '..',
   '..',
 );
+
+/** Request header carrying the browser session's key (Node lowercases it). */
+export const RESEARCH_KEY_HEADER = 'x-hev-research-key';
 
 /** Dataset id -> encrypted file under data/research/. */
 export const RESEARCH_DATASETS = Object.freeze({
@@ -90,7 +95,10 @@ export function decryptResearchBuffer(buffer, passphrase) {
 /** Vite plugin serving the locked datasets to this machine's map. */
 export function researchDataProxy({
   dataDir = path.join(ROOT, 'data', 'research'),
-  readKey = () => String(process.env.HEV_RESEARCH_DATA_KEY || '').trim(),
+  readKey = (req) =>
+    String(req?.headers?.[RESEARCH_KEY_HEADER] || '')
+      .trim()
+      .slice(0, 512),
 } = {}) {
   // Decrypted text per dataset, remembered with the key that opened it.
   const opened = new Map();
@@ -116,7 +124,7 @@ export function researchDataProxy({
       const id = String(req.url || '')
         .split('?')[0]
         .replace(/^\/+|\/+$/g, '');
-      const key = readKey();
+      const key = readKey(req);
       if (id === 'status') {
         const datasets = {};
         for (const name of Object.keys(RESEARCH_DATASETS)) {

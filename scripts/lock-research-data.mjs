@@ -2,58 +2,67 @@
 // the repository: encrypt the plaintext layer files kept in the git-ignored
 // data/restricted/ folder into data/research/*.enc, which is committed.
 //
-// The key is HEV_RESEARCH_DATA_KEY from pinokio/ENVIRONMENT (or the shell).
-// With --generate and no key yet, a random key is created and saved into
-// pinokio/ENVIRONMENT (owner-only file, git-ignored). The key is never printed:
-// share it with collaborators privately; they paste it into POWER UP.
+// The key is never stored in the app: the map asks for it once per browser
+// session (POWER UP -> RESEARCH DATASETS). This script reads it from the
+// HEV_RESEARCH_DATA_KEY shell variable, or from a private key file outside the
+// repository (--key-file, default ~/Documents/HuskyEyeView-backups/
+// research-data-key.txt). With --generate and no key yet, a random key is
+// created in that file. The key is never printed: share it privately.
 //
-// Usage: node scripts/lock-research-data.mjs [--generate]
+// Usage: node scripts/lock-research-data.mjs [--key-file <path>] [--generate]
 import { randomBytes } from 'node:crypto';
-import {
-  appendFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {
   RESEARCH_DATASETS,
   decryptResearchBuffer,
   encryptResearchText,
 } from '../server/providers/research.js';
-import { readPinokioEnvironment } from './pinokio-environment.mjs';
 
-const ENVIRONMENT_FILE = path.join('pinokio', 'ENVIRONMENT');
+const flag = process.argv.indexOf('--key-file');
+const KEY_FILE =
+  flag > 0 && process.argv[flag + 1]
+    ? path.resolve(process.argv[flag + 1])
+    : path.join(
+        os.homedir(),
+        'Documents',
+        'HuskyEyeView-backups',
+        'research-data-key.txt',
+      );
 /** Dataset id -> plaintext layer file under data/restricted/. */
 const PLAINTEXT = Object.freeze({
   'gva-2015': 'data/restricted/gva_2015/incidents.geojsonl',
   mkdb: 'data/restricted/mkdb/incidents.geojsonl',
 });
 
-let key = String(
-  readPinokioEnvironment(ENVIRONMENT_FILE).HEV_RESEARCH_DATA_KEY ||
-    process.env.HEV_RESEARCH_DATA_KEY ||
-    '',
-).trim();
+/** The key is the first non-comment line of the key file. */
+function readKeyFile() {
+  if (!existsSync(KEY_FILE)) return '';
+  return (
+    readFileSync(KEY_FILE, 'utf8')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line && !line.startsWith('#')) || ''
+  );
+}
+
+let key = String(process.env.HEV_RESEARCH_DATA_KEY || readKeyFile()).trim();
 if (!key) {
   if (!process.argv.includes('--generate')) {
     console.error(
-      'No HEV_RESEARCH_DATA_KEY configured. Set one in POWER UP, or rerun with --generate.',
+      `No research key: set HEV_RESEARCH_DATA_KEY, put it in ${KEY_FILE}, or rerun with --generate.`,
     );
     process.exit(1);
   }
   key = `hev_rk_${randomBytes(24).toString('base64url')}`;
-  const existing = existsSync(ENVIRONMENT_FILE)
-    ? readFileSync(ENVIRONMENT_FILE, 'utf8')
-    : '';
-  const separator = existing && !existing.endsWith('\n') ? '\n' : '';
-  appendFileSync(
-    ENVIRONMENT_FILE,
-    `${separator}# Research datasets key (locks GVA 2015 and MKDB). Share privately.\nHEV_RESEARCH_DATA_KEY=${key}\n`,
+  mkdirSync(path.dirname(KEY_FILE), { recursive: true });
+  writeFileSync(
+    KEY_FILE,
+    `# Husky Eye View research datasets key (GVA 2015, MKDB). Keep private.\n${key}\n`,
     { mode: 0o600 },
   );
-  console.log(`Generated a research key and saved it in ${ENVIRONMENT_FILE}.`);
+  console.log(`Generated a research key in ${KEY_FILE}.`);
 }
 
 mkdirSync('data/research', { recursive: true });

@@ -63,7 +63,11 @@ test('the status payload reports presence without any credential material', () =
     // Secret missing: the OpenSky pair must read as NOT set.
   };
   const status = keySetupStatus(env);
-  assert.equal(status.total, KEY_SETUP_KEYS.filter((key) => !key.hidden).length);
+  assert.equal(
+    status.total,
+    KEY_SETUP_KEYS.filter((key) => !key.hidden && !key.browserSession).length,
+    'browser-session keys never count toward keys waiting',
+  );
   const google = status.keys.find((key) => key.id === 'google-maps');
   assert.equal(google.set, true);
   const opensky = status.keys.find((key) => key.id === 'opensky');

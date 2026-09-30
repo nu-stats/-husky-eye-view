@@ -18,7 +18,6 @@ module.exports = {
           OPENSKY_CLIENT_ID: '{{env.OPENSKY_CLIENT_ID || ""}}',
           OPENSKY_CLIENT_SECRET: '{{env.OPENSKY_CLIENT_SECRET || ""}}',
           LL2_API_TOKEN: '{{env.LL2_API_TOKEN || ""}}',
-          HEV_RESEARCH_DATA_KEY: '{{env.HEV_RESEARCH_DATA_KEY || ""}}',
           PINOKIO_SHARE_CLOUDFLARE: '{{env.PINOKIO_SHARE_CLOUDFLARE || "false"}}',
           PINOKIO_SHARE_LOCAL: '{{env.PINOKIO_SHARE_LOCAL || "false"}}',
           PINOKIO_SHARE_VAR: '{{env.PINOKIO_SHARE_VAR || "__gev_sharing_disabled__"}}',

@@ -182,6 +182,12 @@ export function chunksInView(index, view, limit) {
  * @param {string} [options.zoomInMessage] Panel hint above `maxHeightM`.
  * @param {string} [options.sourceNote] Source line for every area's details
  *   card, instead of repeating it in each feature.
+ * @param {function(object):string} [options.featureSummary] Builds the
+ *   details-card summary from a feature's properties, so several layers can
+ *   share one set of chunks and still describe it their own way.
+ * @param {function(object):boolean} [options.featureFilter] Keeps only the
+ *   features whose properties pass, e.g. the significant tracts of a shared
+ *   tract set.
  * @param {number} [options.fillAlpha] Area fill opacity (0–1).
  * @param {Function} [options.screenSpaceEventHandlerFactory] Test seam.
  * @param {object} services Shared context/overlay operations.
@@ -199,6 +205,8 @@ export function createChunkedAreaLayer(
     maxChunks = CHUNKED_AREA_MAX_CHUNKS,
     zoomInMessage = 'zoom in to a city or county to load',
     sourceNote = null,
+    featureSummary = null,
+    featureFilter = null,
     fillAlpha = FILL_ALPHA,
     screenSpaceEventHandlerFactory = (canvas) =>
       new Cesium.ScreenSpaceEventHandler(canvas),
@@ -289,7 +297,10 @@ export function createChunkedAreaLayer(
     const features = text
       .split('\n')
       .filter((line) => line.trim())
-      .map((line) => JSON.parse(line));
+      .map((line) => JSON.parse(line))
+      .filter(
+        (feature) => !featureFilter || featureFilter(feature.properties || {}),
+      );
     cache.set(chunkId, features);
     while (cache.size > CHUNK_CACHE_LIMIT) {
       const oldest = cache.keys().next().value;
@@ -444,11 +455,19 @@ export function createChunkedAreaLayer(
     governorRequestRender?.(`chunked-area:${id}`);
   }
 
-  function selectArea(entity) {
-    const props = {
-      ...(entity.properties?.getValue?.(Cesium.JulianDate.now()) || {}),
+  /** A feature's properties plus the layer-level summary and source line. */
+  function describe(properties) {
+    return {
+      ...properties,
+      ...(featureSummary && { summary: featureSummary(properties) }),
       ...(sourceNote && { source_note: sourceNote }),
     };
+  }
+
+  function selectArea(entity) {
+    const props = describe(
+      entity.properties?.getValue?.(Cesium.JulianDate.now()) || {},
+    );
     const hierarchy = entity.polygon?.hierarchy?.getValue(
       Cesium.JulianDate.now(),
     );
@@ -630,10 +649,7 @@ export function createChunkedAreaLayer(
       if (!enabled) return { ...base, status: 'disabled' };
       if (status === 'zoom-in')
         return { ...base, status: 'zoom-in', statusMessage: zoomInMessage };
-      const withNote = (properties) => ({
-        ...properties,
-        ...(sourceNote && { source_note: sourceNote }),
-      });
+      const withNote = describe;
       let atPoint = null;
       const nearby = [];
       for (const chunkId of drawn.keys()) {

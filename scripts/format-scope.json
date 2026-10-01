@@ -180,6 +180,8 @@
   "scripts/qa-map-source-controls.mjs",
   "src/ui/layers.js",
   "src/ui/layerPanel.js",
+  "src/ui/researchKeyPrompt.js",
+  "src/ui/layerProfile.js",
   "src/ui/layerKeyRequirement.test.mjs",
   "src/ui/layerPanel.test.mjs",
   "src/ui/clearLayersControl.js",
@@ -747,5 +749,6 @@
   "scripts/qa-director-interactions.mjs",
   "src/director/sharing/sharing.test.mjs",
   "scripts/qa-director-sharing.mjs",
-  "src/data/aisStreamSentinels.test.mjs"
+  "src/data/aisStreamSentinels.test.mjs",
+  "src/debugLog.test.mjs"
 ]

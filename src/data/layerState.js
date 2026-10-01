@@ -344,6 +344,21 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
     disposition: 'enabled-only',
   }),
   Object.freeze({
+    id: 'local-air-nonattainment',
+    token: 'an',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-air-ozone',
+    token: 'ao',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-air-pm25',
+    token: 'ap',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
     id: 'local-boston-neighborhoods',
     token: 'bn',
     disposition: 'enabled-only',
@@ -438,6 +453,16 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
   Object.freeze({
     id: 'local-mkdb',
     token: 'mk',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-park-access',
+    token: 'pa',
+    disposition: 'enabled-only',
+  }),
+  Object.freeze({
+    id: 'local-parks',
+    token: 'pk',
     disposition: 'enabled-only',
   }),
   Object.freeze({

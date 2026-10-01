@@ -224,7 +224,7 @@ function aisWebSocketImpl() {
  *
  * A custom subscription (one harbor, one message type) can be legitimately
  * silent for minutes, so the silence watch only self-arms for the default
- * worldwide subscription. An operator with a narrow filter opts back in by
+ * (US waters) subscription. An operator with a narrow filter opts back in by
  * setting AISSTREAM_SILENCE_TIMEOUT_MS to a value sized for that filter; 0 is
  * an explicit kill switch.
  */

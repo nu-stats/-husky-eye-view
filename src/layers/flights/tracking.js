@@ -22,6 +22,7 @@ import {
   TRAIL_COLOR,
   CYAN_TRANSPARENT,
 } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createTracking({
   flightState,
@@ -1055,7 +1056,7 @@ export function createTracking({
 
     _publishTrackedSelection(icao24, origin);
 
-    console.log(
+    debugLog(
       `[Data:Flights] Tracking ${parts.queries._contactLabel(icao24, info)} (${icao24})`,
     );
   }

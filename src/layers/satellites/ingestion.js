@@ -1,6 +1,7 @@
 import { twoline2satrec } from 'satellite.js';
 import * as Cesium from 'cesium';
 import { CATALOG_GROUPS, ISS_NORAD, POINT_STYLES } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createIngestion({
   state: layerState,
@@ -50,7 +51,7 @@ export function createIngestion({
             `[Data:Satellites] Groups failed or empty: ${failed.join(', ')}`,
           );
         }
-        console.log(
+        debugLog(
           `[Data:Satellites] Loaded ${results.map((r) => `${r.tag}:${r.entries.length}`).join(' ')}`,
         );
 
@@ -162,7 +163,7 @@ export function createIngestion({
           status: failed.length ? 'partial' : 'accepted',
           failedGroups: [...failed],
         };
-        console.log(
+        debugLog(
           `[Data:Satellites] ${layerState._count} satellites active, ISS path shown`,
         );
 

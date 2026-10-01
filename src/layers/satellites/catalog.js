@@ -6,6 +6,7 @@ import {
   POINT_STYLES,
   DENSE_CREATE_CHUNK,
 } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createCatalog({ state: layerState, services, parts, source }) {
   function _abortActiveUpdates() {
@@ -163,7 +164,7 @@ export function createCatalog({ state: layerState, services, parts, source }) {
       layerState._count = layerState._points.size;
       layerState._catalogRevision++;
       layerState._denseStatus = 'ready';
-      console.log(
+      debugLog(
         `[Data:Satellites] Dense catalog: +${added} ${DENSE_GROUP_PATH} (points only)`,
       );
       // The panel would otherwise keep the pre-load count and legend until the

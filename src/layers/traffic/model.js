@@ -11,6 +11,7 @@ import {
   JAM_DOT_FAR_SCALE,
   JAM_DOT_DEPTH_PUNCH,
 } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createModel({ state: layerState, services, parts, source }) {
   /** Build scene waypoints from source records; thinning and terrain remain rendering policy. */
@@ -354,7 +355,7 @@ export function createModel({ state: layerState, services, parts, source }) {
         layerState._lastRenderAltitude,
       ),
     );
-    console.log(
+    debugLog(
       `[Data:Traffic] Flow recolor (${label}): ${layerState._dots.length} dots, closedDots=${closedDots}`,
     );
   }

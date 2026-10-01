@@ -1582,3 +1582,86 @@
   height: auto;
   max-height: var(--left-stack-max-height, 70vh);
 }
+
+/* Research key prompt (src/ui/researchKeyPrompt.js): used when POWER UP is
+   not offered, e.g. on a shared link or a built copy. Above the cockpit HUD. */
+.research-key-prompt {
+  position: fixed;
+  z-index: 200;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: min(360px, calc(100vw - 32px));
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.24));
+  border-radius: 8px;
+  background: rgba(10, 14, 18, 0.96);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  color: #f0f4f7;
+  font: 13px/1.45 var(--font-ui, sans-serif);
+  transform: translate(-50%, -50%);
+}
+.research-key-prompt h2 {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.research-key-prompt p {
+  margin: 0;
+  color: rgba(240, 244, 247, 0.78);
+}
+.research-key-prompt input {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font: inherit;
+}
+.research-key-prompt input:focus-visible,
+.research-key-prompt button:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+.research-key-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.research-key-prompt button {
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.research-key-prompt button[type='submit'] {
+  background: rgba(255, 255, 255, 0.85);
+  color: #0a0e12;
+  font-weight: 600;
+}
+
+/* Research profile (src/ui/layerProfile.js): "Show all layers" switch at the
+   foot of Data Layers, and inherited extras hidden while the profile is on. */
+.data-profile-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 4px 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(240, 244, 247, 0.72);
+  font-size: 11px;
+  cursor: pointer;
+}
+.data-profile-toggle input {
+  margin: 0;
+  accent-color: #ffffff;
+}
+body.profile-research #tr3b-toggle {
+  display: none !important;
+}

@@ -1,0 +1,2 @@
+{"type":"Feature","id":"park-30-110457684220","properties":{"name":"Handel Park","kind":"park","acres":4},"geometry":{"type":"Polygon","coordinates":[[[-108.08987,46.51887],[-108.08987,46.51957],[-108.08917,46.51957],[-108.08715,46.51862],[-108.08987,46.51887]]]}}
+{"type":"Feature","id":"park-30-110457684340","properties":{"name":"Unnamed park","kind":"park","acres":5},"geometry":{"type":"Polygon","coordinates":[[[-108.53884,46.4492],[-108.53883,46.44971],[-108.53615,46.44969],[-108.53617,46.44894],[-108.53884,46.4492]]]}}

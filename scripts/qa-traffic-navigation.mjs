@@ -24,6 +24,10 @@ try {
     const errors = [];
     let londonRequests = 0;
     page.on('pageerror', (error) => errors.push(error.message));
+    // Routine [Data:Traffic] lines are debug-gated (src/debugLog.js).
+    await page.evaluateOnNewDocument(() =>
+      localStorage.setItem('hev.debug', '1'),
+    );
     page.on('console', (message) => {
       if (message.text().includes('[Data:Traffic]'))
         console.log(message.text());

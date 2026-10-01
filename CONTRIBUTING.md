@@ -7,8 +7,8 @@ Thanks for being here. God's Eye View is an open foundation for live spatial int
 Use Node.js 24.14.x or 26.x (also enforced by `package.json`).
 
 ```bash
-git clone https://github.com/bilawalsidhu/gods-eye-view.git
-cd gods-eye-view
+git clone https://github.com/nu-stats/husky-eye-view.git
+cd husky-eye-view
 nvm install 24.14.0
 nvm use 24.14.0
 npm install
@@ -122,10 +122,12 @@ ownership and adoption process.
 
 ## Maintainers
 
-God's Eye View is maintained by [Bilawal Sidhu](https://github.com/bilawalsidhu)
-and [Sameh Khamis](https://github.com/samehkhamis) at
-[Halfpixel](https://halfpixel.ai). Either maintainer can review and merge
-contributions.
+Husky Eye View is maintained by Northeastern University researchers at
+[nu-stats/husky-eye-view](https://github.com/nu-stats/husky-eye-view). It is a
+fork of God's Eye View by [Bilawal Sidhu](https://github.com/bilawalsidhu) and
+[Sameh Khamis](https://github.com/samehkhamis) at
+[Halfpixel](https://halfpixel.ai); changes that belong upstream can be offered
+there too.
 
 ## Ground rules
 

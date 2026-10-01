@@ -154,6 +154,8 @@ async function main() {
       if (req.url().includes('/api/tomtom/flow/')) flowRequests.push(req.url());
     });
     const trafficLogs = [];
+    // Routine [Data:Traffic] lines are debug-gated (src/debugLog.js); (ii) reads the fetch line.
+    await page.evaluateOnNewDocument(() => localStorage.setItem('hev.debug', '1'));
     page.on('console', (msg) => {
       const t = msg.text();
       if (t.includes('[Data:Traffic]')) trafficLogs.push(t);

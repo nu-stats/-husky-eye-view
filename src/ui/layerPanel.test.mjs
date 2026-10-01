@@ -26,9 +26,16 @@ test('locked research datasets keep their own group that never starts folded', (
     order.filter(({ label }) => label === 'Research Data').map(({ id }) => id),
     ['local-gva-2015', 'local-mkdb'],
   );
-  // Right after Events, where they used to live.
+  // Research comes first: the research groups sit above the inherited live
+  // feeds, infrastructure and utilities.
   const labels = [...new Set(order.map(({ label }) => label))];
-  assert.equal(labels.indexOf('Research Data'), labels.indexOf('Events') + 1);
+  assert.equal(labels[0], 'Neighborhood Data (US)');
+  assert.ok(labels.indexOf('Research Data') < labels.indexOf('Live Feeds'));
+  assert.deepEqual(labels.slice(-3), [
+    'Live Feeds',
+    'Infrastructure',
+    'Utilities',
+  ]);
   // First-visit folding skips the group, so the locked rows are in sight.
   assert.match(
     source,
@@ -36,21 +43,33 @@ test('locked research datasets keep their own group that never starts folded', (
   );
 });
 
-test('panel presentation places Transit between Street Traffic and Bike Share in Movement', () => {
+test('panel presentation places Transit between Street Traffic and Bike Share in Live Feeds', () => {
   const { order } = panelOrder();
+  const live = order
+    .filter(({ label }) => label === 'Live Feeds')
+    .map(({ id }) => id);
+  const transit = live.indexOf('transit');
+  assert.deepEqual(live.slice(transit - 1, transit + 2), [
+    'traffic',
+    'transit',
+    'bikeshare',
+  ]);
+  assert.equal(order.filter(({ id }) => id === 'transit').length, 1);
+  // Chicago's research layers are no longer mixed into a live "Events" group.
+  assert.equal(
+    order.some(({ label }) => label === 'Events'),
+    false,
+  );
   assert.deepEqual(
-    order.filter(({ label }) => label === 'Movement').map(({ id }) => id),
+    order.filter(({ label }) => label === 'Chicago').map(({ id }) => id),
     [
-      'satellites',
-      'flights',
-      'military',
-      'ais-live-vessels',
-      'traffic',
-      'transit',
-      'bikeshare',
+      'local-chicago-events',
+      'local-tlr',
+      'local-famous-shootings',
+      'local-gang-map',
+      'local-gang-map-labels',
     ],
   );
-  assert.equal(order.filter(({ id }) => id === 'transit').length, 1);
 });
 
 test('partial feed controls distinguish incomplete records from stale data and outages', async () => {
@@ -111,4 +130,32 @@ test('partial feed controls distinguish incomplete records from stale data and o
   layer.enabled = false;
   panel._syncToggleButton(button, layer);
   assert.equal(button.textContent, 'OFF');
+});
+
+test('static research rows show the years their data covers, not a refresh time', async () => {
+  const { LayerPanel } = await import('./layerPanel.js');
+  const meta = (layer) =>
+    LayerPanel.prototype._buildMetaText.call(
+      { _timeAgo: () => '2m ago' },
+      { enabled: true, stats: { lastUpdate: Date.now() }, ...layer },
+    );
+  assert.equal(
+    meta({ id: 'local-holc-redlining', source: 'Mapping Inequality' }),
+    'Mapping Inequality · 1930s maps',
+  );
+  assert.equal(
+    meta({ id: 'local-air-pm25', source: 'CDC 2021' }),
+    'CDC 2021 · 2021',
+  );
+  // A static layer without a listed vintage shows just its source...
+  assert.equal(
+    meta({ id: 'local-tlr', source: 'Video locations' }),
+    'Video locations',
+  );
+  // ...while live feeds keep their refresh time.
+  assert.equal(meta({ id: 'flights', source: 'OpenSky' }), 'OpenSky · 2m ago');
+  assert.equal(
+    meta({ id: 'local-firms', source: 'NASA FIRMS' }),
+    'NASA FIRMS · 2m ago',
+  );
 });

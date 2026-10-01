@@ -6,14 +6,14 @@
 // category are left out of the gang map. Each famous shooting gets a summary
 // (its description without links) and its nearest trauma center with
 // straight-line distances; run scripts/fetch-trauma-centers.mjs first.
-// Usage: node scripts/build-gang-map-layers.mjs [public/big_bas_chicagoland_gang_map.geojson]
+// Usage: node scripts/build-gang-map-layers.mjs [data/inputs/big_bas_chicagoland_gang_map.geojson]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import {
   loadTraumaCenters,
   nearestTraumaProperties,
 } from './lib/nearest-trauma.mjs';
 
-const input = process.argv[2] ?? 'public/big_bas_chicagoland_gang_map.geojson';
+const input = process.argv[2] ?? 'data/inputs/big_bas_chicagoland_gang_map.geojson';
 const outDir = 'src/data/local_data/gang_map';
 const SHOOTINGS_LAYER = 'Famous Shootings';
 const EXCLUDED_LAYERS = new Set(['Disputed, Dying & Unknown Hoods']);

@@ -590,6 +590,89 @@ const BHOTE_KOSHI_NEPAL_BOOTSTRAP_RECIPE = BHOTE_KOSHI_NEPAL_APPEND_RECIPE
 
 const EVENT_RECIPES = [BHOTE_KOSHI_NEPAL_BOOTSTRAP_RECIPE].filter(Boolean);
 
+// Husky Eye View's own research tour (2026-09-30): Boston's census tracts —
+// life expectancy, the 1930s redlining maps over it, air quality and park
+// access. Listed first; the inherited God's Eye View scenes follow.
+const RESEARCH_SCENE_RECIPES = [
+  {
+    id: 'boston-neighborhoods-tour',
+    title: 'Boston: Neighborhoods, Air & Green Space',
+    durationSec: 40,
+    style: 'normal',
+    ui: { hidePanels: true, hudMode: 'off', safeFrame: '16:9' },
+    layers: {
+      'local-life-expectancy': true,
+      'local-holc-redlining': false,
+      'local-air-pm25': false,
+      'local-park-access': false,
+    },
+    post: { bloom: 0, sharpen: false, detectionMode: 'OFF' },
+    cameraPath: [
+      {
+        title: 'Life expectancy across Boston',
+        lat: 42.25,
+        lon: -71.08,
+        alt: 32000,
+        heading: 0,
+        pitch: -55,
+        duration: 6,
+        hold: 2,
+      },
+      {
+        title: 'Roxbury, Dorchester and Mattapan',
+        lat: 42.27,
+        lon: -71.08,
+        alt: 7000,
+        heading: 10,
+        pitch: -45,
+        duration: 5,
+        hold: 2,
+      },
+      {
+        title: '1930s redlining over today’s life expectancy',
+        lat: 42.27,
+        lon: -71.08,
+        alt: 7000,
+        heading: 10,
+        pitch: -45,
+        duration: 2,
+        hold: 4,
+        layers: { 'local-holc-redlining': true },
+      },
+      {
+        title: 'Fine-particle pollution (PM2.5), 2021',
+        lat: 42.22,
+        lon: -71.08,
+        alt: 45000,
+        heading: 0,
+        pitch: -60,
+        duration: 5,
+        hold: 3,
+        layers: {
+          'local-life-expectancy': false,
+          'local-holc-redlining': false,
+          'local-air-pm25': true,
+        },
+      },
+      {
+        title: 'Living within 1/2 mile of a park, 2020',
+        lat: 42.29,
+        lon: -71.08,
+        alt: 14000,
+        heading: 0,
+        pitch: -50,
+        duration: 5,
+        hold: 4,
+        layers: {
+          'local-life-expectancy': false,
+          'local-air-pm25': false,
+          'local-park-access': true,
+        },
+      },
+    ],
+  },
+];
+
 const PUBLIC_SCENE_RECIPES = [
   {
     id: 'flights-radar',
@@ -966,7 +1049,11 @@ const PUBLIC_SCENE_RECIPES = [
 
 /** Build the recipe list without mutating stored user-authored projects. */
 export function createSceneRecipes({ localDemoRecipes = EVENT_RECIPES } = {}) {
-  return [...localDemoRecipes, ...PUBLIC_SCENE_RECIPES];
+  return [
+    ...RESEARCH_SCENE_RECIPES,
+    ...localDemoRecipes,
+    ...PUBLIC_SCENE_RECIPES,
+  ];
 }
 
 export const SCENE_RECIPES = createSceneRecipes();

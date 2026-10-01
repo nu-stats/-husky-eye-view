@@ -10,6 +10,7 @@ import { createLifecycle } from './lifecycle.js';
 import { createEvidence } from './evidence.js';
 import { createTesting } from './testing.js';
 import { createQueries } from './queries.js';
+import { debugLog } from '../../debugLog.js';
 /** Compose one civil-flight layer with application-owned scene services. */
 export function createCivilFlightLayer({
   source,
@@ -51,6 +52,7 @@ export function createCivilFlightLayer({
     },
     applyPendingTrackingRestore: () =>
       parts.tracking._applyPendingTrackingRestore(),
+    debugLog,
   });
 
   Object.assign(

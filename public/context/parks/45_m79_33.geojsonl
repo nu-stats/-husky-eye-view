@@ -1,0 +1,2 @@
+{"type":"Feature","id":"park-45-110463201220","properties":{"name":"Myrtle Beach State Park","kind":"state-park","acres":339},"geometry":{"type":"Polygon","coordinates":[[[-78.94079,33.64766],[-78.92729,33.65893],[-78.9213,33.6541],[-78.93472,33.64274],[-78.94079,33.64766]]]}}
+{"type":"Feature","id":"park-45-110463202607","properties":{"name":"Unnamed park","kind":"park","acres":4},"geometry":{"type":"Polygon","coordinates":[[[-78.9614,33.82415],[-78.96094,33.82506],[-78.95962,33.82479],[-78.96044,33.82367],[-78.9614,33.82415]]]}}

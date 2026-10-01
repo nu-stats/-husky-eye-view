@@ -21,6 +21,7 @@ import {
   formatRouteDistance,
   formatRouteDuration,
 } from '../../data/routeSteps.js';
+import { debugLog } from '../../debugLog.js';
 
 export const DIRECTIONS_STEP_OVERLAY_SOURCE_ID = 'directions-step';
 export const DIRECTIONS_STEP_OVERLAY_SOURCE_OPTIONS = Object.freeze({
@@ -1275,7 +1276,7 @@ export function createDirectionsLayer({ services }) {
       _flightStep = null;
       _overlayHost.setVisible(DIRECTIONS_STEP_OVERLAY_SOURCE_ID, false);
       services.sprites.restoreSpriteOrder(viewer);
-      console.log('[Data:Directions] Initialized');
+      debugLog('[Data:Directions] Initialized');
     },
 
     /**

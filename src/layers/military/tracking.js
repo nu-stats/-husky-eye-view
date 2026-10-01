@@ -25,6 +25,7 @@ import {
   AMBER_TRANSPARENT,
   TRACKED_ICON_COLOR,
 } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createTracking({
   flightState,
@@ -1015,7 +1016,7 @@ export function createTracking({
       parts.queries._toCleanText(info.registration) ||
       icao24;
     _publishTrackedSelection(icao24, origin);
-    console.log(`[Data:Military] Tracking ${callsign} (${icao24})`);
+    debugLog(`[Data:Military] Tracking ${callsign} (${icao24})`);
   }
 
   /**

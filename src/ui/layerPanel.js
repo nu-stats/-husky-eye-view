@@ -2,6 +2,13 @@ import { layerFeedState } from '../data/feedState.js';
 export { layerFeedState } from '../data/feedState.js';
 import { GUIDANCE_STATUSES } from '../loadingFeedback.js';
 import { keySetupRequirement } from '../keySetupCore.mjs';
+import { openResearchKeyPrompt } from './researchKeyPrompt.js';
+import {
+  applyLayerProfileClass,
+  layerListedInProfile,
+  readShowAllLayers,
+  writeShowAllLayers,
+} from './layerProfile.js';
 const FEED_STATE_LABELS = Object.freeze({
   nominal: 'ON',
   loading: 'LOADING',
@@ -15,47 +22,49 @@ const FEED_STATE_LABELS = Object.freeze({
 const RESEARCH_GROUP = 'Research Data';
 // Presentation order is independent of catalog registration and startup order.
 const PANEL_GROUPS = [
+  // The project's own research layers come first; the live feeds and tools
+  // inherited from God's Eye View follow.
   {
-    label: 'Movement',
+    label: 'Neighborhood Data (US)',
     ids: [
-      'satellites',
-      'flights',
-      'military',
-      'ais-live-vessels',
-      'traffic',
-      'transit',
-      'bikeshare',
+      'local-holc-redlining',
+      'local-life-expectancy',
+      'local-tract-le-clusters',
+      'local-county-life-expectancy',
+      'local-county-le-clusters',
     ],
   },
   {
-    label: 'Cameras',
-    ids: ['cctv', 'alpr-cameras'],
+    label: 'Air Quality (US)',
+    ids: ['local-air-pm25', 'local-air-ozone', 'local-air-nonattainment'],
   },
   {
-    label: 'Infrastructure',
-    ids: [
-      'military-installations',
-      'local-datacenters',
-      'telegeography-submarine-cables',
-      'local-dams',
-    ],
+    label: 'Green Space (US)',
+    ids: ['local-park-access', 'local-parks'],
   },
   {
-    label: 'Events',
-    ids: [
-      'rocket-launches',
-      'earthquakes',
-      'local-firms',
-      'local-chicago-events',
-      'local-tlr',
-      'local-famous-shootings',
-    ],
+    label: 'Health & Housing (US)',
+    ids: ['local-trauma-centers', 'local-public-housing'],
   },
   {
     // Key-locked datasets get their own group that never starts folded, so
     // they stay in sight whether or not the research key is set.
     label: RESEARCH_GROUP,
     ids: ['local-gva-2015', 'local-mkdb'],
+  },
+  {
+    label: 'Boston',
+    ids: ['local-boston-neighborhoods'],
+  },
+  {
+    label: 'Chicago',
+    ids: [
+      'local-chicago-events',
+      'local-tlr',
+      'local-famous-shootings',
+      'local-gang-map',
+      'local-gang-map-labels',
+    ],
   },
   {
     label: 'Miami-Dade Homicides',
@@ -70,30 +79,34 @@ const PANEL_GROUPS = [
     ],
   },
   {
-    label: 'Chicago Gangs',
-    ids: ['local-gang-map', 'local-gang-map-labels'],
-  },
-  {
-    label: 'Boston',
-    ids: ['local-boston-neighborhoods'],
-  },
-  {
     label: '3D Captures',
     ids: ['local-3d-captures'],
   },
   {
-    label: 'Neighborhood Data (US)',
+    label: 'Live Feeds',
     ids: [
-      'local-holc-redlining',
-      'local-life-expectancy',
-      'local-tract-le-clusters',
-      'local-county-life-expectancy',
-      'local-county-le-clusters',
+      'flights',
+      'military',
+      'ais-live-vessels',
+      'traffic',
+      'transit',
+      'bikeshare',
+      'cctv',
+      'alpr-cameras',
+      'earthquakes',
+      'local-firms',
+      'satellites',
+      'rocket-launches',
     ],
   },
   {
-    label: 'Health & Housing (US)',
-    ids: ['local-trauma-centers', 'local-public-housing'],
+    label: 'Infrastructure',
+    ids: [
+      'military-installations',
+      'local-datacenters',
+      'telegeography-submarine-cables',
+      'local-dams',
+    ],
   },
   {
     label: 'Utilities',
@@ -117,6 +130,40 @@ const PANEL_LABELS = {
 
 function panelLabel(layer) {
   return PANEL_LABELS[layer.id] || layer.name;
+}
+
+// The years a static dataset describes, shown in its row instead of a "2m
+// ago" refresh time that only means something for live feeds.
+const DATA_VINTAGE = Object.freeze({
+  'local-holc-redlining': '1930s maps',
+  'local-life-expectancy': '2010–2015',
+  'local-tract-le-clusters': '2010–2015',
+  'local-county-life-expectancy': '2000–2019',
+  'local-county-le-clusters': '2015',
+  'local-air-pm25': '2021',
+  'local-air-ozone': '2022',
+  'local-air-nonattainment': 'as of Aug 2026',
+  'local-park-access': '2020',
+  'local-parks': '2025',
+  'local-gva-2015': '2015',
+  'local-mkdb': '2006–2023',
+  'local-miami-homicide-hotspots': '1956–2011',
+  'local-miami-homicides-1950s': '1956–1959',
+  'local-miami-homicides-1960s': '1960s',
+  'local-miami-homicides-1970s': '1970s',
+  'local-miami-homicides-1980s': '1980s',
+  'local-miami-homicides-1990s': '1990s',
+  'local-miami-homicides-2000s': '2000–2011',
+});
+// Live layers whose ids share the local- prefix of the static datasets.
+const LIVE_LOCAL_LAYERS = new Set(['local-firms']);
+
+/** What the row says about how current the data is, or '' for none. */
+function dataFreshness(layerId, ago) {
+  if (DATA_VINTAGE[layerId]) return DATA_VINTAGE[layerId];
+  const staticLayer =
+    String(layerId).startsWith('local-') && !LIVE_LOCAL_LAYERS.has(layerId);
+  return staticLayer ? '' : ago;
 }
 
 /**
@@ -212,6 +259,7 @@ export class LayerPanel {
     if (this._destroyed) return;
     this._releaseBindings();
     this._toggleContainer = container;
+    applyLayerProfileClass();
     this._renderToggles();
   }
   _bind(element, type, listener) {
@@ -358,7 +406,18 @@ export class LayerPanel {
     for (const layer of layers) {
       if (!layer.showInTogglePanel) continue;
       const row = this._rows?.get(layer.id);
-      if (!row) continue;
+      if (!row) {
+        // A layer the research profile left out was just switched on (voice,
+        // a link): rebuild so it is listed and can be switched off again.
+        if (layer.enabled && !this._profileRerenderQueued) {
+          this._profileRerenderQueued = true;
+          queueMicrotask(() => {
+            this._profileRerenderQueued = false;
+            this._renderToggles();
+          });
+        }
+        continue;
+      }
       row.classList.toggle('is-on', Boolean(layer.enabled));
       const locked = layerIsLocked(layer);
       row.classList.toggle('is-locked', locked);
@@ -452,8 +511,10 @@ export class LayerPanel {
       );
     }
     let previousGroup = '';
+    const showAll = readShowAllLayers();
     for (const layer of layers) {
       if (!layer.showInTogglePanel) continue;
+      if (!layerListedInProfile(layer, showAll)) continue;
       const group = groupOf(layer);
       if (group && group !== previousGroup) {
         const heading = document.createElement('button');
@@ -517,7 +578,8 @@ export class LayerPanel {
           toggle.getAttribute('aria-disabled') === 'true'
         )
           return;
-        // A locked layer opens POWER UP, where its key goes, instead.
+        // A locked layer asks for its key instead: POWER UP when this server
+        // offers it, otherwise a small built-in prompt (shared links, builds).
         const live = this.getAll().find(({ id }) => id === layer.id);
         if (live && layerIsLocked(live)) {
           const powerUp = document.getElementById('key-setup-chip');
@@ -525,6 +587,11 @@ export class LayerPanel {
             powerUp.click();
             return;
           }
+          const saved = await openResearchKeyPrompt({
+            layerName: panelLabel(live),
+          });
+          if (!saved || this._destroyed || this._generation !== generation)
+            return;
         }
         toggle.setAttribute('aria-disabled', 'true');
         toggle.setAttribute('aria-busy', 'true');
@@ -605,8 +672,34 @@ export class LayerPanel {
       this._toggleContainer.appendChild(row);
     }
     this._toggleContainer.appendChild(empty);
+    this._toggleContainer.appendChild(this._buildProfileToggle(layers));
     this._applyFilter();
     this._syncOnState(layers);
+  }
+
+  /** "Show all layers" switch for the research profile (see layerProfile.js). */
+  _buildProfileToggle(layers) {
+    const showAll = readShowAllLayers();
+    const hidden = layers.filter(
+      (layer) =>
+        layer.showInTogglePanel && !layerListedInProfile(layer, showAll),
+    ).length;
+    const label = document.createElement('label');
+    label.className = 'data-profile-toggle';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = showAll;
+    const text = document.createElement('span');
+    text.textContent = showAll
+      ? 'Show all layers (including God’s Eye View extras)'
+      : `Show all layers (${hidden} more from God’s Eye View)`;
+    label.appendChild(box);
+    label.appendChild(text);
+    this._bind(box, 'change', () => {
+      writeShowAllLayers(box.checked);
+      this._renderToggles();
+    });
+    return label;
   }
 
   /** Qualify a loaded count when it does not mean items currently on screen. */
@@ -869,7 +962,8 @@ export class LayerPanel {
     if (typeof stats.loadingLabel === 'string' && stats.loadingLabel.trim()) {
       return `${source} · ${stats.loadingLabel.trim()}`;
     }
-    return `${source} · ${ago}`;
+    const freshness = dataFreshness(layer.id, ago);
+    return freshness ? `${source} · ${freshness}` : source;
   }
 
   _syncToggleButton(button, layer) {

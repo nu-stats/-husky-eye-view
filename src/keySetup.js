@@ -16,12 +16,14 @@ import { createSurfaceKeyboard } from './ui/surfaceKeyboard.js';
  * the chip and the dialog are removed outright.
  */
 
-/** Chip label — pure, exported for tests. */
+/**
+ * Chip label — pure, exported for tests. No key is required, so the chip does
+ * not count "waiting" keys at every start; a layer that needs one says so in
+ * its own row (KEY REQUIRED / Locked).
+ */
 export function keySetupChipLabel(status) {
   const missing = Math.max(0, (status?.total || 0) - (status?.setCount || 0));
-  return missing > 0
-    ? `POWER UP · ${missing} ${missing === 1 ? 'KEY' : 'KEYS'} WAITING`
-    : 'POWERED UP';
+  return missing > 0 ? 'POWER UP · OPTIONAL KEYS' : 'POWERED UP';
 }
 
 /**

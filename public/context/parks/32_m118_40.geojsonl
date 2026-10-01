@@ -1,0 +1,2 @@
+{"type":"Feature","id":"park-32-110534735796","properties":{"name":"Unnamed park","kind":"park","acres":75},"geometry":{"type":"Polygon","coordinates":[[[-117.72804,40.97236],[-117.72563,40.9744],[-117.71718,40.97426],[-117.72088,40.96931],[-117.72804,40.97236]]]}}
+{"type":"Feature","id":"park-32-110534735797","properties":{"name":"Unnamed park","kind":"park","acres":8},"geometry":{"type":"Polygon","coordinates":[[[-117.74491,40.97911],[-117.74173,40.97912],[-117.74163,40.97811],[-117.74298,40.97779],[-117.74488,40.97817],[-117.74491,40.97911]]]}}

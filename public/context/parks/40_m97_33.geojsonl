@@ -1,0 +1,2 @@
+{"type":"Feature","id":"park-40-110795783353","properties":{"name":"American Legion Park","kind":"park","acres":6},"geometry":{"type":"Polygon","coordinates":[[[-96.38216,33.98855],[-96.38199,33.98901],[-96.38074,33.98869],[-96.38112,33.98713],[-96.38256,33.98747],[-96.38216,33.98855]]]}}
+{"type":"Feature","id":"park-40-110795783344","properties":{"name":"Slaton Park","kind":"park","acres":3},"geometry":{"type":"Polygon","coordinates":[[[-96.37017,33.99169],[-96.37013,33.99223],[-96.36896,33.99201],[-96.36918,33.99096],[-96.37023,33.99106],[-96.37017,33.99169]]]}}

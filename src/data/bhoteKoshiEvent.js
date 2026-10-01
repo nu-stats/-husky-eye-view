@@ -22,6 +22,7 @@ import {
   createBhoteKoshiEmbeddedMedia,
   resolveEmbeddedMediaSource,
 } from './bhoteKoshiEmbeddedMedia.js';
+import { debugLog } from '../debugLog.js';
 
 export const BHOTE_KOSHI_LAYER_ID = 'bhote-koshi-2026';
 export const BHOTE_KOSHI_OVERLAY_SOURCE_ID = 'bhote-koshi-witnesses';
@@ -3421,7 +3422,7 @@ export function createBhoteKoshiEventLayer({
     _viewer = viewer;
     _embeddedMedia = embeddedMediaFactory({ viewer });
     await loadEvent();
-    console.log('[Data:BhoteKoshi] Event pack ready');
+    debugLog('[Data:BhoteKoshi] Event pack ready');
     return true;
   }
 

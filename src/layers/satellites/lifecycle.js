@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium';
 import { ISS_OVERLAY_SOURCE_ID } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createLifecycle({
   state: layerState,
@@ -57,7 +58,7 @@ export function createLifecycle({
         parts.rendering._preRenderTick,
       );
 
-      console.log('[Data:Satellites] Initialized');
+      debugLog('[Data:Satellites] Initialized');
     },
 
     enable(viewer) {

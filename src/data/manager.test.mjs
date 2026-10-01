@@ -2995,6 +2995,10 @@ function makeRowControlLayer() {
 test('a layer that declares row controls renders its chips and color legend', async () => {
   const originalDocument = globalThis.document;
   globalThis.document = { createElement: makeControlElement };
+  // The fixture layer is Satellites, which the research profile lists only
+  // when it is on or "Show all layers" is chosen.
+  const { writeShowAllLayers } = await import('../ui/layerProfile.js');
+  writeShowAllLayers(true, null);
   const mgr = new DataLayerManager({});
   const layer = makeRowControlLayer();
   mgr.register(layer.module);
@@ -3026,6 +3030,7 @@ test('a layer that declares row controls renders its chips and color legend', as
     assert.deepEqual(items.map((i) => i.title), ['GNSS', 'belt']);
     assert.equal(items.length, 2);
   } finally {
+    writeShowAllLayers(false, null);
     await mgr.destroyAll();
     if (originalDocument === undefined) delete globalThis.document;
     else globalThis.document = originalDocument;

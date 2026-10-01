@@ -1,5 +1,6 @@
 import { matchFlowToRoads } from '../../data/flowMatch.js';
 import { TRAFFIC_TIMING_ENABLED, FLOW_RENDER_RACE_MS } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createFlow({ state: layerState, services, parts, source }) {
   const { registerDynamicCredit, TOMTOM_CREDIT } = services.credits;
@@ -47,7 +48,7 @@ export function createFlow({ state: layerState, services, parts, source }) {
           layerState._liveMode = Boolean(status?.hasKey);
           layerState._flowStatusUnavailable = false;
           if (layerState._liveMode) {
-            console.log('[Data:Traffic] TomTom key present — live flow mode');
+            debugLog('[Data:Traffic] TomTom key present — live flow mode');
             registerDynamicCredit(layerState._viewer, TOMTOM_CREDIT);
           }
         })

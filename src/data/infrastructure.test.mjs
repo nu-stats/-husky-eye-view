@@ -62,7 +62,7 @@ test('infrastructure factory preserves identity and creates independent state wi
     first.map(({ id, name, source }) => ({ id, name, source })),
     [
       { id: 'local-datacenters', name: 'Datacenters', source: 'Local' },
-      { id: 'local-dams', name: 'Dams', source: 'USACE' },
+      { id: 'local-dams', name: 'Dams', source: 'OpenStreetMap' },
       { id: 'local-chicago-events', name: 'Chicago Events', source: 'Local' },
       { id: 'local-tlr', name: 'TLR', source: 'Video locations' },
       { id: 'local-gang-map', name: 'Gang Map', source: 'Big Bas My Maps' },
@@ -100,6 +100,31 @@ test('infrastructure factory preserves identity and creates independent state wi
         id: 'local-county-le-clusters',
         name: 'Life Expectancy Clusters (counties)',
         source: "Local Moran's I",
+      },
+      {
+        id: 'local-air-pm25',
+        name: 'Air Quality: PM2.5 (tracts)',
+        source: 'CDC 2021',
+      },
+      {
+        id: 'local-air-ozone',
+        name: 'Air Quality: Ozone (tracts)',
+        source: 'CDC 2022',
+      },
+      {
+        id: 'local-air-nonattainment',
+        name: 'Air Quality: Nonattainment Areas',
+        source: 'EPA Green Book',
+      },
+      {
+        id: 'local-park-access',
+        name: 'Green Space: Park Access (tracts)',
+        source: 'CDC 2020',
+      },
+      {
+        id: 'local-parks',
+        name: 'Green Space: Parks',
+        source: 'Census TIGER 2025',
       },
       {
         id: 'local-miami-homicides-1950s',
@@ -197,7 +222,10 @@ test('a locked research layer refuses to turn on until the server unlocks it', a
     ({ id }) => id === 'local-mkdb',
   );
   await layer.init();
-  await assert.rejects(layer.enable({}), /RESEARCH DATASETS key in POWER UP/);
+  await assert.rejects(
+    layer.enable({}),
+    /Locked: click to enter the research key/,
+  );
   assert.equal(
     (await layer.getAreaContext({ longitude: 0, latitude: 0 })).status,
     'locked',

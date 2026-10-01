@@ -1,0 +1,2 @@
+{"type":"Feature","id":"park-66-1101513973472","properties":{"name":"Chief Quipuha Park","kind":"park","acres":1},"geometry":{"type":"Polygon","coordinates":[[[144.75333,13.4771],[144.75375,13.47752],[144.75441,13.47734],[144.75333,13.4771]]]}}
+{"type":"Feature","id":"park-66-1101513973452","properties":{"name":"Central Park","kind":"park","acres":22},"geometry":{"type":"Polygon","coordinates":[[[144.75568,13.47461],[144.75865,13.47428],[144.75949,13.47234],[144.75553,13.47242],[144.75568,13.47461]]]}}

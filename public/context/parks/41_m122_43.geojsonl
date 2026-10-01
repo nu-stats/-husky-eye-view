@@ -1,0 +1,2 @@
+{"type":"Feature","id":"park-41-110528911877","properties":{"name":"Cy Bingham Co Park","kind":"park","acres":8},"geometry":{"type":"Polygon","coordinates":[[[-121.70134,43.4651],[-121.70007,43.46552],[-121.69888,43.46784],[-121.69905,43.46414],[-121.70134,43.4651]]]}}
+{"type":"Feature","id":"park-41-110330113230","properties":{"name":"Lava River Caves State Park","kind":"state-park","acres":22},"geometry":{"type":"Polygon","coordinates":[[[-121.37061,43.89484],[-121.37054,43.89635],[-121.36681,43.89633],[-121.36711,43.8936],[-121.37059,43.89356],[-121.37061,43.89484]]]}}

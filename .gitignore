@@ -28,3 +28,6 @@ data/restricted/
 
 # Downloaded Gaussian splat sample (CesiumJS test data; see public/splats/README.md)
 public/splats/cesium-tower/
+# 31 MB building-level export written by scripts/fetch-public-housing.mjs;
+# regenerate locally (the app uses src/data/local_data/public_housing/).
+data/exports/public_housing_buildings.csv

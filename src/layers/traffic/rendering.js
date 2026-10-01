@@ -11,6 +11,7 @@ import {
   TRAFFIC_TIMING_ENABLED,
   MAX_DOTS,
 } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createRendering({
   state: layerState,
@@ -154,7 +155,7 @@ export function createRendering({
 
     layerState._heatLineCount = kept.length;
     if (candidates.length > kept.length) {
-      console.log(
+      debugLog(
         `[Data:Traffic] Heat-lines capped at ${HEAT_LINE_CAP} (${candidates.length} congested roads in view)`,
       );
     }
@@ -292,7 +293,7 @@ export function createRendering({
 
     layerState._count = layerState._dots.length;
     layerState._lastUpdate = Date.now();
-    console.log(
+    debugLog(
       `[Data:Traffic] ${label}: ${layerState._count} dots (roads=${roads.length}, alt=${Math.round(altitude)}m)`,
     );
     if (state) {

@@ -4,6 +4,7 @@ import {
   claimCameraSensitivity,
   releaseCameraSensitivity,
 } from '../../data/cameraSensitivity.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createLifecycle({
   state: layerState,
@@ -65,7 +66,7 @@ export function createLifecycle({
         }
       }
       parts.style.refreshBucketColors();
-      console.log('[Data:Traffic] Initialized');
+      debugLog('[Data:Traffic] Initialized');
     },
 
     /**

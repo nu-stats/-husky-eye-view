@@ -1,0 +1,2 @@
+{"type":"Feature","id":"park-02-110511183336","properties":{"name":"Wrangell-St Elias Natl Park","kind":"national-forest","acres":38},"geometry":{"type":"Polygon","coordinates":[[[-141.76929,61.72448],[-141.76911,61.69535],[-141.77101,61.71136],[-141.76929,61.72448]]]}}
+{"type":"Feature","id":"park-02-110536119049","properties":{"name":"Wrangell-St Elias Natl Prsv Wilderness","kind":"national-forest","acres":13},"geometry":{"type":"Polygon","coordinates":[[[-141.8318,61.90676],[-141.82847,61.90696],[-141.82856,61.90405],[-141.8318,61.90405],[-141.8318,61.90676]]]}}

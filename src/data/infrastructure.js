@@ -58,6 +58,24 @@ const clusterLegend = () =>
     color: c.color,
     test: (p) => p.cluster === c.type,
   }));
+// Card wording for a tract's cluster (formerly stored in every feature).
+const CLUSTER_WORDING = Object.freeze({
+  HH: ['long-life cluster (high–high)', 'high, and so are its neighbors'],
+  LL: ['short-life cluster (low–low)', 'low, and so are its neighbors'],
+  HL: ['high outlier (high–low)', 'high while its neighbors are low'],
+  LH: ['low outlier (low–high)', 'low while its neighbors are high'],
+});
+function tractClusterSummary(p) {
+  const [label, detail] = CLUSTER_WORDING[p.cluster] || [];
+  if (!label) return 'Not a significant cluster.';
+  const value = Number.isFinite(p.life_exp_8)
+    ? `${p.life_exp_8.toFixed(1)} years`
+    : 'n/a';
+  const pValue = Number.isFinite(p.p_value)
+    ? ` (p = ${p.p_value.toFixed(3)})`
+    : '';
+  return `Local Moran's I ${label}: this tract's life expectancy (${value}) is ${detail}${pValue}.`;
+}
 // Miami-Dade homicides 1956-2011: one pin layer per decade, each in its own
 // color (the 1950s and 2000s layers are partial decades). Files are written
 // by scripts/convert-miami-dade-homicides.mjs.
@@ -128,6 +146,99 @@ const HOMICIDE_HOTSPOT_BANDS = Object.freeze([
   { band: 5, label: '31–86', color: '#fd8d3c' },
   { band: 6, label: '86–532 (top 3%)', color: '#f16913' },
 ]);
+// Air quality by census tract (scripts/build-air-quality.mjs). PM2.5 bins
+// bracket the EPA annual standard (9.0 µg/m³ since 2024; 12 before).
+const PM25_BINS = Object.freeze([
+  { label: 'Under 6 µg/m³', color: '#1a9850', min: -Infinity, max: 6 },
+  { label: '6–8', color: '#91cf60', min: 6, max: 8 },
+  { label: '8–9 (just under the standard)', color: '#fee08b', min: 8, max: 9 },
+  { label: '9–10 (above the EPA standard)', color: '#fc8d59', min: 9, max: 10 },
+  { label: '10–12', color: '#d73027', min: 10, max: 12 },
+  { label: '12 and over', color: '#7b3294', min: 12, max: Infinity },
+]);
+// Ozone: yearly average of each day's highest 8-hour level (ppb). Not the
+// 70 ppb standard's test (the 4th-highest day), so bins are relative.
+const OZONE_BINS = Object.freeze([
+  { label: 'Under 32 ppb', color: '#1a9850', min: -Infinity, max: 32 },
+  { label: '32–36', color: '#91cf60', min: 32, max: 36 },
+  { label: '36–40', color: '#fee08b', min: 36, max: 40 },
+  { label: '40–44', color: '#fc8d59', min: 40, max: 44 },
+  { label: '44–48', color: '#d73027', min: 44, max: 48 },
+  { label: '48 and over', color: '#7b3294', min: 48, max: Infinity },
+]);
+const AIR_TRACT_SOURCE_NOTE =
+  'CDC Environmental Public Health Tracking Downscaler model (EPA CMAQ fused with monitor readings): PM2.5 is the 2021 annual mean, ozone the 2022 annual mean of the daily 8-hour maximum. Census 2024 tract outlines. Lower 48 states only.';
+// Park access: share of residents within 1/2 mile of a park. Many city tracts
+// are at 100%, so the top bin is exactly 100 and the lower bins spread out.
+const PARK_ACCESS_BINS = Object.freeze([
+  { label: 'Under 25%', color: '#a6611a', min: -Infinity, max: 25 },
+  { label: '25–50%', color: '#dfc27d', min: 25, max: 50 },
+  { label: '50–75%', color: '#c2e699', min: 50, max: 75 },
+  { label: '75–99%', color: '#78c679', min: 75, max: 99.95 },
+  { label: '100% (everyone)', color: '#238443', min: 99.95, max: Infinity },
+]);
+const PARK_ACCESS_SOURCE_NOTE =
+  'CDC Environmental Public Health Tracking, Access to Parks (2020): percent of residents living within 1/2 mile of a park. Census 2024 tract outlines.';
+// TIGER/Line park landmark kinds (scripts/build-environment-layers.mjs).
+const PARK_KINDS = Object.freeze([
+  {
+    kinds: ['national-park'],
+    label: 'National Park Service',
+    color: '#1b5e20',
+  },
+  {
+    kinds: ['national-forest'],
+    label: 'National forest / other federal',
+    color: '#558b2f',
+  },
+  { kinds: ['state-park'], label: 'State park', color: '#2e7d32' },
+  {
+    kinds: ['regional-park', 'county-park'],
+    label: 'Regional / county park',
+    color: '#66bb6a',
+  },
+  {
+    kinds: ['city-park', 'park'],
+    label: 'City / local park',
+    color: '#9ccc65',
+  },
+  { kinds: ['tribal-park'], label: 'Tribal park', color: '#8d6e63' },
+  {
+    kinds: ['private-park', 'other-park'],
+    label: 'Private / other',
+    color: '#a5d6a7',
+  },
+]);
+const parkKindLabel = (kind) =>
+  PARK_KINDS.find((k) => k.kinds.includes(kind))?.label || 'Park';
+
+function binOf(bins, value) {
+  return value === null || value === undefined || !Number.isFinite(value)
+    ? null
+    : bins.find((b) => value >= b.min && value < b.max);
+}
+
+/** Legend rows for a layer shaded by binOf(bins, property). */
+function binLegend(bins, key) {
+  return [
+    ...bins.map((b) => ({
+      label: b.label,
+      color: b.color,
+      test: (p) => binOf(bins, p[key]) === b,
+    })),
+    {
+      label: 'No estimate',
+      color: NO_DATA_COLOR,
+      test: (p) => !binOf(bins, p[key]),
+    },
+  ];
+}
+
+const NONATTAINMENT_TYPES = Object.freeze([
+  { pollutant: 'ozone', label: 'Ozone (2015 standard)', color: '#ff8c00' },
+  { pollutant: 'pm25', label: 'PM2.5 (2012 standard)', color: '#9c27b0' },
+]);
+
 /** County layers are drawn nationwide: every state, from space-station height. */
 const COUNTY_LAYER_OPTIONS = Object.freeze({
   maxHeightM: 8_000_000,
@@ -374,7 +485,8 @@ export function createInfrastructureLayers(services) {
       name: 'Dams',
       color: '#0088ff', // Blue
       icon: '▰',
-      source: 'USACE',
+      // OpenStreetMap via Open Infrastructure Map (see the folder README).
+      source: 'OpenStreetMap',
       labels: true,
       labelMax: 900,
       labelGridPx: 132,
@@ -492,6 +604,11 @@ export function createInfrastructureLayers(services) {
       baseUrl: 'context/life-expectancy/',
       icon: '♥',
       source: 'USALEEP',
+      sourceNote: 'USALEEP census-tract life expectancy (life_exp_8).',
+      featureSummary: (p) =>
+        Number.isFinite(p.life_exp_8)
+          ? `Life expectancy at birth: ${p.life_exp_8.toFixed(1)} years.`
+          : 'No life expectancy estimate for this tract.',
       featureColor: (p) =>
         lifeExpectancyBin(p.life_exp_8)?.color || NO_DATA_COLOR,
       legend: lifeExpectancyLegend('life_exp_8'),
@@ -499,16 +616,138 @@ export function createInfrastructureLayers(services) {
     services,
   );
 
+  // PM2.5, ozone and park access share one set of 2020 tract chunks; each
+  // layer colors and describes the tracts its own way.
+  const airSummary = (p) =>
+    [
+      Number.isFinite(p.pm25)
+        ? `PM2.5 (2021 avg): ${p.pm25.toFixed(1)} µg/m³; EPA annual standard 9.0`
+        : null,
+      Number.isFinite(p.o3)
+        ? `Ozone (2022 avg daily 8-h max): ${p.o3.toFixed(1)} ppb`
+        : null,
+    ]
+      .filter(Boolean)
+      .join('\n') ||
+    'No modeled estimate (the CDC model covers the lower 48 states).';
+
+  const airPm25 = createChunkedAreaLayer(
+    {
+      id: 'local-air-pm25',
+      name: 'Air Quality: PM2.5 (tracts)',
+      baseUrl: 'context/tracts-2020/',
+      icon: '☁',
+      source: 'CDC 2021',
+      sourceNote: AIR_TRACT_SOURCE_NOTE,
+      featureSummary: airSummary,
+      featureColor: (p) => binOf(PM25_BINS, p.pm25)?.color || NO_DATA_COLOR,
+      legend: binLegend(PM25_BINS, 'pm25'),
+    },
+    services,
+  );
+
+  const airOzone = createChunkedAreaLayer(
+    {
+      id: 'local-air-ozone',
+      name: 'Air Quality: Ozone (tracts)',
+      baseUrl: 'context/tracts-2020/',
+      icon: '☁',
+      source: 'CDC 2022',
+      sourceNote: AIR_TRACT_SOURCE_NOTE,
+      featureSummary: airSummary,
+      featureColor: (p) => binOf(OZONE_BINS, p.o3)?.color || NO_DATA_COLOR,
+      legend: binLegend(OZONE_BINS, 'o3'),
+    },
+    services,
+  );
+
+  const parkAccess = createChunkedAreaLayer(
+    {
+      id: 'local-park-access',
+      name: 'Green Space: Park Access (tracts)',
+      baseUrl: 'context/tracts-2020/',
+      icon: '♣',
+      source: 'CDC 2020',
+      sourceNote: PARK_ACCESS_SOURCE_NOTE,
+      featureSummary: (p) =>
+        Number.isFinite(p.park)
+          ? `${p.park.toFixed(1)}% of residents live within 1/2 mile of a park (2020).`
+          : 'No park-access estimate for this tract.',
+      featureColor: (p) =>
+        binOf(PARK_ACCESS_BINS, p.park)?.color || NO_DATA_COLOR,
+      legend: binLegend(PARK_ACCESS_BINS, 'park'),
+    },
+    services,
+  );
+
+  const parks = createChunkedAreaLayer(
+    {
+      id: 'local-parks',
+      name: 'Green Space: Parks',
+      baseUrl: 'context/parks/',
+      icon: '♠',
+      source: 'Census TIGER 2025',
+      sourceNote:
+        'Census TIGER/Line 2025 Area Landmarks, park feature classes (K2180–K2190). Small neighborhood parks are incomplete.',
+      featureSummary: (p) =>
+        `${parkKindLabel(p.kind)}${Number.isFinite(p.acres) && p.acres > 0 ? ` · about ${p.acres.toLocaleString('en-US')} acres of land` : ''}.`,
+      featureColor: (p) =>
+        PARK_KINDS.find((k) => k.kinds.includes(p.kind))?.color ||
+        NO_DATA_COLOR,
+      legend: PARK_KINDS.map((k) => ({
+        label: k.label,
+        color: k.color,
+        test: (p) => k.kinds.includes(p.kind),
+      })),
+      fillAlpha: 0.55,
+      // Parks are sparse; a wider view still loads only a few cells.
+      maxHeightM: 600_000,
+      maxChunks: 60,
+    },
+    services,
+  );
+
+  const airNonattainment = createChunkedAreaLayer(
+    {
+      id: 'local-air-nonattainment',
+      name: 'Air Quality: Nonattainment Areas',
+      baseUrl: 'context/air-nonattainment/',
+      icon: '⚠',
+      source: 'EPA Green Book',
+      featureColor: (p) =>
+        NONATTAINMENT_TYPES.find((t) => t.pollutant === p.pollutant)?.color ||
+        NO_DATA_COLOR,
+      legend: NONATTAINMENT_TYPES.map((t) => ({
+        label: t.label,
+        color: t.color,
+        test: (p) => p.pollutant === t.pollutant,
+      })),
+      fillAlpha: 0.35,
+      // 75 regulatory areas in all, so the whole country can be shown at once.
+      maxHeightM: 8_000_000,
+      maxChunks: 64,
+      zoomInMessage: 'zoom in to the United States to load',
+    },
+    services,
+  );
+
+  // Reads the life-expectancy tract chunks and keeps the tracts with a
+  // significant Local Moran's I result (scripts/build-context-layers.mjs).
   const tractClusters = createChunkedAreaLayer(
     {
       id: 'local-tract-le-clusters',
       name: 'Life Expectancy Clusters (tracts)',
-      baseUrl: 'context/tract-clusters/',
+      baseUrl: 'context/life-expectancy/',
       icon: '◈',
       source: "Local Moran's I",
+      sourceNote:
+        "Local Moran's I (Anselin) on USALEEP tract life expectancy (nation_tracts_le_cluster).",
+      featureFilter: (p) => Boolean(p.cluster),
+      featureSummary: tractClusterSummary,
       featureColor: clusterColor,
       legend: clusterLegend(),
-      // Only significant tracts are stored, so a wider view stays light.
+      // Chunks are shared with the full tract layer, so keep the same
+      // view limits as other tract layers.
       maxHeightM: 400_000,
       maxChunks: 45,
     },
@@ -713,6 +952,11 @@ export function createInfrastructureLayers(services) {
     tractClusters,
     countyLifeExpectancy,
     countyClusters,
+    airPm25,
+    airOzone,
+    airNonattainment,
+    parkAccess,
+    parks,
     ...miamiHomicides,
     miamiHomicideHotspots,
     traumaCenters,

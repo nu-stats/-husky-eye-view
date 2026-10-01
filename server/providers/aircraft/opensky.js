@@ -4,6 +4,7 @@ import {
   readResponseJsonCapped,
 } from '../common/http.js';
 import { requiredFiniteQueryNumber } from '../common/query.js';
+import { debugLog } from '../common/debugLog.js';
 // ---------------------------------------------------------------------------
 // OpenSky OAuth2 token + response cache state
 // ---------------------------------------------------------------------------
@@ -158,7 +159,7 @@ export async function getOpenSkyToken() {
       // Default to 1800 s (30 min) if expires_in is missing or non-finite
       _openskyTokenExpiry =
         Date.now() + (Number.isFinite(expiresIn) ? expiresIn : 1800) * 1000;
-      console.log(
+      debugLog(
         '[OpenSky] OAuth token refreshed, expires in',
         Number.isFinite(expiresIn) ? expiresIn : 1800,
         's',

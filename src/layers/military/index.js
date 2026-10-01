@@ -8,6 +8,7 @@ import { createIngestion } from './ingestion.js';
 import { createLifecycle } from './lifecycle.js';
 import { createTesting } from './testing.js';
 import { createQueries } from './queries.js';
+import { debugLog } from '../../debugLog.js';
 /** Compose one military-flight layer with application-owned scene services. */
 export function createMilitaryFlightLayer({
   source,
@@ -43,6 +44,7 @@ export function createMilitaryFlightLayer({
     },
     applyPendingTrackingRestore: () =>
       parts.tracking._applyPendingTrackingRestore(),
+    debugLog,
   });
 
   Object.assign(

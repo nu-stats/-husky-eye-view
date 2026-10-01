@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium';
 import { PLANE_MODEL_URL } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createLifecycle({
   flightState,
@@ -126,7 +127,7 @@ export function createLifecycle({
 
       restoreSpriteOrder(viewer);
 
-      console.log('[Data:Flights] Initialized with billboard icons');
+      debugLog('[Data:Flights] Initialized with billboard icons');
     },
 
     /**

@@ -7,6 +7,7 @@ import {
   TRACK_VIEW_FROM_HIGH_SCALE,
   TRACK_VIEW_FROM_LEO,
 } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createTracking({ state: layerState, services, parts, source }) {
   const { clearFocusTarget, publishFocusTargetFromCachedPosition } =
@@ -460,7 +461,7 @@ export function createTracking({ state: layerState, services, parts, source }) {
     layerState._contextRefreshedAtMs = Date.now();
 
     layerState._viewer.trackedEntity = layerState._trackedEntity;
-    console.log(`[Data:Satellites] Tracking ${name} (NORAD ${noradId})`);
+    debugLog(`[Data:Satellites] Tracking ${name} (NORAD ${noradId})`);
   }
   return {
     _normalizeTrackedNorad,

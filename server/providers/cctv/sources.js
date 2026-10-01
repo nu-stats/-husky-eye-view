@@ -79,6 +79,7 @@ import {
 } from './normalize.js';
 import { directionToHeading } from '../../../src/data/directionText.js';
 import { readResponseJsonCapped } from '../common/http.js';
+import { debugLog } from '../common/debugLog.js';
 /**
  * Fetch and parse Austin traffic camera records from the city Open Data portal.
  *
@@ -166,11 +167,11 @@ export async function loadAustinSourcesFromOpenData() {
       : DEFAULT_AUSTIN_MAX_SOURCES;
     const prioritized = prioritizeSources(unique, maxCount, [AUSTIN_DOWNTOWN]);
     if (prioritized.length < unique.length) {
-      console.log(
+      debugLog(
         `[CCTV] Loaded Austin camera sources: ${unique.length} (using nearest ${prioritized.length})`,
       );
     } else {
-      console.log('[CCTV] Loaded Austin camera sources:', prioritized.length);
+      debugLog('[CCTV] Loaded Austin camera sources:', prioritized.length);
     }
     return prioritized;
   } catch (error) {
@@ -297,7 +298,7 @@ export async function loadCaltransSourcesFromOpenData() {
     ? Math.max(8, Math.min(600, Math.floor(maxRaw)))
     : DEFAULT_CALTRANS_MAX_SOURCES;
   const prioritized = prioritizeSources(cameras, maxCount, CALTRANS_ANCHORS);
-  console.log(
+  debugLog(
     `[CCTV] Loaded Caltrans camera sources: ${cameras.length} inService (using nearest ${prioritized.length})`,
   );
   return prioritized;
@@ -380,7 +381,7 @@ export async function loadTflSourcesFromOpenData() {
       ? Math.max(8, Math.min(600, Math.floor(maxRaw)))
       : DEFAULT_TFL_MAX_SOURCES;
     const prioritized = prioritizeSources(cameras, maxCount, [LONDON_CENTER]);
-    console.log(
+    debugLog(
       `[CCTV] Loaded TfL JamCam sources: ${cameras.length} available (using nearest ${prioritized.length})`,
     );
     return prioritized;
@@ -537,7 +538,7 @@ export async function loadOntarioSourcesFromOpenData() {
       ? Math.max(8, Math.min(1000, Math.floor(maxRaw)))
       : DEFAULT_ONTARIO_MAX_SOURCES;
     const prioritized = prioritizeSources(unique, maxCount, ONTARIO_ANCHORS);
-    console.log(
+    debugLog(
       `[CCTV] Loaded Ontario 511 camera sources: ${unique.length} enabled (using nearest ${prioritized.length})`,
     );
     return prioritized;
@@ -671,7 +672,7 @@ export async function loadFintrafficSourcesFromOpenData() {
       ? Math.max(8, Math.min(600, Math.floor(maxRaw)))
       : DEFAULT_FINTRAFFIC_MAX_SOURCES;
     const prioritized = prioritizeSources(cameras, maxCount, FINLAND_ANCHORS);
-    console.log(
+    debugLog(
       `[CCTV] Loaded Fintraffic camera sources: ${cameras.length} live presets across ${stationsSeen} stations (using nearest ${prioritized.length})`,
     );
     return prioritized;
@@ -804,7 +805,7 @@ export async function loadDriveBcSourcesFromOpenData() {
       ? Math.max(8, Math.min(1200, Math.floor(maxRaw)))
       : DEFAULT_DRIVEBC_MAX_SOURCES;
     const prioritized = prioritizeSources(cameras, maxCount, DRIVEBC_ANCHORS);
-    console.log(
+    debugLog(
       `[CCTV] Loaded DriveBC camera sources: ${cameras.length} published (using nearest ${prioritized.length})`,
     );
     return prioritized;
@@ -963,7 +964,7 @@ export async function loadTxdotSourcesFromOpenData() {
     ? Math.max(8, Math.min(2000, Math.floor(maxRaw)))
     : DEFAULT_TXDOT_MAX_SOURCES;
   const prioritized = prioritizeSources(cameras, maxCount, TXDOT_ANCHORS);
-  console.log(
+  debugLog(
     `[CCTV] Loaded TxDOT camera sources: ${cameras.length} online across ${districts.join(',')} (using nearest ${prioritized.length})`,
   );
   return prioritized;
@@ -1068,7 +1069,7 @@ export function loadTallinnSourcesFromCatalog({
     ? Math.max(8, Math.min(300, Math.floor(maxRaw)))
     : DEFAULT_TALLINN_MAX_SOURCES;
   const prioritized = prioritizeSources(unique, maxCount, [TALLINN_CENTER]);
-  console.log(
+  debugLog(
     `[CCTV] Loaded Tallinn camera sources: ${unique.length} (using nearest ${prioritized.length})`,
   );
   return prioritized;
@@ -1216,7 +1217,7 @@ export async function loadTarkteeSourcesFromDatex() {
       ? Math.max(8, Math.min(300, Math.floor(maxRaw)))
       : DEFAULT_TARKTEE_MAX_SOURCES;
     const prioritized = prioritizeSources(cameras, maxCount, TARKTEE_ANCHORS);
-    console.log(
+    debugLog(
       `[CCTV] Loaded Tarktee camera sources: ${cameras.length} with images (using nearest ${prioritized.length})`,
     );
     return prioritized;
@@ -1284,7 +1285,7 @@ export function loadWarendorfSourcesFromCatalog({
       sourceKind: 'municipal-webcam',
     });
   }
-  console.log('[CCTV] Loaded Warendorf camera sources:', cameras.length);
+  debugLog('[CCTV] Loaded Warendorf camera sources:', cameras.length);
   return cameras;
 }
 
@@ -1387,7 +1388,7 @@ export async function loadNswSourcesFromOpenData() {
       ? Math.max(8, Math.min(900, Math.floor(maxRaw)))
       : DEFAULT_NSW_MAX_SOURCES;
     const prioritized = prioritizeSources(cameras, maxCount, [SYDNEY_CENTER]);
-    console.log(
+    debugLog(
       `[CCTV] Loaded NSW camera sources: ${cameras.length} (using nearest ${prioritized.length})`,
     );
     return prioritized;
@@ -1582,7 +1583,7 @@ export async function loadCalgarySourcesFromOpenData() {
     const prioritized = prioritizeSources(cameras, maxCount, [
       CALGARY_DOWNTOWN,
     ]);
-    console.log(
+    debugLog(
       `[CCTV] Loaded Calgary camera sources: ${cameras.length} (using nearest ${prioritized.length})`,
     );
     return prioritized;

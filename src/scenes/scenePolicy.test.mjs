@@ -46,6 +46,9 @@ const REGISTERED = new Set([
   'cctv', 'radio', 'bikeshare', 'ais-live-vessels', 'military-installations',
   'military-awareness', 'local-datacenters', 'local-dams',
   'telegeography-submarine-cables', 'local-firms',
+  // The Boston research tour's layers.
+  'local-life-expectancy', 'local-holc-redlining', 'local-air-pm25',
+  'local-park-access',
 ]);
 
 test('a shot only reconciles the layers it declares', () => {

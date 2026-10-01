@@ -1,0 +1,2 @@
+{"type":"Feature","id":"park-12-110510933260","properties":{"name":"Chattahoochee State Park","kind":"state-park","acres":11},"geometry":{"type":"Polygon","coordinates":[[[-85.04078,31.00059],[-85.03134,31.00065],[-85.031,31.00018],[-85.04065,31.00019],[-85.04078,31.00059]]]}}
+{"type":"Feature","id":"park-12-110510933261","properties":{"name":"Chattahoochee State Park","kind":"state-park","acres":8},"geometry":{"type":"Polygon","coordinates":[[[-85.03031,31.00065],[-85.02387,31.00068],[-85.0239,31.00019],[-85.02996,31.00018],[-85.03031,31.00065]]]}}

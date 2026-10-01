@@ -89,6 +89,14 @@ export function environmentalLabel(choice = ENVIRONMENTAL_LABEL_CHOICE) {
 
 /** @type {Readonly<Record<string, object>>} */
 export const FIRST_RUN_MISSIONS = Object.freeze({
+  // Husky Eye View's research start: Boston's census tracts with life
+  // expectancy and the 1930s redlining maps, framed over the city.
+  neighborhoods: Object.freeze({
+    kind: 'globe',
+    layerIds: Object.freeze(['local-life-expectancy', 'local-holc-redlining']),
+    view: Object.freeze({ longitude: -71.08, latitude: 42.33, height: 30000 }),
+    busyText: 'Opening Boston neighborhood data…',
+  }),
   contacts: Object.freeze({
     kind: 'context',
     contextMode: 'contacts',
@@ -258,11 +266,13 @@ export function rememberFirstRunSessionDismissed(sessionStorageRef) {
  * @param {(mode: string) => Promise<object>} deps.setContextMode
  * @param {(layerId: string) => Promise<boolean>} deps.setLayerEnabled
  * @param {() => Promise<any>} deps.flyToGlobe
+ * @param {(view: {longitude: number, latitude: number, height: number}) => Promise<any>} [deps.flyToView]
+ *   Frames a mission that names a `view`; without it the globe pull-out runs.
  * @returns {Promise<{ok: boolean, choice: string, result?: object, failedLayerIds?: string[]}>}
  */
 export async function runFirstRunChoice(
   choice,
-  { setContextMode, setLayerEnabled, flyToGlobe },
+  { setContextMode, setLayerEnabled, flyToGlobe, flyToView },
 ) {
   const mission = FIRST_RUN_MISSIONS[choice];
   if (!mission) return { ok: false, choice };
@@ -275,7 +285,11 @@ export async function runFirstRunChoice(
   // camera is already moving while the feeds spin up. The flight is framing,
   // not the mission — a stalled or superseded flight never fails the tile.
   const flight = Promise.resolve()
-    .then(() => flyToGlobe())
+    .then(() =>
+      mission.view && typeof flyToView === 'function'
+        ? flyToView(mission.view)
+        : flyToGlobe(),
+    )
     .catch(() => null);
   const outcomes = await Promise.all(
     mission.layerIds.map(async (layerId) => {
@@ -472,6 +486,24 @@ export function initFirstRunExperience({
         setLayerEnabled: (layerId) =>
           dataManager.setEnabled(layerId, true, { origin: 'user' }),
         flyToGlobe: () => styleManager.resetToGlobeView(),
+        flyToView: ({ longitude, latitude, height }) => {
+          const viewer = dataManager?.viewer;
+          const ellipsoid = viewer?.scene?.globe?.ellipsoid;
+          if (!ellipsoid || !viewer.camera?.flyTo)
+            return styleManager.resetToGlobeView();
+          return new Promise((resolve) =>
+            viewer.camera.flyTo({
+              destination: ellipsoid.cartographicToCartesian({
+                longitude: (longitude * Math.PI) / 180,
+                latitude: (latitude * Math.PI) / 180,
+                height,
+              }),
+              duration: 2.5,
+              complete: resolve,
+              cancel: resolve,
+            }),
+          );
+        },
       });
     } catch (error) {
       // A thrown mission is a real defect worth seeing in a bug report; the

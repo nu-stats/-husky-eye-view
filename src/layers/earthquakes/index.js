@@ -8,6 +8,7 @@ import {
   selectEarthquakeOverlayCohort,
   mapAnalystRecord,
 } from './model.js';
+import { debugLog } from '../../debugLog.js';
 export * from './model.js';
 export { createUsgsEarthquakeSource } from './source.js';
 
@@ -42,7 +43,7 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
       _lastError = null;
       _enabled = false;
       overlayHost.setVisible(EARTHQUAKE_OVERLAY_SOURCE_ID, false);
-      console.log('[Data:Earthquakes] Initialized');
+      debugLog('[Data:Earthquakes] Initialized');
     },
 
     enable(viewer) {
@@ -148,7 +149,7 @@ export function createEarthquakesLayer({ source, overlayHost } = {}) {
         _count = count;
         _lastUpdate = Date.now();
         _lastError = null;
-        console.log(`[Data:Earthquakes] Updated: ${_count} events (M2.5+)`);
+        debugLog(`[Data:Earthquakes] Updated: ${_count} events (M2.5+)`);
         return true;
       } catch (e) {
         if (request.signal.aborted || _request !== request || !_enabled)

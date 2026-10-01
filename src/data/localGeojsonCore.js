@@ -13,10 +13,11 @@ import {
 const DEFAULT_LABEL_MAX = 900;
 /** What a locked research layer says until its key is added. */
 export const LOCKED_DATASET_MESSAGE =
-  'Locked: add the RESEARCH DATASETS key in POWER UP to open this layer.';
+  'Locked: click to enter the research key (kept only for this browser session).';
 /**
  * The research key lives only in this browser session: POWER UP (keySetup.js)
- * stores it under this sessionStorage slot and announces changes with the
+ * or the panel's key prompt (ui/researchKeyPrompt.js) stores it under this
+ * sessionStorage slot and announces changes with the
  * event below, and locked layers send it to the server in this header.
  */
 export const RESEARCH_KEY_SESSION_SLOT = 'hev.researchKey';

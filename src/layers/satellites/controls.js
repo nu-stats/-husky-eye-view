@@ -5,6 +5,7 @@ import {
 } from '../../data/satelliteClass.js';
 import * as Cesium from 'cesium';
 import { ISS_NORAD, POINT_STYLES } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createControls({ state: layerState, services, parts, source }) {
   const { isExplicitLayerStateOrigin } = services.layerState;
@@ -429,7 +430,7 @@ export function createControls({ state: layerState, services, parts, source }) {
         layerState._denseError = null;
       }
       if (catalogChanged)
-        console.log(`[Data:Satellites] Catalog mode: ${catalog}`);
+        debugLog(`[Data:Satellites] Catalog mode: ${catalog}`);
       if (Object.hasOwn(params, 'selectedSatTrackingId')) {
         const requested = parts.tracking._normalizeTrackedNorad(
           params.selectedSatTrackingId,

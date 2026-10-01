@@ -8,6 +8,7 @@ import {
   terrainPointKey,
   validTerrainResult,
 } from '../../src/data/terrainHeightsProxy.js';
+import { debugInfo } from './common/debugLog.js';
 
 /**
  * Re:Earth terrain point-height proxy: batched lon/lat → ellipsoidal height
@@ -198,7 +199,7 @@ export function terrainHeightsProxy() {
           // returned a null height for a few of them (~0.16%, transient);
           // the next poll re-asks and the client meanwhile resolves those
           // through its bundled geoid. Informational, not actionable.
-          console.info(
+          debugInfo(
             `[terrain-heights-proxy] ${outcome.absentPoints}` +
               ` of ${outcome.requestedPoints} position(s) had no upstream` +
               ' height this poll — retrying next cycle',

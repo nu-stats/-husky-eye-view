@@ -5,6 +5,7 @@ import {
   claimCameraSensitivity,
   releaseCameraSensitivity,
 } from '../../data/cameraSensitivity.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createLifecycle({
   state: layerState,
@@ -63,7 +64,7 @@ export function createLifecycle({
 
       restoreSpriteOrder(viewer);
 
-      console.log(
+      debugLog(
         `[Data:Bikeshare] Initialized with ${GBFS_CITY_REGISTRY.length} cities`,
       );
     },

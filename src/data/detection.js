@@ -48,6 +48,7 @@ import {
   viewScaleForAltitude,
 } from './detectionPolicy.js';
 import { detectionBracketOpacity } from './detectionPresentation.js';
+import { debugLog } from '../debugLog.js';
 
 /**
  * @module detection
@@ -671,7 +672,7 @@ function _applyModeState() {
   }
 
   if (_onModeChange) _onModeChange(label);
-  console.log(`[Detection] Mode: ${label}`);
+  debugLog(`[Detection] Mode: ${label}`);
 }
 
 /**

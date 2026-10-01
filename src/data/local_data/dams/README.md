@@ -14,5 +14,5 @@ this derived database.
 
 The public-release snapshot removes contact-oriented fields and note values
 that contain email or phone identifiers. The runtime layer does not display or
-depend on those fields. Both `dams.geojson` and the runtime JSONL form carry the
-same privacy transform.
+depend on those fields. The runtime JSONL file (`dams.geojsonl`) carries that
+privacy transform.

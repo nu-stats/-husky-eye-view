@@ -1,4 +1,4 @@
-// Convert public/chicago_events2.json (Esri JSON export) into the GeoJSON Lines
+// Convert data/inputs/chicago_events2.json (Esri JSON export) into the GeoJSON Lines
 // format read by createLocalGeoJsonLayer. Unmapped points (NaN or 0,0) are skipped.
 // Each point is joined by point_id to its caption-derived note in
 // src/data/local_data/chicago_events/video_notes.json, which adds the incident
@@ -12,7 +12,7 @@ import {
   nearestTraumaProperties,
 } from './lib/nearest-trauma.mjs';
 
-const input = 'public/chicago_events2.json';
+const input = 'data/inputs/chicago_events2.json';
 const outDir = 'src/data/local_data/chicago_events';
 const output = `${outDir}/chicago_events.geojsonl`;
 const notesPath = `${outDir}/video_notes.json`;

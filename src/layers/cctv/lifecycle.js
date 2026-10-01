@@ -8,6 +8,7 @@ import {
   IDLE_CAMERA_COLOR,
   CALIBRATION_RANGE_FLOOR_M,
 } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createLifecycle({
   state: layerState,
@@ -328,7 +329,7 @@ export function createLifecycle({
       parts.rendering.refreshCoverageStyles();
       parts.presentation.notifyListeners();
       restoreSpriteOrder(layerState._viewer);
-      console.log('[Data:CCTV] Initialized with', layerState._count, 'cameras');
+      debugLog('[Data:CCTV] Initialized with', layerState._count, 'cameras');
     },
 
     /**

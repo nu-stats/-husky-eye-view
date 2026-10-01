@@ -1,11 +1,16 @@
 import { ERROR_BACKOFF_INTERVAL } from './recordPolicy.js';
 
-/** Own military source acquisition, cancellation, freshness and error backoff. */
+/**
+ * Own military source acquisition, cancellation, freshness and error backoff.
+ * `debugLog` receives the routine per-update line; the browser composition
+ * passes the switchable logger, and portable consumers stay quiet by default.
+ */
 export function createIngestion({
   feed,
   applySnapshot,
   setSourceLabel,
   applyPendingTrackingRestore,
+  debugLog = () => {},
 }) {
   const methods = {
     async update(viewer, { signal = null } = {}) {
@@ -53,7 +58,7 @@ export function createIngestion({
           ids: accepted.ids,
           source: feed._lastSource,
         };
-        console.log(`[Data:Military] Updated: ${feed._count} aircraft`);
+        debugLog(`[Data:Military] Updated: ${feed._count} aircraft`);
         applyPendingTrackingRestore();
       } catch (e) {
         if (updateSignal.aborted || e?.name === 'AbortError') {

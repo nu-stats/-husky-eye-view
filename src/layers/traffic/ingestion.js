@@ -4,6 +4,7 @@ import {
   TILE_CACHE_MAX_ENTRIES,
   FAST_FETCH_ALTITUDE,
 } from './policy.js';
+import { debugLog } from '../../debugLog.js';
 
 export function createIngestion({
   state: layerState,
@@ -243,7 +244,7 @@ export function createIngestion({
         renderedSomething = true;
       } else {
         // Fetch major roads first (smaller payload, faster response)
-        console.log(`[Data:Traffic] Fast fetch major roads [${cacheKey}]`);
+        debugLog(`[Data:Traffic] Fast fetch major roads [${cacheKey}]`);
         const majorData = await fetchRoads(
           clamped.south,
           clamped.west,
@@ -277,7 +278,7 @@ export function createIngestion({
       if (altitude > FAST_FETCH_ALTITUDE) return;
 
       // Detailed pass: fetch the full road graph (tertiary, residential, etc.)
-      console.log(`[Data:Traffic] Full fetch local roads [${cacheKey}]`);
+      debugLog(`[Data:Traffic] Full fetch local roads [${cacheKey}]`);
       const fullData = await fetchRoads(
         clamped.south,
         clamped.west,

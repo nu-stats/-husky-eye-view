@@ -1,1 +1,6 @@
-* @bilawalsidhu @samehkhamis
+# Husky Eye View (nu-stats/husky-eye-view) code owners.
+# The upstream owners (God's Eye View, bilawalsidhu/gods-eye-view) do not
+# review this fork. GitHub requires a user or an org team here (@org/team),
+# not a bare org, so the default rule stays commented out until the fork's
+# maintainers name their team or usernames, e.g.:
+# * @nu-stats/<team>

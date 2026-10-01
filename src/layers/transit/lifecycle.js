@@ -9,6 +9,7 @@ import {
   TRANSIT_SELECTED_OVERLAY_SOURCE_ID,
 } from './policy.js';
 import { TRANSIT_ENABLED_FEEDS } from '../../data/transitFeeds.js';
+import { debugLog } from '../../debugLog.js';
 
 /**
  * Init / enable / disable / update / destroy for one Transit layer instance.
@@ -161,7 +162,7 @@ export function createLifecycle({ state, services, parts }) {
       state._overlayHost.setVisible(TRANSIT_SELECTED_OVERLAY_SOURCE_ID, false);
       restoreSpriteOrder(viewer);
       bindStyleEvents();
-      console.log(
+      debugLog(
         `[Data:Transit] Initialized with ${TRANSIT_ENABLED_FEEDS.length} GTFS-RT feeds`,
       );
     },

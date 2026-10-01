@@ -1,12 +1,17 @@
 import { ERROR_BACKOFF_INTERVAL } from './recordPolicy.js';
 
-/** Own acquisition, cancellation, freshness and backoff independently of rendering. */
+/**
+ * Own acquisition, cancellation, freshness and backoff independently of rendering.
+ * `debugLog` receives the routine per-update line; the browser composition
+ * passes the switchable logger, and portable consumers stay quiet by default.
+ */
 export function createIngestion({
   feed,
   getQuery,
   applySnapshot,
   setSourceLabel,
   applyPendingTrackingRestore,
+  debugLog = () => {},
 }) {
   const methods = {
     async update(viewer, { signal = null } = {}) {
@@ -61,7 +66,7 @@ export function createIngestion({
           source: feed._lastSource,
           coverage: feed._lastCoverage,
         };
-        console.log(`[Data:Flights] Updated: ${feed._count} aircraft`);
+        debugLog(`[Data:Flights] Updated: ${feed._count} aircraft`);
         applyPendingTrackingRestore();
       } catch (e) {
         if (updateSignal.aborted || e?.name === 'AbortError') {

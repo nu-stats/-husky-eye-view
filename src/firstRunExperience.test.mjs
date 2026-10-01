@@ -408,8 +408,10 @@ test('the menu is the four owner-ordered missions', () => {
   // tanked the frame rate. The layers stay reachable by hand and by voice; what
   // went is the one-click globe-scale dump. Restoring the tile needs the
   // globe-LOD declutter first.
+  // Husky Eye View (2026-09-30): the research start leads. Space Missions stays
+  // a valid mission (voice and links can still run it) but has no tile.
   assert.deepEqual(Object.keys(FIRST_RUN_MISSIONS), [
-    'contacts', 'space-missions', 'environmental', 'explore',
+    'neighborhoods', 'contacts', 'space-missions', 'environmental', 'explore',
   ]);
   assert.equal(FIRST_RUN_MISSIONS.infrastructure, undefined,
     'the infrastructure mission must be gone, not dormant');
@@ -425,6 +427,24 @@ test('Live Contacts and Space Missions go through the one setContextMode facade'
     assert.deepEqual(spy.calls.layerIds, []);
     assert.equal(spy.calls.globeFlights, 0);
   }
+});
+
+test('Boston Neighborhoods enables the research layers and frames Boston, not the globe', async () => {
+  const spy = missionSpy();
+  const views = [];
+  const outcome = await runFirstRunChoice('neighborhoods', {
+    ...spy.deps,
+    flyToView: async (view) => views.push(view),
+  });
+  assert.equal(outcome.ok, true);
+  assert.deepEqual(spy.calls.layerIds, ['local-life-expectancy', 'local-holc-redlining']);
+  assert.deepEqual(spy.calls.contextModes, []);
+  assert.equal(spy.calls.globeFlights, 0);
+  assert.deepEqual(views, [{ longitude: -71.08, latitude: 42.33, height: 30000 }]);
+  // Without a framing helper it still opens, pulling out to the globe instead.
+  const fallback = missionSpy();
+  assert.equal((await runFirstRunChoice('neighborhoods', fallback.deps)).ok, true);
+  assert.equal(fallback.calls.globeFlights, 1);
 });
 
 test('Environmental enables BOTH its feeds and pulls out to the globe', async () => {
@@ -569,18 +589,16 @@ test('markup, startup ordering and accessibility remain pinned', () => {
   assert.match(visible, /earthquakes/i);
   assert.match(visible, /fires?/i, 'the tile must promise the fires it enables');
 
-  // The card's one persuasive line is OWNER-AUTHORED and pinned verbatim,
-  // unspaced em dash included. This is copy, not prose to be improved in a
-  // passing edit — changing it needs the owner, not a nicer-sounding rewrite.
+  // The card's one line is Husky Eye View's research pitch (owner-approved
+  // 2026-09-30, replacing upstream's "forbidden cockpit" line).
   assert.ok(
-    html.includes('<p id="first-run-description">It feels like a forbidden cockpit'
-      + '—then you realize the sources are public and the data is real.</p>'),
-    'the owner-authored first-run line must ship exactly as written',
+    html.includes('<p id="first-run-description">Neighborhood research on a live 3D globe'),
+    'the first-run line leads with the research data',
   );
 
-  // Menu order is the owner's, read straight off the markup.
+  // Menu order, read straight off the markup: research first.
   const order = [...html.matchAll(/data-first-run-choice="([a-z-]+)"/g)].map((match) => match[1]);
-  assert.deepEqual(order, ['contacts', 'space-missions', 'environmental', 'explore']);
+  assert.deepEqual(order, ['neighborhoods', 'contacts', 'environmental', 'explore']);
   assert.doesNotMatch(html, /data-first-run-choice="infrastructure"/,
     'the removed tile must leave no markup behind');
 

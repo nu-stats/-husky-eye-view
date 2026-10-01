@@ -10,6 +10,7 @@ import {
   sampleGroundHeight,
 } from './annotationResolver.js';
 import { ringCentroid } from './drawMode.js';
+import { debugLog } from '../debugLog.js';
 
 // Dev convenience: expose the app's Cesium instance for console/preview probing
 // (single shared module instance — avoids dual-Cesium state bugs when testing).
@@ -984,9 +985,7 @@ export function createAnnotationEngine({
         if (m.to) points.push(m.to);
       }
       if (!points.length || points.some((p) => isPointOnScreen(p))) return;
-      console.log(
-        `[Annotations] auto-framing ${marks.length} off-screen mark(s)`,
-      );
+      debugLog(`[Annotations] auto-framing ${marks.length} off-screen mark(s)`);
       assistFlightUntil = performance.now() + 2600; // ~flight duration + settle
       if (marks.length === 1) {
         frameAnnotation(marks[0]);

@@ -28,7 +28,11 @@
   "vite-build": {
     "runtime": "node",
     "exports": ["./build/vite", "./build/html"],
-    "modules": ["build/vite.js", "build/application-html.js"],
+    "modules": [
+      "build/vite.js",
+      "build/application-html.js",
+      "build/context-compression.js"
+    ],
     "external": ["vite-plugin-cesium"]
   },
   "live-providers": {
@@ -39,6 +43,7 @@
       "server/providers/common/http.js",
       "server/providers/common/query.js",
       "server/providers/aircraft/opensky.js",
+      "server/providers/common/debugLog.js",
       "server/providers/aircraft/adsb-lol.js",
       "server/providers/aircraft/enrichment.js",
       "server/providers/aircraft/tracks.js",
@@ -103,6 +108,7 @@
     "exports": ["./server/providers/terrain"],
     "modules": [
       "server/providers/terrain.js",
+      "server/providers/common/debugLog.js",
       "src/data/terrainHeightsProxy.js"
     ],
     "external": []
@@ -169,6 +175,7 @@
       "server/providers/cctv/normalize.js",
       "server/providers/cctv/range.js",
       "server/providers/cctv/sources.js",
+      "server/providers/common/debugLog.js",
       "server/providers/common/http.js",
       "src/data/directionText.js",
       "server/providers/common/geo.js",
@@ -384,6 +391,8 @@
     "modules": [
       "src/ui/layers.js",
       "src/ui/layerPanel.js",
+      "src/ui/researchKeyPrompt.js",
+      "src/ui/layerProfile.js",
       "src/ui/clearLayersControl.js",
       "src/loadingFeedback.js",
       "src/data/installationFeedback.js",
@@ -556,6 +565,8 @@
       "src/ui/effects.js",
       "src/ui/frameRateMonitor.js",
       "src/ui/layerPanel.js",
+      "src/ui/researchKeyPrompt.js",
+      "src/ui/layerProfile.js",
       "src/ui/layers.js",
       "src/ui/leftPanelRail.js",
       "src/ui/location.js",
@@ -736,6 +747,7 @@
       "src/layers/flights/enrichment.js",
       "src/layers/flights/evidence.js",
       "src/layers/flights/index.js",
+      "src/debugLog.js",
       "src/layers/flights/ingestion.js",
       "src/layers/flights/lifecycle.js",
       "src/layers/flights/motion.js",
@@ -771,6 +783,7 @@
       "src/data/trackingClickGesture.js",
       "src/layers/military/controller.js",
       "src/layers/military/index.js",
+      "src/debugLog.js",
       "src/layers/military/ingestion.js",
       "src/layers/military/lifecycle.js",
       "src/layers/military/motion.js",
@@ -839,6 +852,7 @@
     "exports": ["./layers/earthquakes"],
     "modules": [
       "src/layers/earthquakes/index.js",
+      "src/debugLog.js",
       "src/layers/earthquakes/model.js",
       "src/layers/earthquakes/source.js",
       "src/layers/earthquakes/records.js"
@@ -874,6 +888,7 @@
       "src/data/issPass.js",
       "src/data/satelliteClass.js",
       "src/layers/satellites/catalog.js",
+      "src/debugLog.js",
       "src/layers/satellites/controls.js",
       "src/layers/satellites/index.js",
       "src/layers/satellites/ingestion.js",
@@ -976,6 +991,7 @@
       "src/layers/traffic/animation.js",
       "src/layers/traffic/controls.js",
       "src/layers/traffic/flow.js",
+      "src/debugLog.js",
       "src/layers/traffic/flowDecode.js",
       "src/layers/traffic/flowSource.js",
       "src/layers/traffic/index.js",
@@ -1000,6 +1016,7 @@
       "src/layers/bikeshare/index.js",
       "src/layers/bikeshare/ingestion.js",
       "src/layers/bikeshare/lifecycle.js",
+      "src/debugLog.js",
       "src/layers/bikeshare/model.js",
       "src/layers/bikeshare/policy.js",
       "src/layers/bikeshare/queries.js",
@@ -1037,6 +1054,7 @@
       "src/layers/cctv/index.js",
       "src/layers/cctv/ingestion.js",
       "src/layers/cctv/lifecycle.js",
+      "src/debugLog.js",
       "src/layers/cctv/model.js",
       "src/layers/cctv/navigation.js",
       "src/layers/cctv/policy.js",
@@ -1219,6 +1237,7 @@
     "modules": [
       "src/scenes/nepalEvidencePack.js",
       "src/data/bhoteKoshiEvent.js",
+      "src/debugLog.js",
       "src/data/bhoteKoshiEmbeddedMedia.js",
       "src/data/bhoteKoshiLocator.js",
       "src/data/bhoteKoshiIncidentPlaces.js",
@@ -1681,6 +1700,8 @@
       "src/ui/effects.js",
       "src/ui/frameRateMonitor.js",
       "src/ui/layerPanel.js",
+      "src/ui/researchKeyPrompt.js",
+      "src/ui/layerProfile.js",
       "src/ui/layers.js",
       "src/ui/leftPanelRail.js",
       "src/ui/location.js",
@@ -1853,6 +1874,7 @@
     "exports": ["./application/layers"],
     "modules": [
       "src/data/bhoteKoshiEvent.js",
+      "src/debugLog.js",
       "src/data/bhoteKoshiEmbeddedMedia.js",
       "src/data/bhoteKoshiLocator.js",
       "src/data/bhoteKoshiIncidentPlaces.js",
@@ -2417,7 +2439,11 @@
   },
   "directions-layer": {
     "exports": ["./layers/directions"],
-    "modules": ["src/layers/directions/index.js", "src/data/routeSteps.js"],
+    "modules": [
+      "src/layers/directions/index.js",
+      "src/debugLog.js",
+      "src/data/routeSteps.js"
+    ],
     "external": ["cesium"]
   },
   "radio-browser-source": {
@@ -2624,6 +2650,7 @@
       "src/layers/transit/index.js",
       "src/layers/transit/ingestion.js",
       "src/layers/transit/lifecycle.js",
+      "src/debugLog.js",
       "src/layers/transit/movement.js",
       "src/layers/transit/policy.js",
       "src/layers/transit/qaMetrics.js",
@@ -2666,6 +2693,7 @@
       "src/layers/transit/index.js",
       "src/layers/transit/ingestion.js",
       "src/layers/transit/lifecycle.js",
+      "src/debugLog.js",
       "src/layers/transit/policy.js",
       "src/layers/transit/queries.js",
       "src/layers/transit/rendering.js",

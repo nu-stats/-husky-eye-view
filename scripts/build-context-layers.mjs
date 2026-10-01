@@ -131,16 +131,41 @@ function simplifyLine(points, tolerance) {
   return points.filter((_, i) => keep[i]);
 }
 
+const round5 = (v) => Math.round(v * 1e5) / 1e5;
+
+/**
+ * Douglas-Peucker tolerance scaled to one tract (as in
+ * scripts/build-environment-layers.mjs): 0.5% of its bounding-box diagonal,
+ * ~30 m for dense city tracts up to ~200 m for large rural ones.
+ */
+function tractTolerance(geometry) {
+  const [w, s, e, n] = bboxOf(geometry);
+  return Math.min(0.002, Math.max(0.0003, Math.hypot(e - w, n - s) * 0.005));
+}
+
+/** Project every vertex of a (Multi)Polygon; null for other geometry. */
+function projectGeometry(geometry, project) {
+  const ring = (points) => points.map(project);
+  if (geometry?.type === 'Polygon')
+    return { type: 'Polygon', coordinates: geometry.coordinates.map(ring) };
+  if (geometry?.type === 'MultiPolygon')
+    return {
+      type: 'MultiPolygon',
+      coordinates: geometry.coordinates.map((polygon) => polygon.map(ring)),
+    };
+  return null;
+}
+
 /** Project, simplify and round one ring; null when it degenerates. */
-function cleanRing(points, project, tolerance) {
+function cleanRing(points, project, tolerance, round = round6) {
   const projected = points.map(project);
   // Simplify as an open line (first point repeated at the end is kept).
   let ring = simplifyLine(projected, tolerance);
   if (ring.length < 4) ring = projected; // too small to simplify safely
   const out = [];
   for (const point of ring) {
-    const lon = round6(point[0]);
-    const lat = round6(point[1]);
+    const lon = round(point[0]);
+    const lat = round(point[1]);
     const last = out[out.length - 1];
     if (!last || last[0] !== lon || last[1] !== lat) out.push([lon, lat]);
   }
@@ -152,13 +177,18 @@ function cleanRing(points, project, tolerance) {
 }
 
 /** Clean a (Multi)Polygon; null when nothing drawable is left. */
-function cleanGeometry(geometry, project = (p) => p, tolerance = SIMPLIFY_DEG) {
+function cleanGeometry(
+  geometry,
+  project = (p) => p,
+  tolerance = SIMPLIFY_DEG,
+  round = round6,
+) {
   const polygon = (rings) => {
-    const outer = cleanRing(rings[0], project, tolerance);
+    const outer = cleanRing(rings[0], project, tolerance, round);
     if (!outer) return null;
     const holes = rings
       .slice(1)
-      .map((r) => cleanRing(r, project, tolerance))
+      .map((r) => cleanRing(r, project, tolerance, round))
       .filter(Boolean);
     return [outer, ...holes];
   };
@@ -292,15 +322,24 @@ async function buildHolc() {
     console.log(`  holc: dropped ${dropped} slivers with no drawable area`);
 }
 
-// ---- Life expectancy, every census tract -------------------------------------
+// ---- Life expectancy and its clusters, every census tract --------------------
+// One set of tract chunks carries both: the life-expectancy layer draws every
+// tract, and the clusters layer reads the same chunks and keeps only tracts
+// with a significant `cluster` (featureFilter in src/data/infrastructure.js).
+// Card text is written by each layer (featureSummary), not stored per tract.
 async function buildTractLifeExpectancy() {
+  const clusters = await readTractClusters();
   const writer = createChunkWriter('life-expectancy');
   let dropped = 0;
   let checked = 0;
   let offCenter = 0;
+  let withCluster = 0;
   for await (const f of features(TRACTS_INPUT)) {
     const p = f.properties;
-    const geometry = cleanGeometry(f.geometry, albersToLonLat);
+    const projected = projectGeometry(f.geometry, albersToLonLat);
+    const geometry =
+      projected &&
+      cleanGeometry(projected, (q) => q, tractTolerance(projected), round5);
     if (!geometry) {
       dropped += 1;
       continue;
@@ -315,6 +354,8 @@ async function buildTractLifeExpectancy() {
     const years =
       Number(p.life_exp_8) > 0 ? Math.round(p.life_exp_8 * 10) / 10 : null;
     const place = p.life_exp_4 || `${p.STATEFP}${p.COUNTYFP}`;
+    const cluster = clusters.get(p.GEOID);
+    if (cluster) withCluster += 1;
     writer.add(`${p.STATEFP}${p.COUNTYFP}`, {
       type: 'Feature',
       id: `tract-${p.GEOID}`,
@@ -322,19 +363,66 @@ async function buildTractLifeExpectancy() {
         name: `${p.NAMELSAD}, ${place}`,
         geoid: p.GEOID,
         life_exp_8: years,
-        summary:
-          years === null
-            ? 'No life expectancy estimate for this tract.'
-            : `Life expectancy at birth: ${years.toFixed(1)} years.`,
-        source_note: 'USALEEP census-tract life expectancy (life_exp_8).',
+        ...(cluster && {
+          cluster: cluster.type,
+          p_value: Math.round(Number(cluster.pValue) * 1000) / 1000,
+        }),
       },
       geometry,
     });
   }
   writer.finish();
   console.log(
-    `  life-expectancy: ${offCenter} of ${checked} tracts failed the interior-point check; dropped ${dropped} empty geometries`,
+    `  life-expectancy: ${offCenter} of ${checked} tracts failed the interior-point check; dropped ${dropped} empty geometries; ${withCluster} tracts carry a significant cluster`,
   );
+}
+
+/**
+ * Significant Local Moran's I results by tract GEOID, read from the cluster
+ * file's properties only (its geometry duplicates the tract file's).
+ * SOURCE_ID indexes the tract file; each match is confirmed by the tract's
+ * outline length, which both files carry, and rows whose SOURCE_ID does not
+ * line up fall back to a unique outline length + area match.
+ * @returns {Promise<Map<string, {type: string, pValue: number}>>}
+ */
+async function readTractClusters() {
+  const tracts = [];
+  const byShape = new Map();
+  const shapeKey = (length, area) =>
+    `${Number(length).toFixed(2)}|${Math.round(Number(area))}`;
+  for await (const p of featureProperties(TRACTS_INPUT)) {
+    const tract = { geoid: p.GEOID, length: p.Shape_Leng };
+    tracts.push(tract);
+    const key = shapeKey(p.Shape_Leng, p.Shape_Area);
+    byShape.set(key, byShape.has(key) ? null : tract);
+  }
+  const clusters = new Map();
+  const counts = {};
+  let byIndex = 0;
+  let byOutline = 0;
+  let unmatched = 0;
+  for await (const p of featureProperties(TRACT_CLUSTER_INPUT)) {
+    const type = CLUSTER_TYPES[p.COType] ? p.COType : null;
+    counts[type ?? 'not significant'] =
+      (counts[type ?? 'not significant'] || 0) + 1;
+    if (!type) continue;
+    let tract = tracts[p.SOURCE_ID];
+    if (tract && Math.abs(tract.length - p.Shape_Leng) <= 1e-3) {
+      byIndex += 1;
+    } else {
+      tract = byShape.get(shapeKey(p.Shape_Leng, p.Shape_Area));
+      if (!tract) {
+        unmatched += 1;
+        continue;
+      }
+      byOutline += 1;
+    }
+    clusters.set(tract.geoid, { type, pValue: p.LMiPValue });
+  }
+  console.log(
+    `  tract clusters: ${JSON.stringify(counts)}; matched ${byIndex} by SOURCE_ID, ${byOutline} by outline, ${unmatched} unmatched`,
+  );
+  return clusters;
 }
 
 // ---- Shared helpers for the county and cluster layers ------------------------
@@ -602,85 +690,13 @@ async function buildCountyClusters() {
   );
 }
 
-// ---- Tract clusters (Local Moran's I on life_exp_8) -------------------------
-async function buildTractClusters() {
-  // SOURCE_ID indexes the tract file; each match is confirmed by the tract's
-  // outline length, which both files carry.
-  // Rows whose SOURCE_ID does not line up fall back to a unique outline
-  // length + area match.
-  const tracts = [];
-  const byShape = new Map();
-  const shapeKey = (length, area) =>
-    `${Number(length).toFixed(2)}|${Math.round(Number(area))}`;
-  for await (const p of featureProperties(TRACTS_INPUT)) {
-    const tract = {
-      geoid: p.GEOID,
-      county: `${p.STATEFP}${p.COUNTYFP}`,
-      name: `${p.NAMELSAD}, ${p.life_exp_4 || `${p.STATEFP}${p.COUNTYFP}`}`,
-      length: p.Shape_Leng,
-    };
-    tracts.push(tract);
-    const key = shapeKey(p.Shape_Leng, p.Shape_Area);
-    byShape.set(key, byShape.has(key) ? null : tract);
-  }
-  let byIndex = 0;
-  let byOutline = 0;
-  const writer = createChunkWriter('tract-clusters');
-  const counts = {};
-  let unmatched = 0;
-  for await (const f of features(TRACT_CLUSTER_INPUT)) {
-    const p = f.properties;
-    const type = CLUSTER_TYPES[p.COType] ? p.COType : null;
-    counts[type ?? 'not significant'] =
-      (counts[type ?? 'not significant'] || 0) + 1;
-    if (!type) continue; // only significant clusters and outliers are drawn
-    let tract = tracts[p.SOURCE_ID];
-    if (tract && Math.abs(tract.length - p.Shape_Leng) <= 1e-3) {
-      byIndex += 1;
-    } else {
-      tract = byShape.get(shapeKey(p.Shape_Leng, p.Shape_Area));
-      if (!tract) {
-        unmatched += 1;
-        continue;
-      }
-      byOutline += 1;
-    }
-    const geometry = cleanGeometry(f.geometry, albersToLonLat);
-    if (!geometry) continue;
-    writer.add(tract.county, {
-      type: 'Feature',
-      id: `tract-cluster-${tract.geoid}`,
-      properties: {
-        name: tract.name,
-        geoid: tract.geoid,
-        cluster: type,
-        life_exp: years1(p.life_exp_8),
-        p_value: p.LMiPValue,
-        summary: clusterSummary(
-          type,
-          'tract',
-          years1(p.life_exp_8),
-          '',
-          p.LMiPValue,
-        ),
-        source_note:
-          "Local Moran's I (Anselin) on USALEEP tract life expectancy (nation_tracts_le_cluster).",
-      },
-      geometry,
-    });
-  }
-  writer.finish();
-  console.log(
-    `  tract-clusters: ${JSON.stringify(counts)}; matched ${byIndex} by SOURCE_ID, ${byOutline} by outline, ${unmatched} unmatched`,
-  );
-}
-
 const BUILDERS = {
   holc: buildHolc,
   'tract-le': buildTractLifeExpectancy,
   'county-le': buildCountyLifeExpectancy,
   'county-clusters': buildCountyClusters,
-  'tract-clusters': buildTractClusters,
+  // Tract clusters now ride in the life-expectancy chunks (see above).
+  'tract-clusters': buildTractLifeExpectancy,
 };
 const requested = process.argv.slice(2);
 for (const name of requested.length ? requested : Object.keys(BUILDERS)) {

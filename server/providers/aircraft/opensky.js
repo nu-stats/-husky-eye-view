@@ -76,6 +76,28 @@ const ADSBLOL_POINT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 // the viewport-scoped adsb.lol source is more honest and keeps local motion
 // current instead of coasting a stale worldwide frame indefinitely.
 const OPENSKY_SOURCE_STALE_MS = 120_000;
+// US focus (2026-09-30): ask OpenSky for the United States only — CONUS,
+// Alaska (including the Aleutians to 180°W), Hawaii and Puerto Rico — instead
+// of the whole world. The worldwide frame was ~1.2 MB per poll; most of it was
+// Europe and Asia, which this project never shows.
+export const OPENSKY_US_BOUNDS = Object.freeze({
+  lamin: 15,
+  lamax: 72,
+  lomin: -180,
+  lomax: -60,
+});
+const OPENSKY_STATES_URL = `https://opensky-network.org/api/states/all?extended=1&lamin=${OPENSKY_US_BOUNDS.lamin}&lomin=${OPENSKY_US_BOUNDS.lomin}&lamax=${OPENSKY_US_BOUNDS.lamax}&lomax=${OPENSKY_US_BOUNDS.lomax}`;
+
+/** Whether a view anchor lies inside the US box the OpenSky frame covers. */
+export function insideOpenSkyUsBounds(anchor) {
+  return (
+    !!anchor &&
+    anchor.latitude >= OPENSKY_US_BOUNDS.lamin &&
+    anchor.latitude <= OPENSKY_US_BOUNDS.lamax &&
+    anchor.longitude >= OPENSKY_US_BOUNDS.lomin &&
+    anchor.longitude <= OPENSKY_US_BOUNDS.lomax
+  );
+}
 
 /**
  * Obtain a valid OpenSky OAuth2 bearer token, refreshing if needed.
@@ -355,6 +377,21 @@ export function openSkyProxy() {
           process.env.OPENSKY_AUTH_MODE,
         );
         const now = Date.now();
+        // Outside the US frame, the viewport-scoped regional feed is the
+        // only source that has aircraft there.
+        const anchor = adsbLolFallbackAnchor(req);
+        if (
+          anchor &&
+          !insideOpenSkyUsBounds(anchor) &&
+          (await serveAdsbLolPointFallback(
+            req,
+            res,
+            requestedMode,
+            'outside_us_regional',
+          ))
+        ) {
+          return;
+        }
         const inCooldown = now < _openskyCooldownUntil;
         // Fresh-enough cache (adaptive TTL) OR any cache during a 429
         // cooldown: serve it without touching upstream. Stale-during-cooldown
@@ -470,10 +507,7 @@ export function openSkyProxy() {
           }
         }
 
-        let upstream = await fetch(
-          'https://opensky-network.org/api/states/all?extended=1',
-          { headers },
-        );
+        let upstream = await fetch(OPENSKY_STATES_URL, { headers });
         // Auto-mode fallback: if OAuth was rejected, retry with Basic credentials
         if (
           (upstream.status === 401 || upstream.status === 403) &&
@@ -485,10 +519,7 @@ export function openSkyProxy() {
             Accept: 'application/json',
             Authorization: `Basic ${Buffer.from(`${basicUser}:${basicPass}`).toString('base64')}`,
           };
-          upstream = await fetch(
-            'https://opensky-network.org/api/states/all?extended=1',
-            { headers: retryHeaders },
-          );
+          upstream = await fetch(OPENSKY_STATES_URL, { headers: retryHeaders });
           usedMode = 'basic';
           reason = 'oauth_rejected_fallback_basic';
         }

@@ -172,6 +172,19 @@ const COCKPIT_ACTION_ALIASES = new Map([
   ['next closest helicopter', 'next'],
   ['next closest military', 'next'],
   ['go to next', 'next'],
+  ['zoom', 'zoom'],
+  ['zoom_in', 'zoom_in'],
+  ['zoom_out', 'zoom_out'],
+  ['zoom_reset', 'zoom_reset'],
+  ['zoom in', 'zoom_in'],
+  ['zoom out', 'zoom_out'],
+  ['zoom reset', 'zoom_reset'],
+  ['reset zoom', 'zoom_reset'],
+  ['look_left', 'look_left'],
+  ['look_right', 'look_right'],
+  ['look_up', 'look_up'],
+  ['look_down', 'look_down'],
+  ['look_ahead', 'look_ahead'],
 ]);
 const COCKPIT_TARGET_LAYERS = new Set([
   'flights',
@@ -909,6 +922,7 @@ export function createGevActionRunner({
           aircraftClass,
           selectedTarget,
           rollbackTarget,
+          zoom: cockpitZoomArgument(args.zoom, rawAction),
         });
       } catch (error) {
         cockpitResult = {
@@ -2819,6 +2833,16 @@ function normalizeContextMode(value) {
   return CONTEXT_MODE_ALIASES.get(raw) || null;
 }
 
+/** Read a cockpit magnification from the zoom argument or a phrase like "zoom 4x". */
+function cockpitZoomArgument(zoom, rawAction) {
+  const direct = Number(zoom);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const spoken = /(\d+(?:\.\d+)?)\s*(?:x|times)?\b/i.exec(
+    String(rawAction || ''),
+  );
+  return spoken ? Number(spoken[1]) : null;
+}
+
 function normalizeCockpitAction(value) {
   const raw = String(value || '')
     .trim()
@@ -2835,6 +2859,20 @@ function normalizeCockpitAction(value) {
   const directNormalized = COCKPIT_ACTION_ALIASES.get(normalized);
   if (directNormalized) return directNormalized;
 
+  if (/\bzoom\b/.test(normalized)) {
+    if (/\breset\b|\bnormal\b|\bclear\b/.test(normalized)) return 'zoom_reset';
+    if (/\bout\b/.test(normalized)) return 'zoom_out';
+    if (/\bin\b|\bcloser\b/.test(normalized)) return 'zoom_in';
+    return 'zoom';
+  }
+  if (/\b(look|pan|turn)\b/.test(normalized)) {
+    if (/\bleft\b/.test(normalized)) return 'look_left';
+    if (/\bright\b/.test(normalized)) return 'look_right';
+    if (/\bup\b/.test(normalized)) return 'look_up';
+    if (/\bdown\b/.test(normalized)) return 'look_down';
+    if (/\b(ahead|forward|front|center|centre|straight)\b/.test(normalized))
+      return 'look_ahead';
+  }
   if (/\bprevious\b|\bprev\b/.test(normalized)) return 'previous';
   if (/\bstatus\b|\bstate\b/.test(normalized)) return 'status';
   if (/\bexit\b|\bleave\b|\bquit\b/.test(normalized)) return 'exit';

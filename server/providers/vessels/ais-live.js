@@ -15,10 +15,22 @@ import {
 // AISStream live vessel cache state
 // ---------------------------------------------------------------------------
 const AISSTREAM_URL = 'wss://stream.aisstream.io/v0/stream';
-const AISSTREAM_DEFAULT_BBOXES = [
+// US focus (2026-09-30): US waters only — the lower 48 with the Gulf, Great
+// Lakes and Puerto Rico; Alaska; Hawaii. The worldwide subscription filled the
+// 12,000-row client cap mostly with ships elsewhere. AISSTREAM_BOUNDING_BOXES
+// still overrides this.
+export const AISSTREAM_DEFAULT_BBOXES = [
   [
-    [-90, -180],
-    [90, 180],
+    [17, -128],
+    [50, -64],
+  ],
+  [
+    [50, -180],
+    [72, -129],
+  ],
+  [
+    [18, -161],
+    [23, -154],
   ],
 ];
 const AISSTREAM_DEFAULT_MESSAGE_TYPES = [

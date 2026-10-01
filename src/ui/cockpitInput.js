@@ -1,4 +1,8 @@
 /** Route Cockpit keys while preserving the active disclosure and form-control owner. */
+import {
+  COCKPIT_LOOK_STEP_PITCH_DEG,
+  COCKPIT_LOOK_STEP_YAW_DEG,
+} from './cockpitLook.js';
 
 export function onKeyDown(event) {
   if (this.destroyed) return false;
@@ -54,6 +58,37 @@ export function onKeyDown(event) {
   if (event.target?.closest?.('input, textarea, select, [contenteditable]'))
     return;
   const key = event.key?.toLowerCase();
+  if (this.active && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    const zoomStep =
+      key === '+' || key === '=' ? 1 : key === '-' || key === '_' ? -1 : 0;
+    if (zoomStep || key === '0') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (zoomStep) this.stepZoom(zoomStep);
+      else this.setZoom(1);
+      return;
+    }
+    // Arrow keys look around, except where a focused control (tabs, sliders,
+    // lists) already uses them.
+    const lookStep = {
+      arrowleft: [-COCKPIT_LOOK_STEP_YAW_DEG, 0],
+      arrowright: [COCKPIT_LOOK_STEP_YAW_DEG, 0],
+      arrowup: [0, COCKPIT_LOOK_STEP_PITCH_DEG],
+      arrowdown: [0, -COCKPIT_LOOK_STEP_PITCH_DEG],
+    }[key];
+    if (
+      (lookStep || key === 'home') &&
+      !event.target?.closest?.(
+        '[role="tab"], [role="slider"], [role="listbox"], [role="option"], [role="menu"], [role="menuitem"], [role="radiogroup"]',
+      )
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (lookStep) this.look(...lookStep);
+      else this.resetLook();
+      return;
+    }
+  }
   if (key === 'c' && !event.metaKey && !event.ctrlKey && !event.altKey) {
     if (!this.active) {
       const cockpitAttempt = !!(

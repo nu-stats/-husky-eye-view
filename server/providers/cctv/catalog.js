@@ -21,6 +21,10 @@ import {
 
 /** Env kill switch: unset or anything but "0" means enabled. */
 const envEnabled = (name) => String(process.env[name] || '1').trim() !== '0';
+// US focus (2026-09-30): packs outside the United States are off unless their
+// switch is set to 1. They were ~72% of all cameras and slowed CCTV start-up.
+const envOptIn = (name) =>
+  /^(1|true|yes|on)$/i.test(String(process.env[name] || '').trim());
 
 /**
  * Live open-data packs, in merge order. Adding a region is one entry here
@@ -38,22 +42,22 @@ const LIVE_PACKS = [
   },
   {
     name: 'tfl',
-    enabled: () => envEnabled('CCTV_TFL_ENABLED'),
+    enabled: () => envOptIn('CCTV_TFL_ENABLED'),
     load: loadTflSourcesFromOpenData,
   },
   {
     name: 'ontario',
-    enabled: () => envEnabled('CCTV_ONTARIO_ENABLED'),
+    enabled: () => envOptIn('CCTV_ONTARIO_ENABLED'),
     load: loadOntarioSourcesFromOpenData,
   },
   {
     name: 'fintraffic',
-    enabled: () => envEnabled('CCTV_FINTRAFFIC_ENABLED'),
+    enabled: () => envOptIn('CCTV_FINTRAFFIC_ENABLED'),
     load: loadFintrafficSourcesFromOpenData,
   },
   {
     name: 'drivebc',
-    enabled: () => envEnabled('CCTV_DRIVEBC_ENABLED'),
+    enabled: () => envOptIn('CCTV_DRIVEBC_ENABLED'),
     load: loadDriveBcSourcesFromOpenData,
   },
   {
@@ -63,27 +67,27 @@ const LIVE_PACKS = [
   },
   {
     name: 'tallinn',
-    enabled: () => envEnabled('CCTV_TALLINN_ENABLED'),
+    enabled: () => envOptIn('CCTV_TALLINN_ENABLED'),
     load: loadTallinnSourcesFromCatalog,
   },
   {
     name: 'tarktee',
-    enabled: () => envEnabled('CCTV_TARKTEE_ENABLED'),
+    enabled: () => envOptIn('CCTV_TARKTEE_ENABLED'),
     load: loadTarkteeSourcesFromDatex,
   },
   {
     name: 'warendorf',
-    enabled: () => envEnabled('CCTV_WARENDORF_ENABLED'),
+    enabled: () => envOptIn('CCTV_WARENDORF_ENABLED'),
     load: loadWarendorfSourcesFromCatalog,
   },
   {
     name: 'nsw',
-    enabled: () => envEnabled('CCTV_NSW_ENABLED'),
+    enabled: () => envOptIn('CCTV_NSW_ENABLED'),
     load: loadNswSourcesFromOpenData,
   },
   {
     name: 'calgary',
-    enabled: () => envEnabled('CCTV_CALGARY_ENABLED'),
+    enabled: () => envOptIn('CCTV_CALGARY_ENABLED'),
     load: loadCalgarySourcesFromOpenData,
   },
 ];

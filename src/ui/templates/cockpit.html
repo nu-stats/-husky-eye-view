@@ -86,6 +86,38 @@
           <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
         </button>
       </div>
+      <div class="cockpit-view-controls">
+        <div class="cockpit-zoom-controls" role="group" aria-label="Cockpit zoom">
+          <button id="cockpit-zoom-out" type="button" aria-label="Zoom out" title="Zoom out (− key or scroll down)">
+            <span class="material-symbols-outlined" aria-hidden="true">zoom_out</span>
+          </button>
+          <button id="cockpit-zoom-reset" class="cockpit-zoom-current" type="button" aria-label="Cockpit zoom 1×. Activate to reset." title="Reset zoom (0 key)">
+            <small>ZOOM</small>
+            <strong id="cockpit-zoom-value" aria-live="polite">1×</strong>
+          </button>
+          <button id="cockpit-zoom-in" type="button" aria-label="Zoom in" title="Zoom in (+ key or scroll up)">
+            <span class="material-symbols-outlined" aria-hidden="true">zoom_in</span>
+          </button>
+        </div>
+        <div class="cockpit-look-controls" role="group" aria-label="Cockpit look direction">
+          <button id="cockpit-look-left" type="button" aria-label="Look left" title="Look left (← key, or drag the view)">
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_left</span>
+          </button>
+          <button id="cockpit-look-up" type="button" aria-label="Look up" title="Look up (↑ key)">
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_drop_up</span>
+          </button>
+          <button id="cockpit-look-center" class="cockpit-look-current" type="button" aria-label="Cockpit view straight ahead. Activate to look straight ahead." title="Look straight ahead (Home key)">
+            <small>VIEW</small>
+            <strong id="cockpit-look-value" aria-live="polite">AHEAD</strong>
+          </button>
+          <button id="cockpit-look-down" type="button" aria-label="Look down" title="Look down (↓ key)">
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_drop_down</span>
+          </button>
+          <button id="cockpit-look-right" type="button" aria-label="Look right" title="Look right (→ key, or drag the view)">
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_right</span>
+          </button>
+        </div>
+      </div>
     </div>
     <div class="cockpit-reticle material-symbols-outlined" aria-hidden="true">my_location</div>
     <div class="cockpit-compass" aria-label="Current aircraft heading">

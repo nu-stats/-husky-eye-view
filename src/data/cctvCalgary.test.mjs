@@ -336,12 +336,13 @@ const runCatalogWithMockedUpstreams = async (t) => {
   return { requested, sources };
 };
 
-test('the Calgary lane is wired into the catalog and its loader runs', async (t) => {
+test('the Calgary lane is wired into the catalog and its loader runs when opted in', async (t) => {
   const saved = { ...process.env };
   try {
     delete process.env.CCTV_SOURCES_FILE;
     delete process.env.CCTV_SOURCES_JSON;
-    delete process.env.CCTV_CALGARY_ENABLED;
+    // Packs outside the US are opt-in (US focus, 2026-09-30).
+    process.env.CCTV_CALGARY_ENABLED = '1';
     const { requested, sources } = await runCatalogWithMockedUpstreams(t);
     assert.ok(
       requested.includes(DEFAULT_CALGARY_ROWS_URL),
@@ -351,6 +352,26 @@ test('the Calgary lane is wired into the catalog and its loader runs', async (t)
       sources.filter((s) => s.cityId === 'calgary').map((s) => s.id),
       ['calgary-142', 'calgary-86'],
       'Calgary cameras reach the served catalog through the registered lane',
+    );
+  } finally {
+    for (const key of Object.keys(process.env)) {
+      if (!(key in saved)) delete process.env[key];
+    }
+    Object.assign(process.env, saved);
+  }
+});
+
+test('without its switch the Calgary lane stays off (US focus)', async (t) => {
+  const saved = { ...process.env };
+  try {
+    delete process.env.CCTV_SOURCES_FILE;
+    delete process.env.CCTV_SOURCES_JSON;
+    delete process.env.CCTV_CALGARY_ENABLED;
+    const { requested, sources } = await runCatalogWithMockedUpstreams(t);
+    assert.equal(requested.includes(DEFAULT_CALGARY_ROWS_URL), false);
+    assert.deepEqual(
+      sources.filter((s) => s.cityId === 'calgary'),
+      [],
     );
   } finally {
     for (const key of Object.keys(process.env)) {

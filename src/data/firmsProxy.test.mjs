@@ -17,8 +17,8 @@ const recent = { acqDate: '2026-09-11', acqTime: '1100' };
 // Inject only its upstream, clock and filter dependencies; keep its aggregation
 // and source-status code intact, including failures while consuming records.
 function createRefresh(fetchSource, filter = filterTrailing24h) {
-  return new Function('SOURCES', 'fetchSource', 'filterTrailing24h', 'Date', 'console',
-    `return (${refreshSource});`)(SOURCES, fetchSource, filter, { now: () => NOW }, { warn() {} });
+  return new Function('SOURCES', 'AREA', 'fetchSource', 'filterTrailing24h', 'Date', 'console',
+    `return (${refreshSource});`)(SOURCES, '-180,15,-60,72', fetchSource, filter, { now: () => NOW }, { warn() {} });
 }
 
 test('FIRMS retains large sources in order and filters expired rows', async () => {

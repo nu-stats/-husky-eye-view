@@ -761,6 +761,9 @@ export function createLocalGeoJsonLayer(
     if (!_enabled || !entity) return;
     viewer.selectedEntity = entity;
     selectEntityContext(entity);
+    // Cockpit owns the camera every frame: a flight would fight it and then
+    // switch map dragging back on. Selecting still opens the details card.
+    if (globalThis.document?.body?.classList?.contains('cockpit-mode')) return;
 
     let targetPos = null;
     if (entity.polyline) {

@@ -29,9 +29,9 @@ test('the complete Realtime tool payload retains its pre-extraction contract and
     .digest('hex');
   assert.equal(
     digest,
-    // Updated 2026-09-27: get_entity_context documents its `areas` answer and
-    // the three layer enums became every registered layer.
-    '4b80c26f06252e53e4753469470aa1466787dbeebfdaddfa662465393b8ce0e8',
+    // Updated 2026-09-30: control_cockpit gained the zoom and look actions and the
+    // `zoom` magnification argument.
+    'd35f5aee4e361c905794b3e2a0dbeafa953d19627f1114a534ba4cdae3263f5c',
   );
 });
 

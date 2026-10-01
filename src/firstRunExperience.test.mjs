@@ -667,13 +667,15 @@ test('the voice TOOL SCHEMA matches the pinned release — the mission mapping i
   // Re-derived again 2026-09-27: the three layer enums are now the layer
   // registry (pinned in actionSchemas.test.mjs), so they are left out here
   // and registering a new layer does not move this pin.
+  // Re-derived 2026-09-30: control_cockpit gained the zoom and look actions
+  // and the `zoom` magnification argument.
   const registry = REGISTERED_LAYER_IDS.join();
   const block = JSON.stringify(GEV_REALTIME_TOOLS, (key, value) =>
     Array.isArray(value) && value.join() === registry ? 'REGISTERED_LAYER_IDS' : value);
-  assert.equal(block.length, 27058, 'serialized tool schema length drifted');
+  assert.equal(block.length, 27629, 'serialized tool schema length drifted');
   assert.equal(
     crypto.createHash('sha256').update(block).digest('hex'),
-    '6a2377e25426e827c76febee7528acf9bfd2b7275bb5c25759b9f83e32771d32',
+    '0c7709f1a59c2718dbf2c5546a45206c42bea870df6699dc71bb458336bdece1',
     'the first-run missions must ride EXISTING tools: no schema edit, no cache bust',
   );
   const instructions = fs.readFileSync(new URL('../server/providers/openai/instructions.js', import.meta.url), 'utf8');

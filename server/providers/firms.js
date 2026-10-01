@@ -5,7 +5,7 @@ import { filterTrailing24h, parseFirmsCsv } from '../../src/data/firmsCsv.js';
 
 /**
  * NASA FIRMS live active-fire proxy with a memory + disk cache.
- * Upstream: https://firms.modaps.eosdis.nasa.gov/api/area/csv/{KEY}/{SOURCE}/world/2
+ * Upstream: https://firms.modaps.eosdis.nasa.gov/api/area/csv/{KEY}/{SOURCE}/{US box}/2
  *
  * Merges three VIIRS NRT sources (NOAA-20, NOAA-21, Suomi-NPP — independent
  * satellites, no cross-source dedup) fetched sequentially with `days=2`
@@ -25,10 +25,15 @@ import { filterTrailing24h, parseFirmsCsv } from '../../src/data/firmsCsv.js';
  *
  * @returns {import('vite').Plugin}
  */
+export const FIRMS_US_AREA = '-180,15,-60,72';
+
 export function firmsProxy() {
   const TTL_MS = 30 * 60_000;
   const STATUS_TTL_MS = 5 * 60_000;
   const SOURCES = ['VIIRS_NOAA20_NRT', 'VIIRS_NOAA21_NRT', 'VIIRS_SNPP_NRT'];
+  // US focus (2026-09-30): west,south,east,north — CONUS, Alaska, Hawaii and
+  // Puerto Rico. The worldwide pull was ~160k fires (31 MB); ~2% were in the US.
+  const AREA = FIRMS_US_AREA;
   const CACHE_DIR = path.join(process.cwd(), '.gev-cache');
   const CACHE_PATH = path.join(CACHE_DIR, 'firms.json');
 
@@ -51,6 +56,8 @@ export function firmsProxy() {
       const parsed = JSON.parse(await fsp.readFile(CACHE_PATH, 'utf8'));
       if (
         Number.isFinite(parsed?.at) &&
+        // A cache written for another area (the old worldwide pull) is ignored.
+        parsed?.area === AREA &&
         Array.isArray(parsed?.sources) &&
         Array.isArray(parsed?.fires)
       ) {
@@ -76,7 +83,7 @@ export function firmsProxy() {
    * it embeds the MAP_KEY.
    */
   async function fetchSource(key, source) {
-    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${encodeURIComponent(key)}/${source}/world/2`;
+    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${encodeURIComponent(key)}/${source}/${AREA}/2`;
     const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const records = parseFirmsCsv(await res.text());
@@ -111,7 +118,7 @@ export function firmsProxy() {
       }
     }
     if (!sources.some((s) => s.ok)) throw new Error('all FIRMS sources failed');
-    return { at: now, sources, fires };
+    return { at: now, area: AREA, sources, fires };
   }
 
   /**

@@ -24,6 +24,69 @@ import {
   speedRulerStep,
   speedRulerTicks,
 } from './cockpitMath.js';
+import {
+  COCKPIT_ZOOM_LEVELS,
+  clampCockpitZoom,
+  stepCockpitZoom,
+  cockpitZoomFov,
+  formatCockpitZoom,
+  clampCockpitLook,
+  easeCockpitLook,
+  formatCockpitLook,
+} from './cockpitMath.js';
+
+test('cockpit zoom steps through the fixed levels and stops at the ends', () => {
+  assert.equal(stepCockpitZoom(1, 1), 1.5);
+  assert.equal(stepCockpitZoom(1.5, 1), 2);
+  assert.equal(stepCockpitZoom(8, 1), 8);
+  // Zooming out past 1x widens the view for context, down to 0.5x.
+  assert.equal(stepCockpitZoom(1, -1), 0.75);
+  assert.equal(stepCockpitZoom(0.75, -1), 0.5);
+  assert.equal(stepCockpitZoom(0.5, -1), 0.5);
+  assert.equal(stepCockpitZoom(4, -1), 3);
+  // A spoken in-between value moves to the next level in that direction.
+  assert.equal(stepCockpitZoom(2.5, 1), 3);
+  assert.equal(stepCockpitZoom(2.5, -1), 2);
+  assert.equal(clampCockpitZoom(20), 8);
+  assert.equal(clampCockpitZoom(0.2), 0.5);
+  assert.equal(clampCockpitZoom(Number.NaN), 1);
+  assert.deepEqual([...COCKPIT_ZOOM_LEVELS], [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8]);
+});
+
+test('cockpit look offsets wrap, clamp, ease the short way and read clearly', () => {
+  assert.deepEqual(clampCockpitLook(190, 0), { yawDeg: -170, pitchDeg: 0 });
+  assert.deepEqual(clampCockpitLook(-180, 0), { yawDeg: 180, pitchDeg: 0 });
+  assert.deepEqual(clampCockpitLook(0, -120), { yawDeg: 0, pitchDeg: -80 });
+  assert.deepEqual(clampCockpitLook(0, 90), { yawDeg: 0, pitchDeg: 45 });
+  // From 170° to -170° the view turns 20° through 180°, not 340° back round.
+  const eased = easeCockpitLook({ yawDeg: 170, pitchDeg: 0 }, { yawDeg: -170, pitchDeg: 0 }, 0.05);
+  assert.ok(eased.yawDeg > 170 || eased.yawDeg < -170, `eased yaw ${eased.yawDeg}`);
+  assert.deepEqual(
+    easeCockpitLook({ yawDeg: 29.95, pitchDeg: 0 }, { yawDeg: 30, pitchDeg: 0 }, 0.05),
+    { yawDeg: 30, pitchDeg: 0 },
+  );
+  assert.equal(formatCockpitLook(0, 0), 'AHEAD');
+  assert.equal(formatCockpitLook(-30, 0), 'L30°');
+  assert.equal(formatCockpitLook(45, 10), 'R45° U10°');
+  assert.equal(formatCockpitLook(0, -20), 'D20°');
+});
+
+test('cockpit zoom narrows the field of view by the magnification', () => {
+  const base = Math.PI / 3;
+  assert.ok(Math.abs(cockpitZoomFov(base, 1) - base) < 1e-12);
+  const zoomed = cockpitZoomFov(base, 4);
+  assert.ok(
+    Math.abs(Math.tan(zoomed / 2) - Math.tan(base / 2) / 4) < 1e-12,
+    'image scale is exactly 4x at the centre',
+  );
+  assert.equal(formatCockpitZoom(1), '1×');
+  assert.equal(formatCockpitZoom(1.5), '1.5×');
+  assert.equal(formatCockpitZoom(4), '4×');
+  assert.equal(formatCockpitZoom(0.75), '0.75×');
+  assert.equal(formatCockpitZoom(0.5), '0.5×');
+  const wide = cockpitZoomFov(base, 0.5) * (180 / Math.PI);
+  assert.ok(wide > 95 && wide < 100, `0.5x is a ~98° wide view (${wide})`);
+});
 
 test('cockpit presentation updates are throttled independently of camera frames', () => {
   assert.equal(cockpitUiUpdateDue(1000, 0, 100), true);

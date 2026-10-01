@@ -39,6 +39,96 @@ export function cockpitAnchorCorrectionStep(distanceM, speedMps, dtSec) {
   return Math.min(distanceM, eased, correctionRateMps * dt);
 }
 
+/**
+ * Cockpit magnification steps, relative to the field of view at entry. Below
+ * 1× widens the view (0.5× ≈ 98° from the default 60°) for broader context.
+ */
+export const COCKPIT_ZOOM_LEVELS = Object.freeze([
+  0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8,
+]);
+
+/** Clamp a requested magnification into the cockpit zoom range. */
+export function clampCockpitZoom(zoom) {
+  const min = COCKPIT_ZOOM_LEVELS[0];
+  const max = COCKPIT_ZOOM_LEVELS[COCKPIT_ZOOM_LEVELS.length - 1];
+  if (!Number.isFinite(zoom)) return 1;
+  return Math.min(max, Math.max(min, zoom));
+}
+
+/** How far the cockpit view may look up or down from the nose, in degrees. */
+export const COCKPIT_LOOK_PITCH_MIN_DEG = -80;
+export const COCKPIT_LOOK_PITCH_MAX_DEG = 45;
+
+/** Keep a look offset in range: yaw wraps to (-180, 180], pitch is clamped. */
+export function clampCockpitLook(yawDeg, pitchDeg) {
+  const yaw = Number.isFinite(yawDeg) ? yawDeg : 0;
+  const pitch = Number.isFinite(pitchDeg) ? pitchDeg : 0;
+  let wrapped = ((((yaw + 180) % 360) + 360) % 360) - 180;
+  if (wrapped === -180) wrapped = 180;
+  return {
+    yawDeg: wrapped,
+    pitchDeg: Math.min(
+      COCKPIT_LOOK_PITCH_MAX_DEG,
+      Math.max(COCKPIT_LOOK_PITCH_MIN_DEG, pitch),
+    ),
+  };
+}
+
+/**
+ * Ease the displayed look offset toward its target. Yaw takes the short way
+ * round. Returns the target exactly once within a tenth of a degree.
+ */
+export function easeCockpitLook(current, target, dtSec, rate = 12) {
+  const dt = Number.isFinite(dtSec) ? Math.max(0, Math.min(0.1, dtSec)) : 0;
+  const k = 1 - Math.exp(-rate * dt);
+  const yawDelta = ((target.yawDeg - current.yawDeg + 540) % 360) - 180;
+  const pitchDelta = target.pitchDeg - current.pitchDeg;
+  if (Math.abs(yawDelta) < 0.1 && Math.abs(pitchDelta) < 0.1) {
+    return { yawDeg: target.yawDeg, pitchDeg: target.pitchDeg };
+  }
+  return clampCockpitLook(
+    current.yawDeg + yawDelta * k,
+    current.pitchDeg + pitchDelta * k,
+  );
+}
+
+/** Label a look offset for the HUD: "AHEAD", "L30°", "R45° U10°", "D20°". */
+export function formatCockpitLook(yawDeg, pitchDeg) {
+  const yaw = Math.round(yawDeg);
+  const pitch = Math.round(pitchDeg);
+  const parts = [];
+  if (yaw) parts.push(`${yaw < 0 ? 'L' : 'R'}${Math.abs(yaw)}°`);
+  if (pitch) parts.push(`${pitch < 0 ? 'D' : 'U'}${Math.abs(pitch)}°`);
+  return parts.length ? parts.join(' ') : 'AHEAD';
+}
+
+/**
+ * Move one zoom step in (direction > 0) or out (direction < 0). A value that
+ * sits between steps moves to the next step in that direction.
+ */
+export function stepCockpitZoom(current, direction) {
+  const zoom = clampCockpitZoom(current);
+  if (!Number.isFinite(direction) || direction === 0) return zoom;
+  if (direction > 0) {
+    return COCKPIT_ZOOM_LEVELS.find((level) => level > zoom + 1e-6) ?? zoom;
+  }
+  return (
+    [...COCKPIT_ZOOM_LEVELS].reverse().find((level) => level < zoom - 1e-6) ??
+    zoom
+  );
+}
+
+/** Narrow a field of view by a magnification factor. */
+export function cockpitZoomFov(baseFovRad, zoom) {
+  if (!Number.isFinite(baseFovRad) || baseFovRad <= 0) return baseFovRad;
+  return 2 * Math.atan(Math.tan(baseFovRad / 2) / clampCockpitZoom(zoom));
+}
+
+/** Label a magnification for the cockpit HUD, e.g. "1.5×" or "4×". */
+export function formatCockpitZoom(zoom) {
+  return `${Number(clampCockpitZoom(zoom).toFixed(2))}×`;
+}
+
 /** Return whether a throttled cockpit presentation update is due. */
 export function cockpitUiUpdateDue(nowMs, lastUpdateMs, intervalMs) {
   if (!Number.isFinite(nowMs) || !Number.isFinite(intervalMs) || intervalMs < 0)

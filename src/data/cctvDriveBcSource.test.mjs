@@ -191,7 +191,8 @@ test('CCTV catalog merges DriveBC cameras and CCTV_DRIVEBC_ENABLED=0 skips the r
     CCTV_MAX_SOURCES: undefined,
     CCTV_CALTRANS_DISTRICTS: undefined,
     CCTV_TFL_ENABLED: undefined,
-    CCTV_DRIVEBC_ENABLED: undefined,
+    // Packs outside the US are opt-in (US focus, 2026-09-30).
+    CCTV_DRIVEBC_ENABLED: '1',
     CCTV_DRIVEBC_MAX_SOURCES: undefined,
   });
   const requested = [];

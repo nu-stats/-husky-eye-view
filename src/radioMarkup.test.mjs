@@ -127,8 +127,9 @@ test('the two Context/Cockpit tools pin their enums and required arguments', () 
   assert.deepEqual(cockpit.parameters.required, ['action']);
   assert.deepEqual(
     cockpit.parameters.properties.action.enum,
-    ['enter', 'exit', 'previous', 'next', 'prev', 'status'],
+    ['enter', 'exit', 'previous', 'next', 'prev', 'status', 'zoom_in', 'zoom_out', 'zoom_reset', 'zoom', 'look_left', 'look_right', 'look_up', 'look_down', 'look_ahead'],
   );
+  assert.equal(cockpit.parameters.properties.zoom.type, 'number');
   assert.deepEqual(
     cockpit.parameters.properties.targetLayer.enum,
     ['flights', 'military', 'ais-live-vessels', 'military-installations'],

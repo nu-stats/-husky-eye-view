@@ -228,6 +228,8 @@
   "src/ui/cockpitDisplayPortal.js",
   "src/ui/cockpitDisplayPortal.test.mjs",
   "src/ui/cockpitInput.js",
+  "src/ui/cockpitZoom.js",
+  "src/ui/cockpitLook.js",
   "src/ui/cockpitInstruments.js",
   "src/ui/cockpitLayout.js",
   "src/ui/cockpitPresentation.js",

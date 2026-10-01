@@ -1175,6 +1175,48 @@ test('control_cockpit forwards schema-valid navigation filters', async () => {
   assert.equal(calls[1].options.targetLayer, 'military');
 });
 
+test('control_cockpit maps zoom phrases and magnifications', async () => {
+  globalThis.window = globalThis.window || { clearTimeout, setTimeout, requestIdleCallback: null };
+  const calls = [];
+  const styleManager = {
+    controlCockpit(action, options) {
+      calls.push({ action, zoom: options.zoom });
+      return { ok: true, state: { active: true } };
+    },
+  };
+  const viewer = {
+    clock: { onTick: { addEventListener: () => () => {} } },
+    scene: { canvas: { addEventListener() {}, removeEventListener() {} } },
+    camera: { moveEnd: { addEventListener() {} } },
+  };
+  const runner = createGevActionRunner({
+    viewer,
+    styleManager,
+    dataManager: { layers: new Map(), getAll: () => [] },
+  });
+
+  await runner('control_cockpit', { action: 'zoom_in' });
+  await runner('control_cockpit', { action: 'zoom out' });
+  await runner('control_cockpit', { action: 'reset zoom' });
+  await runner('control_cockpit', { action: 'zoom', zoom: 4 });
+  await runner('control_cockpit', { action: 'zoom 3x' });
+  await runner('control_cockpit', { action: 'look left' });
+  await runner('control_cockpit', { action: 'pan right' });
+  await runner('control_cockpit', { action: 'look_down' });
+  await runner('control_cockpit', { action: 'look straight ahead' });
+  assert.deepEqual(calls, [
+    { action: 'zoom_in', zoom: null },
+    { action: 'zoom_out', zoom: null },
+    { action: 'zoom_reset', zoom: null },
+    { action: 'zoom', zoom: 4 },
+    { action: 'zoom', zoom: 3 },
+    { action: 'look_left', zoom: null },
+    { action: 'look_right', zoom: null },
+    { action: 'look_down', zoom: null },
+    { action: 'look_ahead', zoom: null },
+  ]);
+});
+
 test('control_cockpit resolves spoken TR-3B spellings to the tr3b class id', async () => {
   globalThis.window = globalThis.window || { clearTimeout, setTimeout, requestIdleCallback: null };
   const calls = [];

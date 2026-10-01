@@ -780,6 +780,136 @@ body.cockpit-mode:has(#left-panel-stack > .panel-collapsible:not(.collapsed))
   box-shadow: 0 0 10px
     color-mix(in srgb, var(--cockpit-accent) 30%, transparent);
 }
+.cockpit-view-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-self: start;
+  gap: 8px;
+}
+.cockpit-look-controls {
+  display: grid;
+  grid-template-columns: 30px 30px 64px 30px 30px;
+  align-items: stretch;
+  gap: 2px;
+  margin-top: 2px;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--cockpit-accent) 22%, transparent);
+  border-radius: 7px;
+  background: rgba(0, 7, 12, 0.46);
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+}
+.cockpit-look-controls button {
+  display: flex;
+  min-width: 0;
+  min-height: 31px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px 2px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: rgba(0, 7, 12, 0.38);
+  color: rgba(244, 251, 255, 0.64);
+  cursor: pointer;
+}
+.cockpit-look-controls button:hover,
+.cockpit-look-controls button:focus-visible {
+  border-color: color-mix(in srgb, var(--cockpit-accent) 62%, transparent);
+  color: #fff;
+  outline: none;
+}
+.cockpit-look-controls .material-symbols-outlined {
+  font-size: 18px;
+}
+.cockpit-look-current small {
+  color: color-mix(in srgb, var(--cockpit-accent) 70%, #fff);
+  font: 700 6px/1 var(--font-mono);
+  letter-spacing: 0.1em;
+}
+.cockpit-look-current strong {
+  color: #fff;
+  font: 700 8px/1 var(--font-mono);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.cockpit-look-controls .cockpit-look-current[data-looking='true'] {
+  border-color: var(--cockpit-accent);
+  background: color-mix(
+    in srgb,
+    var(--cockpit-accent) 10%,
+    rgba(0, 7, 12, 0.72)
+  );
+}
+/* Dragging the view to look around: show that the scene can be grabbed. */
+body.cockpit-mode #cesiumContainer canvas {
+  cursor: grab;
+}
+body.cockpit-mode.cockpit-look-dragging #cesiumContainer canvas {
+  cursor: grabbing;
+}
+.cockpit-zoom-controls {
+  display: grid;
+  grid-template-columns: 34px 52px 34px;
+  align-items: stretch;
+  justify-self: start;
+  gap: 2px;
+  margin-top: 2px;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--cockpit-accent) 22%, transparent);
+  border-radius: 7px;
+  background: rgba(0, 7, 12, 0.46);
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+}
+.cockpit-zoom-controls button {
+  display: flex;
+  min-width: 0;
+  min-height: 31px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px 5px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: rgba(0, 7, 12, 0.38);
+  color: rgba(244, 251, 255, 0.64);
+  cursor: pointer;
+}
+.cockpit-zoom-controls button:hover,
+.cockpit-zoom-controls button:focus-visible {
+  border-color: color-mix(in srgb, var(--cockpit-accent) 62%, transparent);
+  color: #fff;
+  outline: none;
+}
+.cockpit-zoom-controls button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.cockpit-zoom-controls .material-symbols-outlined {
+  font-size: 16px;
+}
+.cockpit-zoom-current small {
+  color: color-mix(in srgb, var(--cockpit-accent) 70%, #fff);
+  font: 700 6px/1 var(--font-mono);
+  letter-spacing: 0.1em;
+}
+.cockpit-zoom-current strong {
+  color: #fff;
+  font: 700 10px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+}
+.cockpit-zoom-controls .cockpit-zoom-current[data-zoomed='true'] {
+  border-color: var(--cockpit-accent);
+  background: color-mix(
+    in srgb,
+    var(--cockpit-accent) 10%,
+    rgba(0, 7, 12, 0.72)
+  );
+}
 .cockpit-route-card {
   display: grid;
   gap: 8px;
@@ -1955,6 +2085,11 @@ body.cockpit-mode
     #reset-globe-view
   ) {
   display: none !important;
+}
+/* A pin clicked from the cockpit opens its details card above the HUD so the
+   video and source links stay clickable (the card sets z-index inline). */
+body.cockpit-mode [data-local-selection-card] {
+  z-index: 150 !important;
 }
 body.cockpit-mode #left-panel-stack {
   z-index: 147;

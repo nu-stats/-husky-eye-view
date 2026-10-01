@@ -126,7 +126,12 @@ export const ACTION_DESCRIPTIONS = {
       properties: {
         action: {
           description:
-            'previous/next (or prev) navigates through nearby contacts in Cockpit context.',
+            'previous/next (or prev) navigates through nearby contacts in Cockpit context. zoom_in/zoom_out step the Cockpit view magnification (zoom out below 1x widens the view for context), zoom_reset returns to 1x, and zoom sets the magnification given in zoom. look_left/look_right/look_up/look_down turn the Cockpit view from the nose; look_ahead faces forward again.',
+          $position: 2,
+        },
+        zoom: {
+          description:
+            'Magnification from 0.5 (wide) to 8 for action zoom (for example 4 for "zoom 4x"). Only works while Cockpit is active.',
           $position: 2,
         },
         targetLayer: {

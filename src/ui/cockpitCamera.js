@@ -275,9 +275,14 @@ export function update() {
   );
   Cesium.Cartesian3.normalize(this.scratchHorizontal, this.scratchHorizontal);
 
-  this.scratchLocal.x = Math.sin(headingRad) * Math.cos(pitchRad);
-  this.scratchLocal.y = Math.cos(headingRad) * Math.cos(pitchRad);
-  this.scratchLocal.z = Math.sin(pitchRad);
+  // The operator's look offset turns only the view; the anchor, its advance
+  // and the forward seat offset above stay on the aircraft's own heading.
+  const look = this.easeLook(dtSec);
+  const viewHeadingRad = headingRad + Cesium.Math.toRadians(look.yawDeg);
+  const viewPitchRad = pitchRad + Cesium.Math.toRadians(look.pitchDeg);
+  this.scratchLocal.x = Math.sin(viewHeadingRad) * Math.cos(viewPitchRad);
+  this.scratchLocal.y = Math.cos(viewHeadingRad) * Math.cos(viewPitchRad);
+  this.scratchLocal.z = Math.sin(viewPitchRad);
   Cesium.Matrix4.multiplyByPointAsVector(
     this.scratchEnu,
     this.scratchLocal,
@@ -285,9 +290,9 @@ export function update() {
   );
   Cesium.Cartesian3.normalize(this.scratchForward, this.scratchForward);
 
-  this.scratchLocal.x = -Math.sin(headingRad) * Math.sin(pitchRad);
-  this.scratchLocal.y = -Math.cos(headingRad) * Math.sin(pitchRad);
-  this.scratchLocal.z = Math.cos(pitchRad);
+  this.scratchLocal.x = -Math.sin(viewHeadingRad) * Math.sin(viewPitchRad);
+  this.scratchLocal.y = -Math.cos(viewHeadingRad) * Math.sin(viewPitchRad);
+  this.scratchLocal.z = Math.cos(viewPitchRad);
   Cesium.Matrix4.multiplyByPointAsVector(
     this.scratchEnu,
     this.scratchLocal,

@@ -580,8 +580,54 @@ Done:     Steps 33-36 committed and pushed, then:
 Last step, on the website: Releases -> Draft a new release -> tag v0.1.2 -> Publish.
 
 
+-------------------------------------------------------------------------------
+STEP 38: Cockpit zoom, look-around and clickable pins
+-------------------------------------------------------------------------------
+Asked:    Zoom from the cockpit, then zoom OUT for broader context, pan left/right and
+          up/down, and click event pins (e.g. Chicago Events) while flying over them.
+Done:
+  - Zoom 0.5x (wide, ~98 degrees) to 8x by narrowing/widening the camera's view angle:
+    mouse wheel over the view, + / - keys (0 resets), ZOOM buttons at the top, or voice
+    ("zoom in", "zoom out", "zoom 4x", "reset zoom"). The normal view returns on exit.
+  - Look around without leaving the aircraft: arrow keys, dragging the view, the VIEW
+    buttons (left/up/center/down/right), Home to face forward, or voice ("look left",
+    "look up", "look straight ahead"). The readout says AHEAD, L30, R45 U10 and so on.
+  - Clicking a pin in the cockpit opens its details card above the cockpit display, so
+    the "Watch at 12:28" video link can be clicked. Before, the click started a camera
+    flight that fought the cockpit camera, and the card was hidden under the display.
+Code:     src/ui/cockpitZoom.js, src/ui/cockpitLook.js, src/cockpitMath.js,
+          cockpitCamera.js, cockpitInput.js, cockpitCoordinator.js, cockpit.html/.css,
+          src/data/localGeojsonCore.js, voice schema (actionSchemas.js, gevActions.js).
+
+
+-------------------------------------------------------------------------------
+STEP 39: Focus the live feeds on the United States
+-------------------------------------------------------------------------------
+Asked:    Limit the project to the US to help loading time (no hard limit: other places
+          still work, they just aren't fetched up front).
+Found:    Nothing worldwide loads for a new visitor, but switching certain layers on pulled
+          the whole world: fires ~160,000 detections (31 MB, ~2% in the US), CCTV ~3,750
+          cameras (72% abroad), flights the world's aircraft every 30 s (~1.2 MB), ships
+          and radio worldwide.
+Done:
+  - Flights: OpenSky asks for the US box only (incl. Alaska, Hawaii, Puerto Rico);
+    measured 1,178 KB -> 786 KB per refresh. Views outside the US switch to the
+    regional adsb.lol feed around the view, so other places still show aircraft.
+  - Fires (FIRMS): the US box instead of the world. Old worldwide caches are ignored.
+  - CCTV: the 9 non-US packs (London, Ontario, Finland, BC, Tallinn, Tarktee,
+    Warendorf, NSW, Calgary) are off unless their switch is set to 1 in the
+    environment. US packs (Austin, Caltrans, TxDOT) unchanged.
+  - Ships (AIS): subscribe to US waters (lower 48 + Gulf + Great Lakes + Puerto Rico,
+    Alaska, Hawaii) instead of the world.
+  - Radio: US stations only.
+  - Left alone: satellites (global by nature), transit feeds abroad (only load nearby),
+    the speed rewrite (Step 6) still out.
+Code:     server/providers/aircraft/opensky.js, firms.js, cctv/catalog.js,
+          vessels/ais-live.js, radio/catalog.js, .env.example.
+
+
 ===============================================================================
-WHERE THINGS STAND (September 29, 2026)
+WHERE THINGS STAND (September 30, 2026)
 ===============================================================================
 Layers:     44, including every custom layer, TLR, Boston Neighborhoods and 3D Captures. All of them are
             on voice's list, automatically. GVA and MKDB need the research key.
@@ -590,7 +636,9 @@ Look:       Northeastern logo, grey interface, full-window view, two menu rows a
 Needs:      A new Cesium ion token (Step 31) for Bing maps and full terrain.
 Not back:   Only the speed rewrite from Step 6 (batched drawing, coarse copies, the Speed
             control). The Miami hotspot map and the large pin layers may feel heavier.
-Tests:      All 4,222 unit tests pass. Format and package-boundary checks are clean.
+Cockpit:    Zoom 0.5x-8x, look-around, clickable pins, and the project's layers in view.
+Live feeds: US-focused (Step 39).
+Tests:      All 4,237 unit tests pass. Format and package-boundary checks are clean.
 
 Backups:    C:\Users\jstow\Documents\HuskyEyeView-backups\
               husky-eye-view-2026-09-26-before-optimization.tar.gz
@@ -605,7 +653,8 @@ Data exports:
             mkdb_incidents_geocoded.csv
 
 Git history on main (newest first):
-            (release)  Cockpit shows the project's layers (tagged v0.1.2)
+            (latest)   Cockpit zoom, look-around, clickable pins; US-focused feeds
+            e12f528e  Cockpit shows the project's layers (tagged v0.1.2)
             62d03624  Add a 3D Captures layer for Gaussian splats
             0c6cb16b  Lock the research layers in every browser session
             973f2652  Show the locked research layers in their own Research Data group

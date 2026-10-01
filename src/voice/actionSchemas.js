@@ -198,7 +198,28 @@ const schemas = [
       properties: {
         action: {
           type: 'string',
-          enum: ['enter', 'exit', 'previous', 'next', 'prev', 'status'],
+          enum: [
+            'enter',
+            'exit',
+            'previous',
+            'next',
+            'prev',
+            'status',
+            'zoom_in',
+            'zoom_out',
+            'zoom_reset',
+            'zoom',
+            'look_left',
+            'look_right',
+            'look_up',
+            'look_down',
+            'look_ahead',
+          ],
+        },
+        zoom: {
+          type: 'number',
+          minimum: 0.5,
+          maximum: 8,
         },
         targetLayer: {
           type: 'string',

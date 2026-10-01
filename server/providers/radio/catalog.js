@@ -171,6 +171,8 @@ export function createRadioProxyMiddleware({
           order: 'clickcount',
           reverse: 'true',
           limit: index === 0 ? '1800' : '220',
+          // US focus (2026-09-30): the catalog was worldwide.
+          countrycode: 'US',
         });
         if (tag) params.set('tag', tag);
         try {

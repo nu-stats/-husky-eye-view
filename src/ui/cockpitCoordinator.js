@@ -140,6 +140,8 @@ export class CockpitCoordinator {
               : 'contacts-inactive'
             : 'no-tracked-aircraft',
       visionMode: this.cockpitView?.visionMode || null,
+      zoom: active ? this.cockpitView?.zoom || 1 : null,
+      look: active ? this.cockpitView?.lookTarget || null : null,
       subject: info
         ? {
             id: info.icao24 || info.id || null,
@@ -236,6 +238,7 @@ export class CockpitCoordinator {
       aircraftClass = null,
       selectedTarget = null,
       rollbackTarget = undefined,
+      zoom = null,
     } = {},
   ) {
     const { flightsLayer, militaryFlightsLayer } = this.services;
@@ -353,6 +356,62 @@ export class CockpitCoordinator {
         action: 'control_cockpit',
         state: this.getCockpitState(),
         error: changed ? null : 'No further context target was available',
+      };
+    }
+    if (normalized.startsWith('look_')) {
+      const step = {
+        look_left: [-30, 0],
+        look_right: [30, 0],
+        look_up: [0, 15],
+        look_down: [0, -15],
+      }[normalized];
+      const changed = !this.cockpitView.active
+        ? false
+        : step
+          ? this.cockpitView.look(...step)
+          : normalized === 'look_ahead'
+            ? this.cockpitView.resetLook()
+            : false;
+      return {
+        ok: changed,
+        action: 'control_cockpit',
+        state: this.getCockpitState(),
+        error: changed
+          ? null
+          : this.cockpitView.active
+            ? `Unknown cockpit action: ${action}`
+            : 'Looking around works inside Cockpit — enter Cockpit first',
+      };
+    }
+    if (normalized.startsWith('zoom')) {
+      if (!this.cockpitView.active) {
+        return {
+          ok: false,
+          action: 'control_cockpit',
+          error: 'Zoom works inside Cockpit — enter Cockpit first',
+          state: this.getCockpitState(),
+        };
+      }
+      if (normalized === 'zoom' && !Number.isFinite(zoom)) {
+        return {
+          ok: false,
+          action: 'control_cockpit',
+          error:
+            'Say a magnification from 0.5 (wide) to 8, for example "zoom 4x"',
+          state: this.getCockpitState(),
+        };
+      }
+      const applied =
+        normalized === 'zoom_in'
+          ? this.cockpitView.stepZoom(1)
+          : normalized === 'zoom_out'
+            ? this.cockpitView.stepZoom(-1)
+            : this.cockpitView.setZoom(normalized === 'zoom' ? zoom : 1);
+      return {
+        ok: applied !== null,
+        action: 'control_cockpit',
+        state: this.getCockpitState(),
+        error: applied === null ? 'Cockpit zoom is unavailable' : null,
       };
     }
     return {

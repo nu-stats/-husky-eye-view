@@ -77,7 +77,7 @@
   top: 2px;
   color: var(--accent);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
   line-height: 1;
 }
@@ -105,7 +105,7 @@
   -webkit-backdrop-filter: blur(14px);
   color: rgba(235, 235, 235, 0.92);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1.35px;
   text-transform: uppercase;
   transform: translateX(-50%);
@@ -199,7 +199,7 @@
   -webkit-backdrop-filter: blur(14px);
   color: rgba(235, 235, 235, 0.92);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1.35px;
   text-transform: uppercase;
   opacity: 0;

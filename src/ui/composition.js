@@ -61,6 +61,7 @@ import {
   regionalDistanceM,
   weatherCodeLabel,
 } from '../data/regionalBrief.js';
+import { setChunkedAreaFillAlpha } from '../data/chunkedAreaLayer.js';
 
 export class StyleManager extends ApplicationShell {
   constructor(viewer, options = {}) {
@@ -112,6 +113,8 @@ export class StyleManager extends ApplicationShell {
         fetchRegionalBrief,
         regionalDistanceM,
         weatherCodeLabel,
+        // The cockpit's LAYERS slider: shared fill opacity of the area layers.
+        setAreaFillAlpha: setChunkedAreaFillAlpha,
         LocationSearch,
         ...options.services,
       },

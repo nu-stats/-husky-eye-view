@@ -9,9 +9,19 @@ import { isLocalCardAction, pickLocalEntity } from './localGeojsonCore.js';
  * the view are released. Zoomed out past `maxHeightM` nothing is drawn and the
  * panel shows a zoom-in hint.
  *
+ * Each drawn chunk is batched into ground primitives holding every area of
+ * the chunk (one primitive, or a few for a county with thousands of tracts),
+ * with a color per area. Entities (one per polygon, via GeoJsonDataSource)
+ * were far slower: every entity costs an updater, and Cesium splits clamped
+ * entity polygons into a new batch whenever their bounding rectangles overlap,
+ * which neighboring tracts always do, so one county became dozens of
+ * separately built primitives and a zoomed-out view stalled the frame while
+ * thousands of entities were processed.
+ *
  * Areas are shaded by `featureColor(properties)` and are selectable: a click
  * publishes the feature's context, which opens the details card for features
- * carrying a `summary`.
+ * carrying a `summary`. Only the clicked area gets a (detached) Entity, built
+ * on demand for the context store; every other area is just a pick record.
  */
 
 /** Default camera height above which the layer asks the user to zoom in. */
@@ -21,6 +31,56 @@ export const CHUNKED_AREA_MAX_CHUNKS = 30;
 /** Parsed chunks kept after leaving the view, so panning back is instant. */
 const CHUNK_CACHE_LIMIT = 90;
 const FILL_ALPHA = 0.4;
+/**
+ * Most polygons in one ground primitive. Cesium prepares every instance of a
+ * new primitive on the main thread in a single frame (~0.1 ms each), so a
+ * county with thousands of tracts is split into a few primitives...
+ */
+export const CHUNKED_AREA_BATCH_SIZE = 600;
+/**
+ * ...and at most this many polygons' worth of new primitives enter the scene
+ * per frame (always at least one primitive), so loading never stalls a
+ * moving camera for long.
+ */
+const FRAME_INSTANCE_BUDGET = 600;
+/**
+ * Polygons added in the current frame by ALL chunked layers together, so two
+ * layers loading at once still share one frame's budget.
+ */
+const sharedFrameBudget = { frame: undefined, added: 0 };
+/**
+ * An opacity that overrides every chunked layer's own `fillAlpha` — the
+ * cockpit's LAYERS slider, so tract colors read clearly from the air — or
+ * null for each layer's own look.
+ */
+let fillAlphaOverride = null;
+const fillAlphaListeners = new Set();
+
+/**
+ * Set (0.05–1) or clear (null) the shared fill opacity. Drawn areas recolor
+ * in place; areas still loading are rebuilt at the new opacity.
+ * @param {number|null} alpha
+ */
+export function setChunkedAreaFillAlpha(alpha) {
+  const next = Number.isFinite(alpha)
+    ? Math.min(1, Math.max(0.05, alpha))
+    : null;
+  if (next === fillAlphaOverride) return;
+  fillAlphaOverride = next;
+  for (const listener of fillAlphaListeners) {
+    try {
+      listener();
+    } catch {
+      /* one layer's failure must not stop the others */
+    }
+  }
+}
+
+/** The shared fill opacity in force, or null when each layer uses its own. */
+export function getChunkedAreaFillAlpha() {
+  return fillAlphaOverride;
+}
+
 /** Longest getAreaContext waits for areas still loading. */
 const AREA_CONTEXT_WAIT_MS = 6000;
 /**
@@ -122,6 +182,41 @@ function featureContains(feature, lon, lat) {
       outer &&
       ringContains(outer, lon, lat) &&
       !holes.some((hole) => ringContains(hole, lon, lat)),
+  );
+}
+
+/**
+ * Cartesian positions of a [lon, lat(, z)] ring, without the closing repeat
+ * of the first point and without non-finite points (a NaN would fail the
+ * whole chunk's batch).
+ */
+function ringPositions(ring) {
+  const degrees = [];
+  for (const point of ring || []) {
+    const lon = Number(point?.[0]);
+    const lat = Number(point?.[1]);
+    if (Number.isFinite(lon) && Number.isFinite(lat)) degrees.push(lon, lat);
+  }
+  const n = degrees.length;
+  if (
+    n >= 4 &&
+    degrees[0] === degrees[n - 2] &&
+    degrees[1] === degrees[n - 1]
+  ) {
+    degrees.length = n - 2;
+  }
+  return Cesium.Cartesian3.fromDegreesArray(degrees);
+}
+
+/** Polygon hierarchy of one polygon's rings, or null when it has no area. */
+function hierarchyOf(rings) {
+  const [outer, ...holes] = (rings || []).map(ringPositions);
+  if (!outer || outer.length < 3) return null;
+  return new Cesium.PolygonHierarchy(
+    outer,
+    holes
+      .filter((hole) => hole.length >= 3)
+      .map((hole) => new Cesium.PolygonHierarchy(hole)),
   );
 }
 
@@ -246,16 +341,94 @@ export function createChunkedAreaLayer(
   let lastViewPose = null;
   let lastMotionCheckMs = 0;
   let rowControlsListener = null;
-  /** chunk id -> Cesium.GeoJsonDataSource currently in the scene */
+  /**
+   * chunk id -> { primitives, features } currently drawn. `primitives` are
+   * the chunk's Cesium.GroundPrimitive batches (none when no area survived
+   * the filter); `features` are the areas they draw.
+   */
   const drawn = new Map();
+  /** Batches waiting for a frame with budget left (see FRAME_INSTANCE_BUDGET). */
+  let addQueue = [];
+  /** Budget for a scene without a frame number (tests); reset every frame. */
+  const ownFrameBudget = { added: 0 };
   /** chunk id -> parsed features (LRU by insertion order) */
   const cache = new Map();
+  /** CSS color -> opaque Cesium color (gray when the CSS does not parse) */
+  const baseColors = new Map();
+  /** "css|alpha" -> per-instance color attribute */
   const colors = new Map();
+  const scratchColor = new Cesium.Color();
 
-  const colorFor = (css) => {
-    if (!colors.has(css)) colors.set(css, Cesium.Color.fromCssColorString(css));
-    return colors.get(css);
+  /** The fill opacity in force: the shared override, else the layer's own. */
+  const currentFillAlpha = () => fillAlphaOverride ?? fillAlpha;
+
+  const baseColorFor = (css) => {
+    if (!baseColors.has(css)) {
+      let color;
+      try {
+        color = Cesium.Color.fromCssColorString(css);
+      } catch {
+        color = undefined;
+      }
+      baseColors.set(css, color || Cesium.Color.fromCssColorString('#9e9e9e'));
+    }
+    return baseColors.get(css);
   };
+
+  const colorAttributeFor = (css) => {
+    const alpha = currentFillAlpha();
+    const key = `${css}|${alpha}`;
+    if (!colors.has(key)) {
+      colors.set(
+        key,
+        Cesium.ColorGeometryInstanceAttribute.fromColor(
+          baseColorFor(css).withAlpha(alpha),
+        ),
+      );
+    }
+    return colors.get(key);
+  };
+
+  /**
+   * Recolor drawn areas for a new shared opacity. Ready batches update their
+   * per-instance colors in place (no redraw); a chunk with a batch still
+   * being prepared is rebuilt from its cached features at the new opacity.
+   */
+  function applyFillAlpha() {
+    if (destroyed || !viewer) return;
+    const alpha = currentFillAlpha();
+    const rebuild = [];
+    for (const [chunkId, chunk] of drawn) {
+      const live = chunk.primitives.every(
+        (primitive) =>
+          primitive.ready &&
+          typeof primitive.getGeometryInstanceAttributes === 'function',
+      );
+      if (!live) {
+        rebuild.push(chunkId);
+        continue;
+      }
+      for (const primitive of chunk.primitives) {
+        for (const record of primitive.__areaRecords || []) {
+          const attributes = primitive.getGeometryInstanceAttributes(record);
+          if (!attributes) continue;
+          const css = featureColor(record.feature?.properties || {});
+          attributes.color = Cesium.ColorGeometryInstanceAttribute.toValue(
+            Cesium.Color.clone(
+              baseColorFor(css || '#9e9e9e'),
+              scratchColor,
+            ).withAlpha(alpha, scratchColor),
+            attributes.color,
+          );
+        }
+      }
+    }
+    for (const chunkId of rebuild) releaseChunk(chunkId);
+    if (rebuild.length && enabled) refresh();
+    if (governorRequestRender) governorRequestRender(`chunked-area:${id}`);
+    else viewer.scene?.requestRender?.();
+  }
+  fillAlphaListeners.add(applyFillAlpha);
 
   function notifyRowControls() {
     try {
@@ -310,52 +483,156 @@ export function createChunkedAreaLayer(
     return features;
   }
 
-  function releaseChunk(chunkId) {
-    const dataSource = drawn.get(chunkId);
-    if (!dataSource) return;
-    drawn.delete(chunkId);
-    if (viewer?.selectedEntity?.__chunkedChunkId === chunkId) {
-      viewer.selectedEntity = undefined;
-      clearSelectedEntityContextForLayer(id);
-    }
+  function destroyPrimitive(primitive) {
     try {
-      viewer?.dataSources?.remove(dataSource, true);
+      viewer?.scene?.groundPrimitives?.remove(primitive);
     } catch {
       /* already gone */
     }
+    try {
+      if (!primitive.isDestroyed?.()) primitive.destroy?.();
+    } catch {
+      /* already destroyed by its collection */
+    }
+  }
+
+  /** This frame's shared budget (or the layer's own one without frames). */
+  function frameBudget() {
+    const frame = viewer.scene.frameState?.frameNumber;
+    if (frame === undefined) return ownFrameBudget;
+    if (sharedFrameBudget.frame !== frame) {
+      sharedFrameBudget.frame = frame;
+      sharedFrameBudget.added = 0;
+    }
+    return sharedFrameBudget;
+  }
+
+  /**
+   * Put queued batches into the scene while this frame's budget lasts (at
+   * least one per frame), and ask for another frame while any are left.
+   */
+  function pumpAddQueue() {
+    const budget = frameBudget();
+    while (addQueue.length) {
+      const { primitive, instanceCount } = addQueue[0];
+      if (
+        budget.added > 0 &&
+        budget.added + instanceCount > FRAME_INSTANCE_BUDGET
+      )
+        break;
+      addQueue.shift();
+      budget.added += instanceCount;
+      viewer.scene.groundPrimitives.add(primitive);
+    }
+    if (!addQueue.length) return;
+    if (governorRequestRender) governorRequestRender(`chunked-area:${id}`);
+    else viewer.scene.requestRender?.();
+  }
+
+  function releaseChunk(chunkId) {
+    const chunk = drawn.get(chunkId);
+    if (!chunk) return;
+    drawn.delete(chunkId);
+    const selected = viewer?.selectedEntity;
+    if (
+      selected?.__localLayerId === id &&
+      selected.__chunkedChunkId === chunkId
+    ) {
+      viewer.selectedEntity = undefined;
+      clearSelectedEntityContextForLayer(id);
+    }
+    addQueue = addQueue.filter((queued) => queued.chunkId !== chunkId);
+    for (const primitive of chunk.primitives) destroyPrimitive(primitive);
   }
 
   function releaseAll() {
     for (const chunkId of [...drawn.keys()]) releaseChunk(chunkId);
   }
 
+  /** A ground primitive drawing `instances`, one color per instance. */
+  function batchPrimitive(instances) {
+    const primitive = new Cesium.GroundPrimitive({
+      geometryInstances: instances,
+      appearance: new Cesium.PerInstanceColorAppearance({
+        flat: true,
+        translucent: true,
+      }),
+      // Clamped like the entities were: over the globe and 3D tiles alike.
+      classificationType: Cesium.ClassificationType.BOTH,
+      asynchronous: true,
+    });
+    for (const instance of instances) instance.id.primitive = primitive;
+    // Kept for recoloring: the primitive may release its instances once ready.
+    primitive.__areaRecords = instances.map((instance) => instance.id);
+    return primitive;
+  }
+
+  /**
+   * Ground primitives holding every area of a chunk (CHUNKED_AREA_BATCH_SIZE
+   * polygons each): a geometry instance per polygon (a MultiPolygon gives one
+   * per part, as entities did), colored per instance. Each instance's id is a
+   * light pick record standing in for an entity: pickLocalEntity reads
+   * `__localLayerId`, and a click turns the record into a selection
+   * (selectArea).
+   * @returns {Cesium.GroundPrimitive[]} Empty when no area has a shape.
+   */
+  function buildChunkPrimitives(chunkId, features) {
+    const instances = [];
+    const usedIds = new Set();
+    features.forEach((feature, featureIndex) => {
+      const properties = feature.properties || {};
+      const color = colorAttributeFor(featureColor(properties) || '#9e9e9e');
+      const baseId =
+        feature.id !== undefined && feature.id !== null
+          ? String(feature.id)
+          : `${chunkId}:${featureIndex}`;
+      polygonsOf(feature.geometry).forEach((rings, part) => {
+        const hierarchy = hierarchyOf(rings);
+        if (!hierarchy) return;
+        // Unique per chunk, like GeoJsonDataSource entity ids (`id`, `id_2`).
+        let recordId = baseId;
+        for (let n = 2; usedIds.has(recordId); n++) recordId = `${baseId}_${n}`;
+        usedIds.add(recordId);
+        instances.push(
+          new Cesium.GeometryInstance({
+            geometry: new Cesium.PolygonGeometry({
+              polygonHierarchy: hierarchy,
+            }),
+            id: {
+              id: recordId,
+              name: properties.name,
+              __localLayerId: id,
+              __chunkedChunkId: chunkId,
+              feature,
+              part,
+            },
+            attributes: { color },
+          }),
+        );
+      });
+    });
+    const primitives = [];
+    // Even batches: 1,300 polygons become 3 × 434, not 600 + 600 + 100.
+    const batches = Math.ceil(instances.length / CHUNKED_AREA_BATCH_SIZE);
+    const size = Math.ceil(instances.length / Math.max(1, batches));
+    for (let i = 0; i < instances.length; i += size)
+      primitives.push(batchPrimitive(instances.slice(i, i + size)));
+    return primitives;
+  }
+
   async function drawChunk(chunkId, gen) {
     const features = await loadChunkFeatures(chunkId);
     if (gen !== generation || !enabled || destroyed || drawn.has(chunkId))
       return;
-    const dataSource = await Cesium.GeoJsonDataSource.load(
-      { type: 'FeatureCollection', features },
-      { clampToGround: true },
-    );
-    if (gen !== generation || !enabled || destroyed || drawn.has(chunkId))
-      return;
-    dataSource.name = `${name} ${chunkId}`;
-    for (const entity of dataSource.entities.values) {
-      entity.__localLayerId = id;
-      entity.__chunkedChunkId = chunkId;
-      if (!entity.polygon) continue;
-      const props =
-        entity.properties?.getValue?.(Cesium.JulianDate.now()) || {};
-      entity.polygon.material = new Cesium.ColorMaterialProperty(
-        colorFor(featureColor(props) || '#9e9e9e').withAlpha(fillAlpha),
-      );
-      entity.polygon.outline = false;
-    }
-    drawn.set(chunkId, dataSource);
-    await viewer.dataSources.add(dataSource);
-    if (gen !== generation || !enabled || destroyed) {
-      releaseChunk(chunkId);
-    }
+    const primitives = buildChunkPrimitives(chunkId, features);
+    drawn.set(chunkId, { primitives, features });
+    for (const primitive of primitives)
+      addQueue.push({
+        chunkId,
+        primitive,
+        instanceCount: primitive.geometryInstances.length,
+      });
+    pumpAddQueue();
   }
 
   /** Camera position and heading in degrees/meters/radians, or null. */
@@ -370,8 +647,13 @@ export function createChunkedAreaLayer(
     };
   }
 
-  /** Recheck a camera that keeps moving (see MOTION_CHECK_MS). */
+  /**
+   * Every frame: add the batches still queued (FRAME_INSTANCE_BUDGET), and
+   * recheck a camera that keeps moving (see MOTION_CHECK_MS).
+   */
   function onFrame() {
+    ownFrameBudget.added = 0;
+    if (addQueue.length && enabled && !destroyed) pumpAddQueue();
     const now = Date.now();
     if (now - lastMotionCheckMs < MOTION_CHECK_MS) return;
     lastMotionCheckMs = now;
@@ -464,24 +746,44 @@ export function createChunkedAreaLayer(
     };
   }
 
-  function selectArea(entity) {
-    const props = describe(
-      entity.properties?.getValue?.(Cesium.JulianDate.now()) || {},
+  /**
+   * The Entity standing for a picked area, built on first selection only:
+   * the context store, the details card and voice expect an Entity. It is
+   * never added to the scene (the chunk's primitive draws the area).
+   */
+  function entityForRecord(record) {
+    if (record.entity) return record.entity;
+    const hierarchy = hierarchyOf(
+      polygonsOf(record.feature.geometry)[record.part],
     );
-    const hierarchy = entity.polygon?.hierarchy?.getValue(
-      Cesium.JulianDate.now(),
-    );
-    const center = hierarchy?.positions?.length
+    const entity = new Cesium.Entity({
+      id: record.id,
+      name: record.name,
+      properties: record.feature.properties || {},
+      ...(hierarchy && { polygon: { hierarchy } }),
+    });
+    entity.__localLayerId = id;
+    entity.__chunkedChunkId = record.__chunkedChunkId;
+    entity.__chunkedCenter = hierarchy
       ? Cesium.Cartographic.fromCartesian(
           Cesium.BoundingSphere.fromPoints(hierarchy.positions).center,
         )
       : null;
+    record.entity = entity;
+    return entity;
+  }
+
+  function selectArea(record) {
+    const entity = entityForRecord(record);
+    const props = describe(record.feature.properties || {});
+    const center = entity.__chunkedCenter;
     registerEntityContext(entity, {
       id: `${id}:${entity.id}`,
       layerId: id,
       layerName: name,
       source,
-      dataSource: drawn.get(entity.__chunkedChunkId),
+      // The batch drawing the area: the store reads its `show`.
+      dataSource: record.primitive,
       label: props.name || name,
       properties: props,
       latitude: center
@@ -511,17 +813,17 @@ export function createChunkedAreaLayer(
       )
         return;
       const target = pickLocalEntity(viewer.scene, click.position);
-      if (target && target.__localLayerId === id) selectArea(target);
+      if (target && target.__localLayerId === id && target.feature)
+        selectArea(target);
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   }
 
+  /** Loaded areas (features) passing `test`. */
   function countBy(test) {
     let count = 0;
-    for (const dataSource of drawn.values()) {
-      for (const entity of dataSource.entities.values) {
-        const props =
-          entity.properties?.getValue?.(Cesium.JulianDate.now()) || {};
-        if (test(props)) count += 1;
+    for (const { features } of drawn.values()) {
+      for (const feature of features) {
+        if (test(feature.properties || {})) count += 1;
       }
     }
     return count;
@@ -529,8 +831,7 @@ export function createChunkedAreaLayer(
 
   function loadedCount() {
     let count = 0;
-    for (const dataSource of drawn.values())
-      count += dataSource.entities.values.length;
+    for (const { features } of drawn.values()) count += features.length;
     return count;
   }
 
@@ -575,6 +876,7 @@ export function createChunkedAreaLayer(
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
+      fillAlphaListeners.delete(applyFillAlpha);
       enabled = false;
       generation += 1;
       moveEndRemover?.();
@@ -652,8 +954,8 @@ export function createChunkedAreaLayer(
       const withNote = describe;
       let atPoint = null;
       const nearby = [];
-      for (const chunkId of drawn.keys()) {
-        for (const feature of cache.get(chunkId) || []) {
+      for (const { features } of drawn.values()) {
+        for (const feature of features) {
           if (!atPoint && featureContains(feature, longitude, latitude)) {
             atPoint = feature;
             continue;

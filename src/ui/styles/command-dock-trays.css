@@ -214,7 +214,7 @@
 #command-dock .location-pill,
 #command-dock .poi-pill,
 #command-dock .btn-label {
-  font-size: 0.56rem;
+  font-size: 0.5625rem;
 }
 
 #command-dock #location-search,
@@ -420,7 +420,7 @@
   border: 1px solid rgba(255, 143, 157, 0.32);
   border-radius: 0.2rem;
   font-family: var(--font-mono);
-  font-size: 0.43rem;
+  font-size: 0.5625rem;
   letter-spacing: 0.06rem;
   cursor: pointer;
 }
@@ -435,9 +435,9 @@
 
 #command-dock .gev-voice-error-hint {
   margin-top: 0.5rem;
-  color: rgba(255, 196, 203, 0.58);
+  color: rgba(255, 196, 203, 0.72);
   font-family: var(--font-mono);
-  font-size: 0.52rem;
+  font-size: 0.5625rem;
   line-height: 1.45;
   letter-spacing: 0.035rem;
 }

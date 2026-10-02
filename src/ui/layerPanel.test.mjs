@@ -1,24 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { runInNewContext } from 'node:vm';
+import { PANEL_ORDER } from './layerPanel.js';
+import { LAYER_MANIFEST } from '../data/layerManifest.js';
 
+// The panel order is derived from the layer manifest.
 function panelOrder() {
   const source = readFileSync(
     new URL('./layerPanel.js', import.meta.url),
     'utf8',
   );
-  const declarations = source.slice(
-    source.indexOf('const RESEARCH_GROUP ='),
-    source.indexOf('const PANEL_POSITIONS ='),
-  );
-  return {
-    source,
-    order: JSON.parse(
-      runInNewContext(`${declarations}\nJSON.stringify(PANEL_ORDER)`),
-    ),
-  };
+  return { source, order: PANEL_ORDER };
 }
+
+test('every panel row comes from exactly one manifest entry', () => {
+  const listed = LAYER_MANIFEST.filter((entry) => entry.group).map(
+    (entry) => entry.id,
+  );
+  assert.deepEqual(
+    PANEL_ORDER.map(({ id }) => id),
+    listed,
+  );
+  assert.equal(new Set(listed).size, listed.length);
+});
 
 test('locked research datasets keep their own group that never starts folded', () => {
   const { source, order } = panelOrder();

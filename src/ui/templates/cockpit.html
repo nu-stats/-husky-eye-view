@@ -117,6 +117,13 @@
             <span class="material-symbols-outlined" aria-hidden="true">arrow_right</span>
           </button>
         </div>
+        <!-- How solid the map-data fills (tract life expectancy, air quality,
+             parks…) look from the cockpit; the map view keeps its own look. -->
+        <label class="cockpit-layer-opacity" title="How solid the map-data layer colors look from the cockpit">
+          <small>LAYERS</small>
+          <input id="cockpit-layer-opacity" class="gev-quantitative-slider" type="range" min="20" max="95" step="5" value="70" aria-label="Map-data layer opacity in the cockpit" />
+          <strong id="cockpit-layer-opacity-value" aria-hidden="true">70%</strong>
+        </label>
       </div>
     </div>
     <div class="cockpit-reticle material-symbols-outlined" aria-hidden="true">my_location</div>
@@ -301,7 +308,11 @@
         </div>
       </div>
     </aside>
-    <div class="cockpit-help">ESC EXIT <span>·</span> C TOGGLE</div>
+    <div class="cockpit-help" role="note" aria-label="Cockpit keyboard shortcuts">
+      <span>WHEEL / <kbd>+</kbd> <kbd>−</kbd> ZOOM · <kbd>0</kbd> RESET</span>
+      <span><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> / DRAG LOOK · <kbd>HOME</kbd> AHEAD</span>
+      <span><kbd>C</kbd> / <kbd>ESC</kbd> EXIT</span>
+    </div>
   </section>
 
   <nav id="view-switcher" aria-label="View switcher">

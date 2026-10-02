@@ -265,7 +265,7 @@
 .scene-shot-meta {
   margin-top: 4px;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 0.8px;
   color: var(--text-dim);
 }
@@ -281,7 +281,7 @@
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 0.8px;
   padding: 4px 6px;
   cursor: pointer;
@@ -338,7 +338,7 @@
   );
   color: #d5f7ff;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1px;
   display: flex;
   align-items: center;
@@ -427,7 +427,7 @@
 #cctv-panel.collapsed .panel-title,
 #radio-panel.collapsed .panel-title,
 #scene-panel.collapsed .panel-title {
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1.8px;
 }
 

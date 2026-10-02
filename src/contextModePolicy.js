@@ -1,3 +1,5 @@
+import { LAYER_MANIFEST } from './data/layerManifest.js';
+
 const CONTEXT_DEPENDENCIES = Object.freeze({
   flights: new Set([
     'military-awareness',
@@ -9,8 +11,13 @@ const CONTEXT_DEPENDENCIES = Object.freeze({
   'space-missions': new Set(['rocket-launches', 'satellites']),
 });
 const CONTEXT_COMPANIONS = new Set(['radio']);
-/** Local layers that are live feeds (FIRMS fires), not this project's map data. */
-const LIVE_LOCAL_LAYERS = new Set(['local-firms']);
+/**
+ * Local layers that are live feeds (FIRMS fires), not this project's map
+ * data: the manifest entries marked `live`.
+ */
+const LIVE_LOCAL_LAYERS = new Set(
+  LAYER_MANIFEST.filter((entry) => entry.live).map((entry) => entry.id),
+);
 
 /**
  * This project's own map-data layers (life expectancy, HOLC, Boston, TLR,

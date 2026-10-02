@@ -44,7 +44,6 @@
     rgba(9, 18, 28, 0.93)
   );
   border-color: rgba(187, 187, 187, 0.7);
-  outline: none;
   transform: translateY(-1px);
 }
 
@@ -149,7 +148,6 @@
 .key-setup-close:focus-visible {
   color: rgba(225, 244, 248, 0.95);
   border-color: rgba(187, 187, 187, 0.5);
-  outline: none;
 }
 
 .key-setup-close .material-symbols-outlined {
@@ -240,13 +238,13 @@
 }
 
 .key-setup-tier {
-  font-size: 0.55rem;
+  font-size: 0.5625rem;
 }
 
 .key-setup-exposed {
   padding: 0.05rem 0.3rem;
   color: rgba(255, 200, 120, 0.75);
-  font-size: 0.5rem;
+  font-size: 0.5625rem;
   letter-spacing: 0.06rem;
   text-transform: uppercase;
   border: 1px solid rgba(255, 200, 120, 0.3);
@@ -266,7 +264,6 @@
 .key-setup-get:focus-visible {
   color: rgba(187, 187, 187, 1);
   text-decoration: underline;
-  outline: none;
 }
 
 .key-setup-unlocks {
@@ -297,7 +294,7 @@
 }
 
 .key-setup-fields input::placeholder {
-  color: rgba(148, 178, 188, 0.42);
+  color: rgba(148, 178, 188, 0.62);
 }
 
 .key-setup-footer {
@@ -321,7 +318,6 @@
 .key-setup-apply:hover,
 .key-setup-apply:focus-visible {
   filter: brightness(1.08);
-  outline: none;
 }
 
 .key-setup-apply[aria-disabled='true'] {
@@ -363,7 +359,7 @@ body.scene-playback-mode #key-setup {
 .key-setup-external {
   padding: 0.05rem 0.3rem;
   color: rgba(190, 190, 190, 0.7);
-  font-size: 0.5rem;
+  font-size: 0.5625rem;
   letter-spacing: 0.06rem;
   text-transform: uppercase;
   border: 1px solid rgba(190, 190, 190, 0.28);
@@ -376,7 +372,7 @@ body.scene-playback-mode #key-setup {
   padding: 0.28rem 0.55rem;
   color: rgba(255, 170, 150, 0.8);
   font-family: var(--font-mono);
-  font-size: 0.55rem;
+  font-size: 0.5625rem;
   letter-spacing: 0.08rem;
   background: none;
   border: 1px solid rgba(255, 170, 150, 0.3);
@@ -391,5 +387,4 @@ body.scene-playback-mode #key-setup {
 .key-setup-remove:focus-visible {
   color: rgba(255, 190, 170, 1);
   border-color: rgba(255, 170, 150, 0.65);
-  outline: none;
 }

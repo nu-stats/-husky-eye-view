@@ -7,18 +7,16 @@
  * layer that is switched on (say, from a shared link) always stays listed.
  */
 
-/** Layers the research profile keeps out of the Data Layers list. */
+import { LAYER_MANIFEST } from '../data/layerManifest.js';
+
+/**
+ * Layers the research profile keeps out of the Data Layers list: the
+ * manifest entries marked `extra` (satellites, launches, military, cables…).
+ */
 export const RESEARCH_HIDDEN_LAYERS = Object.freeze(
-  new Set([
-    'satellites',
-    'rocket-launches',
-    'military',
-    'military-installations',
-    'telegeography-submarine-cables',
-    // Mostly outside the US (62% of data centers, 88% of dams).
-    'local-datacenters',
-    'local-dams',
-  ]),
+  new Set(
+    LAYER_MANIFEST.filter((entry) => entry.extra).map((entry) => entry.id),
+  ),
 );
 
 const SHOW_ALL_KEY = 'hev.showAllLayers';

@@ -778,12 +778,11 @@ Git history on main (newest first):
 Adding a layer later:
             1. Build its data file under src/data/local_data/ (pins) or public/context/
                (chunked areas; see scripts/build-environment-layers.mjs).
-            2. Add it in src/data/infrastructure.js.
-            3. Give it a registry entry and share-link token in src/data/layerState.js.
-               That alone makes it voice-enabled.
-            4. Put it in a panel group in src/ui/layerPanel.js.
-            5. Update the layer counts in the tests.
-            6. Optionally, add spoken names in LAYER_ALIASES (src/voice/gevActions.js).
+            2. Add its factory in src/data/infrastructure.js.
+            3. Add ONE entry in src/data/layerManifest.js (since Step 46): share-link
+               token, Data Layers group and label, data years, spoken names. The
+               share links, voice list, panel and research profile all read it.
+            4. Update the layer counts in the tests.
 
 Useful commands (run from the project folder):
             node scripts/run-unit-tests.mjs         run all tests

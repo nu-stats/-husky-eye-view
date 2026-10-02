@@ -7,7 +7,9 @@ import * as Cesium from 'cesium';
 import {
   chunksInView,
   createChunkedAreaLayer,
+  getChunkedAreaFillAlpha,
   horizonViewBox,
+  setChunkedAreaFillAlpha,
   viewPoseMoved,
 } from './chunkedAreaLayer.js';
 
@@ -71,7 +73,45 @@ test('chunksInView keeps intersecting chunks, nearest first, up to the limit', (
   assert.deepEqual(chunksInView(index, view, 1), ['center']);
 });
 
-async function createHarness({ heightM = 20_000, layerOptions = {} } = {}) {
+// A Cook County chunk with several areas: two plain tracts, a two-part
+// MultiPolygon, and a tract without an estimate.
+const COOK_AREAS = [
+  {
+    type: 'Feature',
+    id: 'tract-a',
+    properties: { name: 'Tract A', life_exp_8: 68.8 },
+    geometry: square(-87.7, 41.9),
+  },
+  {
+    type: 'Feature',
+    id: 'tract-b',
+    properties: { name: 'Tract B', life_exp_8: 81.2 },
+    geometry: {
+      type: 'MultiPolygon',
+      coordinates: [
+        square(-87.66, 41.9).coordinates,
+        square(-87.62, 41.9).coordinates,
+      ],
+    },
+  },
+  {
+    type: 'Feature',
+    id: 'tract-c',
+    properties: { name: 'Tract C', life_exp_8: 72.0 },
+    geometry: square(-87.58, 41.9),
+  },
+  {
+    type: 'Feature',
+    properties: { name: 'Tract D' },
+    geometry: square(-87.54, 41.9),
+  },
+];
+
+async function createHarness({
+  heightM = 20_000,
+  layerOptions = {},
+  chunks = CHUNKS,
+} = {}) {
   const originalFetch = globalThis.fetch;
   const originalWindow = globalThis.window;
   const fetched = [];
@@ -89,19 +129,23 @@ async function createHarness({ heightM = 20_000, layerOptions = {} } = {}) {
     const id = decodeURIComponent(
       url.split('/').pop().replace('.geojsonl', ''),
     );
+    const features = [chunks[id]].flat();
     return {
       ok: true,
       status: 200,
-      text: async () => `${JSON.stringify(CHUNKS[id])}\n`,
+      text: async () =>
+        `${features.map((feature) => JSON.stringify(feature)).join('\n')}\n`,
     };
   };
   const moveEnd = new MockEvent();
   const preRender = new MockEvent();
   const added = [];
+  const ground = [];
   let clickAction = null;
   let pickResult = null;
   const viewer = {
     selectedEntity: undefined,
+    // Entities are no longer drawn; anything added here is a regression.
     dataSources: {
       add: async (ds) => added.push(ds),
       remove: (ds) => {
@@ -126,6 +170,20 @@ async function createHarness({ heightM = 20_000, layerOptions = {} } = {}) {
       pick: () => pickResult,
       requestRender() {},
       preRender,
+      // Like Cesium's PrimitiveCollection: remove() destroys the primitive.
+      groundPrimitives: {
+        add: (primitive) => {
+          ground.push(primitive);
+          return primitive;
+        },
+        remove: (primitive) => {
+          const i = ground.indexOf(primitive);
+          if (i < 0) return false;
+          ground.splice(i, 1);
+          primitive.destroy();
+          return true;
+        },
+      },
     },
   };
   const layer = createChunkedAreaLayer(
@@ -162,11 +220,23 @@ async function createHarness({ heightM = 20_000, layerOptions = {} } = {}) {
     viewer,
     fetched,
     added,
+    ground,
     selected,
     moveEnd,
     preRender,
-    setPick: (entity) => {
-      pickResult = entity ? { id: entity } : null;
+    /** Pick records (instance ids) of the drawn primitive at `index`. */
+    records: (index = 0) =>
+      ground[index].geometryInstances.map((instance) => instance.id),
+    /** Make the next click hit an instance, as scene.pick reports it. */
+    setPick: (record) => {
+      pickResult = record
+        ? {
+            primitive: ground.find((p) =>
+              p.geometryInstances.some((i) => i.id === record),
+            ),
+            id: record,
+          }
+        : null;
     },
     click: () => clickAction({ position: new Cesium.Cartesian2(10, 10) }),
     cleanup() {
@@ -318,8 +388,7 @@ test('clicking an area selects it with its summary', async () => {
   const env = await createHarness();
   try {
     await env.layer.enable(env.viewer);
-    const entity = env.added[0].entities.values[0];
-    env.setPick(entity);
+    env.setPick(env.records()[0]);
     env.click();
     assert.equal(env.selected.length, 1);
     const record = env.selected[0];
@@ -385,12 +454,48 @@ test('fillAlpha sets the area fill opacity', async () => {
   const env = await createHarness({ layerOptions: { fillAlpha: 0.6 } });
   try {
     await env.layer.enable(env.viewer);
-    const entity = env.added[0].entities.values[0];
-    const color = entity.polygon.material.color.getValue(
-      Cesium.JulianDate.now(),
-    );
-    assert.ok(Math.abs(color.alpha - 0.6) < 1e-6);
+    const [instance] = env.ground[0].geometryInstances;
+    // Per-instance colors are bytes: alpha 0.6 is 153/255.
+    assert.ok(Math.abs(instance.attributes.color.value[3] / 255 - 0.6) < 0.01);
+    assert.equal(env.ground[0].appearance.translucent, true);
   } finally {
+    env.cleanup();
+  }
+});
+
+test('the shared fill opacity (cockpit LAYERS slider) recolors drawn areas and clears back', async () => {
+  const env = await createHarness({ layerOptions: { fillAlpha: 0.4 } });
+  const alphaOf = (primitive) =>
+    primitive.geometryInstances[0].attributes.color.value[3] / 255;
+  try {
+    await env.layer.enable(env.viewer);
+    assert.ok(Math.abs(alphaOf(env.ground[0]) - 0.4) < 0.01);
+    // A batch still being prepared is rebuilt at the new opacity.
+    setChunkedAreaFillAlpha(0.8);
+    assert.equal(getChunkedAreaFillAlpha(), 0.8);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(env.ground.length, 1);
+    assert.ok(Math.abs(alphaOf(env.ground[0]) - 0.8) < 0.01);
+
+    // A ready batch recolors in place, without a rebuild.
+    const ready = env.ground[0];
+    const written = [];
+    Object.defineProperty(ready, 'ready', { value: true });
+    ready.getGeometryInstanceAttributes = (record) => {
+      const attributes = { color: new Uint8Array(4) };
+      written.push({ record, attributes });
+      return attributes;
+    };
+    setChunkedAreaFillAlpha(null);
+    assert.equal(getChunkedAreaFillAlpha(), null);
+    assert.equal(env.ground[0], ready, 'same primitive, recolored in place');
+    assert.ok(written.length > 0);
+    for (const { record, attributes } of written) {
+      assert.ok(record.feature, 'each instance is recolored from its feature');
+      assert.ok(Math.abs(attributes.color[3] / 255 - 0.4) < 0.01);
+    }
+  } finally {
+    setChunkedAreaFillAlpha(null);
     env.cleanup();
   }
 });
@@ -399,10 +504,247 @@ test('disable releases every drawn county', async () => {
   const env = await createHarness();
   try {
     await env.layer.enable(env.viewer);
-    assert.equal(env.added.length, 1);
+    assert.equal(env.ground.length, 1);
+    const [primitive] = env.ground;
     env.layer.disable(env.viewer);
-    assert.equal(env.added.length, 0);
+    assert.equal(env.ground.length, 0);
+    assert.equal(primitive.isDestroyed(), true);
     assert.deepEqual(env.layer.getDrawnChunkIds(), []);
+  } finally {
+    env.cleanup();
+  }
+});
+
+test('a county is drawn as one batched ground primitive, not an entity per area', async () => {
+  const env = await createHarness({ chunks: { ...CHUNKS, 17031: COOK_AREAS } });
+  try {
+    await env.layer.enable(env.viewer);
+    assert.equal(env.added.length, 0, 'no data sources / entities');
+    assert.equal(env.ground.length, 1, 'one primitive for the county');
+    const [primitive] = env.ground;
+    assert.ok(primitive instanceof Cesium.GroundPrimitive);
+    assert.equal(primitive.classificationType, Cesium.ClassificationType.BOTH);
+    assert.ok(
+      primitive.appearance instanceof Cesium.PerInstanceColorAppearance,
+    );
+    // One instance per polygon: the MultiPolygon contributes two.
+    assert.deepEqual(
+      env.records().map((record) => record.id),
+      ['tract-a', 'tract-b', 'tract-b_2', 'tract-c', '17031:3'],
+    );
+    assert.ok(
+      primitive.geometryInstances.every(
+        (instance) => instance.geometry instanceof Cesium.PolygonGeometry,
+      ),
+    );
+    // Counts are areas (features), not polygon parts.
+    assert.equal(env.layer.getStats().count, 4);
+    assert.deepEqual(
+      env.layer.getRowControls().legend.map((l) => [l.label, l.count]),
+      [['low', 2]],
+    );
+  } finally {
+    env.cleanup();
+  }
+});
+
+test('each area takes its own color from featureColor', async () => {
+  const env = await createHarness({
+    chunks: { ...CHUNKS, 17031: COOK_AREAS },
+    layerOptions: {
+      featureColor: (p) =>
+        !Number.isFinite(p.life_exp_8)
+          ? 'not a color'
+          : p.life_exp_8 < 75
+            ? '#b2182b'
+            : '#2166ac',
+    },
+  });
+  try {
+    await env.layer.enable(env.viewer);
+    const bytes = (css) => {
+      const value = Cesium.ColorGeometryInstanceAttribute.toValue(
+        Cesium.Color.fromCssColorString(css).withAlpha(0.4),
+      );
+      return [...value];
+    };
+    const colors = env.ground[0].geometryInstances.map((instance) => [
+      ...instance.attributes.color.value,
+    ]);
+    assert.deepEqual(colors, [
+      bytes('#b2182b'),
+      bytes('#2166ac'),
+      bytes('#2166ac'),
+      bytes('#b2182b'),
+      bytes('#9e9e9e'), // unparseable color falls back to gray
+    ]);
+  } finally {
+    env.cleanup();
+  }
+});
+
+test('picking an area of the batch selects exactly that feature', async () => {
+  const env = await createHarness({
+    chunks: { ...CHUNKS, 17031: COOK_AREAS },
+    layerOptions: { sourceNote: 'USALEEP.' },
+  });
+  try {
+    await env.layer.enable(env.viewer);
+    const records = env.records();
+    // The second part of tract B.
+    env.setPick(records[2]);
+    env.click();
+    assert.equal(env.selected.length, 1);
+    const record = env.selected[0];
+    assert.equal(record.id, 'local-life-expectancy:tract-b_2');
+    assert.equal(record.label, 'Tract B');
+    assert.equal(record.properties.life_exp_8, 81.2);
+    assert.equal(record.properties.source_note, 'USALEEP.');
+    assert.equal(record.dataSource, env.ground[0]);
+    // Centered on the clicked part (-87.62), not the feature's other part.
+    assert.ok(Math.abs(record.longitude - -87.62) < 0.01, record.longitude);
+    assert.ok(Math.abs(record.latitude - 41.9) < 0.01, record.latitude);
+    // The context store gets a real (detached) Entity, made on demand.
+    const entity = env.viewer.selectedEntity;
+    assert.ok(entity instanceof Cesium.Entity);
+    assert.equal(entity.__localLayerId, 'local-life-expectancy');
+    assert.equal(entity.__gevContextId, record.id);
+    assert.ok(
+      records.every((r, i) => (i === 2 ? r.entity === entity : !r.entity)),
+      'only the clicked area has an entity',
+    );
+    // Clicking it again reuses the same entity.
+    env.click();
+    assert.equal(env.viewer.selectedEntity, entity);
+
+    // Another layer's area is not ours to select.
+    env.setPick({ ...records[0], __localLayerId: 'local-air-pm25' });
+    env.click();
+    assert.equal(env.selected.length, 2);
+  } finally {
+    env.cleanup();
+  }
+});
+
+test('featureFilter keeps only the matching areas in the batch', async () => {
+  const env = await createHarness({
+    chunks: { ...CHUNKS, 17031: COOK_AREAS },
+    layerOptions: { featureFilter: (p) => p.life_exp_8 < 75 },
+  });
+  try {
+    await env.layer.enable(env.viewer);
+    assert.deepEqual(
+      env.records().map((record) => record.feature.properties.name),
+      ['Tract A', 'Tract C'],
+    );
+    assert.equal(env.layer.getStats().count, 2);
+  } finally {
+    env.cleanup();
+  }
+  // A chunk with nothing left counts as drawn but adds no primitive.
+  const none = await createHarness({
+    chunks: { ...CHUNKS, 17031: COOK_AREAS },
+    layerOptions: { featureFilter: () => false },
+  });
+  try {
+    await none.layer.enable(none.viewer);
+    assert.deepEqual(none.layer.getDrawnChunkIds(), ['17031']);
+    assert.equal(none.ground.length, 0);
+    assert.equal(none.layer.getStats().count, 0);
+  } finally {
+    none.cleanup();
+  }
+});
+
+test('a county with thousands of areas is split into even batches added over several frames', async () => {
+  const many = Array.from({ length: 1300 }, (_, i) => ({
+    type: 'Feature',
+    id: `t${i}`,
+    properties: { name: `T${i}`, life_exp_8: i % 2 ? 70 : 80 },
+    geometry: square(
+      -87.9 + (i % 50) * 0.01,
+      41.6 + Math.floor(i / 50) * 0.01,
+      0.004,
+    ),
+  }));
+  const env = await createHarness({ chunks: { ...CHUNKS, 17031: many } });
+  try {
+    await env.layer.enable(env.viewer);
+    assert.equal(env.layer.getStats().count, 1300);
+    // 1,300 polygons: three batches of 434/434/432, one entering per frame.
+    assert.equal(env.ground.length, 1);
+    env.preRender.raise();
+    assert.equal(env.ground.length, 2);
+    env.preRender.raise();
+    assert.equal(env.ground.length, 3);
+    assert.deepEqual(
+      env.ground.map((p) => p.geometryInstances.length),
+      [434, 434, 432],
+    );
+    // Picking an area in a later batch maps to that batch and feature.
+    const record = env.records(2).at(-1);
+    env.setPick(record);
+    env.click();
+    assert.equal(env.selected[0].properties.name, 'T1299');
+    assert.equal(env.selected[0].dataSource, env.ground[2]);
+    // Leaving releases every batch, including any still queued.
+    const batches = [...env.ground];
+    env.layer.disable(env.viewer);
+    assert.ok(batches.every((p) => p.isDestroyed()));
+    assert.equal(env.ground.length, 0);
+  } finally {
+    env.cleanup();
+  }
+});
+
+test('batches still queued when their county leaves are destroyed, never added', async () => {
+  const many = Array.from({ length: 1300 }, (_, i) => ({
+    type: 'Feature',
+    id: `t${i}`,
+    properties: { life_exp_8: 70 },
+    geometry: square(
+      -87.9 + (i % 50) * 0.01,
+      41.6 + Math.floor(i / 50) * 0.01,
+      0.004,
+    ),
+  }));
+  const env = await createHarness({ chunks: { ...CHUNKS, 17031: many } });
+  try {
+    await env.layer.enable(env.viewer);
+    assert.equal(env.ground.length, 1);
+    env.layer.disable(env.viewer);
+    env.preRender.raise();
+    assert.equal(env.ground.length, 0);
+  } finally {
+    env.cleanup();
+  }
+});
+
+test('a county leaving the view destroys its primitive and its selection', async () => {
+  const env = await createHarness();
+  try {
+    await env.layer.enable(env.viewer);
+    const [chicago] = env.ground;
+    env.setPick(env.records()[0]);
+    env.click();
+    assert.equal(env.viewer.selectedEntity.__chunkedChunkId, '17031');
+    env.viewer.camera.positionCartographic = Cesium.Cartographic.fromDegrees(
+      -118.3,
+      34.2,
+      20_000,
+    );
+    env.viewer.camera.computeViewRectangle = () =>
+      Cesium.Rectangle.fromDegrees(-118.6, 33.9, -118.0, 34.5);
+    env.moveEnd.raise();
+    for (let i = 0; i < 50; i++) {
+      if (env.layer.getDrawnChunkIds()[0] === '06037') break;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    assert.deepEqual(env.layer.getDrawnChunkIds(), ['06037']);
+    assert.equal(chicago.isDestroyed(), true);
+    assert.equal(env.ground.length, 1);
+    assert.notEqual(env.ground[0], chicago);
+    assert.equal(env.viewer.selectedEntity, undefined);
   } finally {
     env.cleanup();
   }

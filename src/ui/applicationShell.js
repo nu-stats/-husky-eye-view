@@ -349,6 +349,7 @@ export class StyleManager extends ShellFacade {
         fetchRegionalBrief: services.fetchRegionalBrief,
         regionalDistanceM: services.regionalDistanceM,
         weatherCodeLabel: services.weatherCodeLabel,
+        setAreaFillAlpha: services.setAreaFillAlpha,
       },
       elements: {
         _ppToggles: this._ppToggles,

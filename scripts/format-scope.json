@@ -232,6 +232,7 @@
   "src/ui/cockpitInput.js",
   "src/ui/cockpitZoom.js",
   "src/ui/cockpitLook.js",
+  "src/ui/cockpitLayerOpacity.js",
   "src/ui/cockpitInstruments.js",
   "src/ui/cockpitLayout.js",
   "src/ui/cockpitPresentation.js",

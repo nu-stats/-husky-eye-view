@@ -635,7 +635,7 @@
 #gev-voice-control .gev-voice-help-kicker {
   color: rgba(187, 187, 187, 0.72);
   font-family: var(--font-mono);
-  font-size: 0.46rem;
+  font-size: 0.5625rem;
   font-weight: 600;
   letter-spacing: 0.1rem;
 }

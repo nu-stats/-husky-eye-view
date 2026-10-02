@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium';
 import { isPointerFree } from './inputOwnership.js';
+import { layerManifestEntry } from './layerManifest.js';
 import {
   selectInfraLod,
   applyInfraEvictionGrace,
@@ -1911,18 +1912,7 @@ function clampCardLine(value) {
   return text.length > 48 ? `${text.slice(0, 45)}...` : text;
 }
 
+/** Card title for an unnamed pin: the layer manifest's `cardNoun`. */
 function layerTitle(layerId) {
-  if (layerId === 'local-datacenters') return 'Datacenter';
-  if (layerId === 'local-dams') return 'Dam';
-  if (layerId === 'local-chicago-events' || layerId === 'local-tlr')
-    return 'Event';
-  if (layerId === 'local-gang-map') return 'Hood';
-  if (layerId === 'local-boston-neighborhoods') return 'Neighborhood';
-  if (layerId === 'local-famous-shootings') return 'Shooting';
-  if (layerId?.startsWith('local-miami-homicides-')) return 'Homicide';
-  if (layerId === 'local-trauma-centers') return 'Trauma center';
-  if (layerId === 'local-gva-2015') return 'Gun death';
-  if (layerId === 'local-mkdb') return 'Mass killing';
-  if (layerId === 'local-public-housing') return 'Public housing';
-  return 'Feature';
+  return layerManifestEntry(layerId)?.cardNoun || 'Feature';
 }

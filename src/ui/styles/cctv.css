@@ -269,7 +269,7 @@
   align-items: center;
   justify-content: center;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 2.2px;
   color: rgba(219, 219, 219, 0.62);
   pointer-events: none;
@@ -316,7 +316,7 @@
   background: rgba(170, 170, 170, 0.09);
   color: #dfdfdf;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1.3px;
   padding: 4px 8px;
 }
@@ -335,7 +335,7 @@
 
 .cctv-summary-label {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1.7px;
   color: var(--text-dim);
 }

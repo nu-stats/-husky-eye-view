@@ -3,6 +3,7 @@ export { layerFeedState } from '../data/feedState.js';
 import { GUIDANCE_STATUSES } from '../loadingFeedback.js';
 import { keySetupRequirement } from '../keySetupCore.mjs';
 import { openResearchKeyPrompt } from './researchKeyPrompt.js';
+import { LAYER_MANIFEST, RESEARCH_GROUP } from '../data/layerManifest.js';
 import {
   applyLayerProfileClass,
   layerListedInProfile,
@@ -19,144 +20,51 @@ const FEED_STATE_LABELS = Object.freeze({
   unavailable: 'UNAVAILABLE',
 });
 
-const RESEARCH_GROUP = 'Research Data';
-// Presentation order is independent of catalog registration and startup order.
-const PANEL_GROUPS = [
-  // The project's own research layers come first; the live feeds and tools
-  // inherited from God's Eye View follow.
-  {
-    label: 'Neighborhood Data (US)',
-    ids: [
-      'local-holc-redlining',
-      'local-life-expectancy',
-      'local-tract-le-clusters',
-      'local-county-life-expectancy',
-      'local-county-le-clusters',
-    ],
-  },
-  {
-    label: 'Air Quality (US)',
-    ids: ['local-air-pm25', 'local-air-ozone', 'local-air-nonattainment'],
-  },
-  {
-    label: 'Green Space (US)',
-    ids: ['local-park-access', 'local-parks'],
-  },
-  {
-    label: 'Health & Housing (US)',
-    ids: ['local-trauma-centers', 'local-public-housing'],
-  },
-  {
-    // Key-locked datasets get their own group that never starts folded, so
-    // they stay in sight whether or not the research key is set.
-    label: RESEARCH_GROUP,
-    ids: ['local-gva-2015', 'local-mkdb'],
-  },
-  {
-    label: 'Boston',
-    ids: ['local-boston-neighborhoods'],
-  },
-  {
-    label: 'Chicago',
-    ids: [
-      'local-chicago-events',
-      'local-tlr',
-      'local-famous-shootings',
-      'local-gang-map',
-      'local-gang-map-labels',
-    ],
-  },
-  {
-    label: 'Miami-Dade Homicides',
-    ids: [
-      'local-miami-homicide-hotspots',
-      'local-miami-homicides-1950s',
-      'local-miami-homicides-1960s',
-      'local-miami-homicides-1970s',
-      'local-miami-homicides-1980s',
-      'local-miami-homicides-1990s',
-      'local-miami-homicides-2000s',
-    ],
-  },
-  {
-    label: '3D Captures',
-    ids: ['local-3d-captures'],
-  },
-  {
-    label: 'Live Feeds',
-    ids: [
-      'flights',
-      'military',
-      'ais-live-vessels',
-      'traffic',
-      'transit',
-      'bikeshare',
-      'cctv',
-      'alpr-cameras',
-      'earthquakes',
-      'local-firms',
-      'satellites',
-      'rocket-launches',
-    ],
-  },
-  {
-    label: 'Infrastructure',
-    ids: [
-      'military-installations',
-      'local-datacenters',
-      'telegeography-submarine-cables',
-      'local-dams',
-    ],
-  },
-  {
-    label: 'Utilities',
-    ids: ['directions', 'radio'],
-  },
-];
-const PANEL_ORDER = PANEL_GROUPS.flatMap(({ label, ids }) =>
+// Groups, their order and the rows in each come from the layer manifest
+// (src/data/layerManifest.js), which lists layers in panel order: the
+// project's research layers first, then the feeds inherited from God's Eye
+// View. Presentation order is independent of catalog registration.
+export const PANEL_GROUPS = Object.freeze(
+  LAYER_MANIFEST.reduce((groups, entry) => {
+    if (!entry.group) return groups;
+    let group = groups.find(({ label }) => label === entry.group);
+    if (!group) {
+      group = { label: entry.group, ids: [] };
+      groups.push(group);
+    }
+    group.ids.push(entry.id);
+    return groups;
+  }, []),
+);
+export const PANEL_ORDER = PANEL_GROUPS.flatMap(({ label, ids }) =>
   ids.map((id) => ({ id, label })),
 );
 const PANEL_POSITIONS = new Map(
   PANEL_ORDER.map(({ id }, index) => [id, index]),
 );
-const PANEL_LABELS = {
-  'ais-live-vessels': 'Live Vessels',
-  bikeshare: 'Bike Share',
-  cctv: 'Cameras',
-  'alpr-cameras': 'Mapped ALPR Cameras',
-  'local-datacenters': 'Data Centers',
-  'local-firms': 'Active Fires',
-};
+const PANEL_LABELS = Object.fromEntries(
+  LAYER_MANIFEST.filter((entry) => entry.label).map((entry) => [
+    entry.id,
+    entry.label,
+  ]),
+);
 
 function panelLabel(layer) {
   return PANEL_LABELS[layer.id] || layer.name;
 }
 
-// The years a static dataset describes, shown in its row instead of a "2m
-// ago" refresh time that only means something for live feeds.
-const DATA_VINTAGE = Object.freeze({
-  'local-holc-redlining': '1930s maps',
-  'local-life-expectancy': '2010–2015',
-  'local-tract-le-clusters': '2010–2015',
-  'local-county-life-expectancy': '2000–2019',
-  'local-county-le-clusters': '2015',
-  'local-air-pm25': '2021',
-  'local-air-ozone': '2022',
-  'local-air-nonattainment': 'as of Aug 2026',
-  'local-park-access': '2020',
-  'local-parks': '2025',
-  'local-gva-2015': '2015',
-  'local-mkdb': '2006–2023',
-  'local-miami-homicide-hotspots': '1956–2011',
-  'local-miami-homicides-1950s': '1956–1959',
-  'local-miami-homicides-1960s': '1960s',
-  'local-miami-homicides-1970s': '1970s',
-  'local-miami-homicides-1980s': '1980s',
-  'local-miami-homicides-1990s': '1990s',
-  'local-miami-homicides-2000s': '2000–2011',
-});
+// The years a static dataset describes (manifest `vintage`), shown in its row
+// instead of a "2m ago" refresh time that only means something for live feeds.
+const DATA_VINTAGE = Object.fromEntries(
+  LAYER_MANIFEST.filter((entry) => entry.vintage).map((entry) => [
+    entry.id,
+    entry.vintage,
+  ]),
+);
 // Live layers whose ids share the local- prefix of the static datasets.
-const LIVE_LOCAL_LAYERS = new Set(['local-firms']);
+const LIVE_LOCAL_LAYERS = new Set(
+  LAYER_MANIFEST.filter((entry) => entry.live).map((entry) => entry.id),
+);
 
 /** What the row says about how current the data is, or '' for none. */
 function dataFreshness(layerId, ago) {

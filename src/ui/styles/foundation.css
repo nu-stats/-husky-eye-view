@@ -12,8 +12,8 @@
   --accent-dim: rgba(170, 170, 170, 0.15);
   --accent-glow: rgba(170, 170, 170, 0.4);
   --text-primary: #e8eaed;
-  --text-secondary: rgba(232, 234, 237, 0.5);
-  --text-dim: rgba(232, 234, 237, 0.3);
+  --text-secondary: rgba(232, 234, 237, 0.76);
+  --text-dim: rgba(232, 234, 237, 0.64);
   /* Opaque surface for browser-painted menus, which cannot use --glass-bg. */
   --menu-bg: #12121c;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
@@ -307,7 +307,7 @@ body.cockpit-mode #cockpit-cloud-effects.active {
   pointer-events: auto;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: rgba(232, 234, 237, 0.55);
+  color: rgba(232, 234, 237, 0.68);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 #cesium-credits .cesium-credit-logoContainer,

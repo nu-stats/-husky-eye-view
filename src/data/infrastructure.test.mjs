@@ -275,9 +275,11 @@ test('a locked layer sends this browser session’s research key, and only that'
 });
 
 test('dataset URLs still name the complete bundled sources', () => {
+  // US-only since v0.1.3 (scripts/filter-points-to-us.mjs): 1,549 of 4,351
+  // data centers and 66 of 704 dams.
   for (const [file, count] of [
-    ['datacenters', 4351],
-    ['dams', 704],
+    ['datacenters', 1549],
+    ['dams', 66],
   ]) {
     const lines = readFileSync(
       new URL(`./local_data/${file}/${file}.geojsonl`, import.meta.url),
@@ -382,6 +384,8 @@ test('consumer build includes only infrastructure code and resolves assets under
   assert.deepEqual(sources.map((id) => id.split('/').at(-1)).sort(), [
     'chunkedAreaLayer.js',
     'infrastructure.js',
+    // Pure layer metadata (card nouns for unnamed pins).
+    'layerManifest.js',
     'localGeojsonCore.js',
     'localGeojsonLod.js',
     'localLabelSettings.js',

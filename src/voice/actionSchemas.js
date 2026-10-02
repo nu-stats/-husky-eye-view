@@ -1,4 +1,6 @@
-import { REGISTERED_LAYER_IDS } from '../data/layerState.js';
+// The pure manifest, not layerState.js: these schemas are a portable export,
+// and layerState.js reaches localStorage.
+import { REGISTERED_LAYER_IDS } from '../data/layerManifest.js';
 
 // Every registered data layer is voice-controllable. A layer joins the
 // registry to get a share-link token, so new layers reach voice automatically.

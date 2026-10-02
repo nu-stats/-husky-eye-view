@@ -48,6 +48,7 @@ export class CockpitCoordinator {
       fetchRegionalBrief,
       regionalDistanceM,
       weatherCodeLabel,
+      setAreaFillAlpha,
     } = services;
     this._cockpitDisplayPortal = null;
     this.cockpitView = new CockpitViewController(viewer, {
@@ -69,6 +70,7 @@ export class CockpitCoordinator {
         fetchRegionalBrief,
         regionalDistanceM,
         weatherCodeLabel,
+        setAreaFillAlpha,
       },
       onVisionChange: (mode, active, options) =>
         this._setCockpitVision(mode, active, options),

@@ -16,3 +16,9 @@ ODbL 1.0 with the required OpenStreetMap attribution.
 
 The original extraction date and query were not recorded alongside this
 snapshot. Future refreshes should record both before replacing the file.
+
+## United States only (since v0.1.3)
+
+The runtime file keeps only features inside the United States (50 states, DC and
+Puerto Rico): 1,549 of the original 4,351 features. The filter uses the Census 2024 tract
+outlines as the boundary; see `scripts/filter-points-to-us.mjs`.

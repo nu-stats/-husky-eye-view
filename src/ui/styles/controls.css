@@ -57,7 +57,7 @@
 
 .panel-mini-label {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1.4px;
   color: var(--text-dim);
   text-transform: uppercase;
@@ -89,7 +89,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1.4px;
   color: var(--text-dim);
 }
@@ -252,7 +252,7 @@
   top: 6px;
   right: 6px;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   color: var(--text-dim);
   opacity: 0;
   transition: opacity var(--transition-fast);
@@ -437,7 +437,7 @@
 
 #pp-toggles .pp-header-label {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1.4px;
   color: var(--text-dim);
 }
@@ -645,7 +645,7 @@
 
 .pp-slider-mini-label {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1px;
   color: var(--text-dim);
   text-transform: uppercase;
@@ -675,7 +675,7 @@
 }
 
 .detection-allocation-seg .pp-mode-btn {
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 0.35px;
 }
 
@@ -698,7 +698,7 @@
   justify-content: space-between;
   color: rgba(190, 221, 230, 0.62);
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1.35px;
 }
 
@@ -784,7 +784,7 @@
 }
 
 .map-stack-chip-req {
-  font-size: 7px;
+  font-size: 9px;
   letter-spacing: 0.3px;
   color: rgba(232, 234, 237, 0.28);
 }
@@ -859,7 +859,7 @@
 .draw-hint {
   flex-basis: 100%;
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 0.6px;
   color: var(--text-dim);
   line-height: 1.4;
@@ -1010,6 +1010,17 @@ body.ui-clean-view #scene-runtime.active {
   }
 }
 
+/* Looping pulses are decoration: the loader text and the green detection
+   state stay fully legible without them. */
+@media (prefers-reduced-motion: reduce) {
+  .loader-logo,
+  .loader-status,
+  #detection-toggle.panoptic,
+  #detection-toggle.god {
+    animation: none;
+  }
+}
+
 /* ── Parameter Slider Panel ──────────────────── */
 #param-slider-panel {
   display: none;
@@ -1070,7 +1081,7 @@ body.ui-clean-view #scene-runtime.active {
 
 .param-panel-title {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 2.5px;
   color: var(--text-dim);
   text-transform: uppercase;

@@ -1,11 +1,9 @@
 import { expandApplicationHtml } from '../build/application-html.js';
 import { readStylesheet } from './testSupport/readStylesheet.mjs';
 import { GEV_REALTIME_TOOLS } from '../server/providers/openai/tools.js';
-import { REGISTERED_LAYER_IDS } from './data/layerState.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import crypto from 'node:crypto';
 import {
   ENVIRONMENTAL_LABEL_CHOICE,
   EXCLUSIVE_SURFACE_CLASSES,
@@ -675,27 +673,15 @@ test('the DISPLAY rail starts collapsed on a first run, and a stored choice wins
 
 // ── Voice: instruction-only, tool schema unchanged ─────────────────────
 
-test('the voice TOOL SCHEMA matches the pinned release — the mission mapping is instructions only', () => {
-  // ALPR deliberately adds its ID to the two layer menus and visibility aliases.
-  // Canonical serialization pins every tool name, description, property and
-  // ordering while allowing source formatting. Derived from the unchanged
-  // release schema before formatting (the previous source-byte pin passed).
-  // Re-derived 2026-09-27: life expectancy, cluster, HOLC, Miami hotspot, public housing, trauma center and GVA layers joined the
-  // layer enums and get_entity_context documents its `areas` answer.
-  // Re-derived again 2026-09-27: the three layer enums are now the layer
-  // registry (pinned in actionSchemas.test.mjs), so they are left out here
-  // and registering a new layer does not move this pin.
-  // Re-derived 2026-09-30: control_cockpit gained the zoom and look actions
-  // and the `zoom` magnification argument.
-  const registry = REGISTERED_LAYER_IDS.join();
-  const block = JSON.stringify(GEV_REALTIME_TOOLS, (key, value) =>
-    Array.isArray(value) && value.join() === registry ? 'REGISTERED_LAYER_IDS' : value);
-  assert.equal(block.length, 27629, 'serialized tool schema length drifted');
-  assert.equal(
-    crypto.createHash('sha256').update(block).digest('hex'),
-    '0c7709f1a59c2718dbf2c5546a45206c42bea870df6699dc71bb458336bdece1',
-    'the first-run missions must ride EXISTING tools: no schema edit, no cache bust',
-  );
+test('the first-run missions ride existing voice tools — the mission mapping is instructions only', () => {
+  // The full Realtime tool payload is pinned once, in
+  // src/voice/actionSchemas.test.mjs; first-run missions add no tool and no
+  // schema field of their own, which this file checks by name below.
+  const toolNames = GEV_REALTIME_TOOLS.map((tool) => tool.name);
+  for (const name of ['set_layer_visibility', 'zoom_to_globe', 'set_context_mode']) {
+    assert.ok(toolNames.includes(name), `${name} is an existing voice tool`);
+  }
+  assert.equal(toolNames.some((name) => /first.?run|mission_launch/i.test(name)), false);
   const instructions = fs.readFileSync(new URL('../server/providers/openai/instructions.js', import.meta.url), 'utf8');
 
   // ...and the mapping that makes them reachable by voice is one instruction

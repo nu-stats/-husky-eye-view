@@ -45,7 +45,7 @@
 
 .location-toolbar-label {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 2px;
   color: var(--text-dim);
 }
@@ -69,7 +69,7 @@
 
 .location-mini-poi {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1px;
   color: var(--text-secondary);
   max-width: 190px;
@@ -222,7 +222,7 @@
 
 .poi-pill-key {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1px;
   color: var(--text-dim);
   background: rgba(255, 255, 255, 0.06);

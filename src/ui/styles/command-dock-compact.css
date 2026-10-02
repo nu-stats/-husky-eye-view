@@ -82,7 +82,7 @@
 #command-dock .panel-title,
 #command-dock .location-toolbar-label {
   width: max-content;
-  font-size: 0.45rem;
+  font-size: 0.5625rem;
   letter-spacing: 0.12rem;
   white-space: nowrap;
 }
@@ -161,7 +161,7 @@
   min-height: 1.75rem;
   padding: 0.3rem 0.55rem;
   border-radius: 0.2rem;
-  font-size: 0.52rem;
+  font-size: 0.5625rem;
   white-space: nowrap;
 }
 
@@ -210,7 +210,7 @@
 }
 
 #command-dock .btn-label {
-  font-size: 0.43rem;
+  font-size: 0.5625rem;
   letter-spacing: 0.02rem;
 }
 
@@ -242,7 +242,7 @@
   grid-column: 2 / 4;
   grid-row: 1;
   align-self: center;
-  color: rgba(190, 221, 230, 0.58);
+  color: rgba(190, 221, 230, 0.72);
   font-size: 0.39rem;
   letter-spacing: 0.07rem;
   text-align: center;
@@ -351,6 +351,14 @@
   font-size: 0.39rem;
   letter-spacing: 0.08rem;
   text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #command-dock #location-bar:not(.collapsed) .location-city-row,
+  #command-dock #control-panel:not(.collapsed) .button-grid,
+  #command-dock .poi-row-container.expanded {
+    animation: none;
+  }
 }
 
 @keyframes command-dock-reveal {

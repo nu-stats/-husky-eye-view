@@ -61,6 +61,11 @@ import {
   onLookPointerMove,
   onLookPointerUp,
 } from './cockpitLook.js';
+import {
+  applyLayerOpacity,
+  releaseLayerOpacity,
+  setLayerOpacity,
+} from './cockpitLayerOpacity.js';
 import * as Cesium from 'cesium';
 
 export class CockpitViewController {
@@ -150,6 +155,12 @@ export class CockpitViewController {
     this.lookDown = document.getElementById('cockpit-look-down');
     this.lookCenter = document.getElementById('cockpit-look-center');
     this.lookValue = document.getElementById('cockpit-look-value');
+    this.layerOpacityInput = document.getElementById('cockpit-layer-opacity');
+    this.layerOpacityValue = document.getElementById(
+      'cockpit-layer-opacity-value',
+    );
+    this.layerOpacityPercent = null;
+    this.layerOpacityTimer = null;
     this.lookTarget = { yawDeg: 0, pitchDeg: 0 };
     this.lookCurrent = { yawDeg: 0, pitchDeg: 0 };
     this.lookDrag = null;
@@ -296,6 +307,12 @@ export class CockpitViewController {
       this.look(0, -COCKPIT_LOOK_STEP_PITCH_DEG),
     );
     this._listen(this.lookCenter, 'click', () => this.resetLook());
+    this._listen(this.layerOpacityInput, 'input', () =>
+      this.setLayerOpacity(this.layerOpacityInput.value),
+    );
+    this._listen(this.layerOpacityInput, 'change', () =>
+      this.setLayerOpacity(this.layerOpacityInput.value, { immediate: true }),
+    );
     this._listen(viewer.scene?.canvas, 'pointerdown', (event) =>
       this.onLookPointerDown(event),
     );
@@ -500,6 +517,15 @@ export class CockpitViewController {
   }
   onLookPointerUp(event) {
     return onLookPointerUp.call(this, event);
+  }
+  applyLayerOpacity() {
+    return applyLayerOpacity.call(this);
+  }
+  releaseLayerOpacity() {
+    return releaseLayerOpacity.call(this);
+  }
+  setLayerOpacity(percent, options) {
+    return setLayerOpacity.call(this, percent, options);
   }
 
   handleSignalClick(event) {

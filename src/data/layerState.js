@@ -1,3 +1,5 @@
+import { LAYER_MANIFEST, REGISTERED_LAYER_IDS } from './layerManifest.js';
+
 const VALID_DISPOSITIONS = new Set([
   'enabled-only',
   'enabled+options',
@@ -299,237 +301,24 @@ export const SHARE_TRACKING_RESTORE_POLICIES = Object.freeze({
 });
 
 /**
- * Canonical serialization registry. Its order, not runtime registration order,
- * owns stable URL ordering.
+ * Canonical serialization registry, derived from the layer manifest
+ * (src/data/layerManifest.js). Its order — sorted by id, not panel or runtime
+ * registration order — owns stable URL ordering.
  */
-export const LAYER_STATE_REGISTRY = Object.freeze([
-  Object.freeze({
-    id: 'ais-live-vessels',
-    token: 'a',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'alpr-cameras',
-    token: 'p',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'bhote-koshi-2026',
-    token: 'h',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'bhote-koshi-locator',
-    token: 'z',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({ id: 'bikeshare', token: 'b', disposition: 'enabled-only' }),
-  Object.freeze({
-    id: 'cctv',
-    token: 'c',
-    disposition: 'enabled+options',
-    optionOwner: 'cctv',
-  }),
-  Object.freeze({ id: 'directions', token: 'n', disposition: 'enabled-only' }),
-  Object.freeze({ id: 'earthquakes', token: 'e', disposition: 'enabled-only' }),
-  Object.freeze({
-    id: 'flights',
-    token: 'f',
-    disposition: 'enabled+options',
-    optionOwner: 'flights',
-  }),
-  Object.freeze({
-    id: 'local-3d-captures',
-    token: '3d',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-air-nonattainment',
-    token: 'an',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-air-ozone',
-    token: 'ao',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-air-pm25',
-    token: 'ap',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-boston-neighborhoods',
-    token: 'bn',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-chicago-events',
-    token: 'k',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-county-le-clusters',
-    token: '3',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-county-life-expectancy',
-    token: '2',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({ id: 'local-dams', token: 'q', disposition: 'enabled-only' }),
-  Object.freeze({
-    id: 'local-datacenters',
-    token: 'd',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-famous-shootings',
-    token: 'v',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({ id: 'local-firms', token: 'w', disposition: 'enabled-only' }),
-  Object.freeze({
-    id: 'local-gang-map',
-    token: 'y',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-gang-map-labels',
-    token: 'l',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-gva-2015',
-    token: 'gv',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-holc-redlining',
-    token: 'o',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-life-expectancy',
-    token: '1',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-miami-homicide-hotspots',
-    token: 'mh',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-miami-homicides-1950s',
-    token: '5',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-miami-homicides-1960s',
-    token: '6',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-miami-homicides-1970s',
-    token: '7',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-miami-homicides-1980s',
-    token: '8',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-miami-homicides-1990s',
-    token: '9',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-miami-homicides-2000s',
-    token: '0',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-mkdb',
-    token: 'mk',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-park-access',
-    token: 'pa',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-parks',
-    token: 'pk',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-public-housing',
-    token: 'ph',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-tlr',
-    token: 'tl',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-tract-le-clusters',
-    token: '4',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'local-trauma-centers',
-    token: 'tc',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'military',
-    token: 'm',
-    disposition: 'enabled+mirrored-options',
-    optionOwner: 'flights',
-  }),
-  Object.freeze({
-    id: 'military-awareness',
-    token: 'g',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'military-installations',
-    token: 'i',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'radio',
-    token: 'r',
-    disposition: 'enabled+options',
-    optionOwner: 'radio',
-  }),
-  Object.freeze({
-    id: 'rocket-launches',
-    token: 'x',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({
-    id: 'satellites',
-    token: 's',
-    disposition: 'enabled+options',
-    optionOwner: 'satellites',
-  }),
-  Object.freeze({
-    id: 'telegeography-submarine-cables',
-    token: 'u',
-    disposition: 'enabled-only',
-  }),
-  Object.freeze({ id: 'traffic', token: 't', disposition: 'enabled-only' }),
-  Object.freeze({ id: 'transit', token: 'j', disposition: 'enabled-only' }),
-]);
-
-export const REGISTERED_LAYER_IDS = Object.freeze(
-  LAYER_STATE_REGISTRY.map((entry) => entry.id),
+export const LAYER_STATE_REGISTRY = Object.freeze(
+  [...LAYER_MANIFEST]
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map(({ id, token, disposition, optionOwner }) =>
+      Object.freeze({
+        id,
+        token,
+        disposition,
+        ...(optionOwner ? { optionOwner } : {}),
+      }),
+    ),
 );
+
+export { REGISTERED_LAYER_IDS };
 
 const REGISTRY_BY_ID = new Map(
   LAYER_STATE_REGISTRY.map((entry) => [entry.id, entry]),

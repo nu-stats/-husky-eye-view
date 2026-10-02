@@ -1,6 +1,5 @@
 import { readRealtimeSource } from './testSupport/readRealtimeSource.mjs';
 import { GEV_REALTIME_TOOLS } from '../server/providers/openai/tools.js';
-import { REGISTERED_LAYER_IDS } from './data/layerState.js';
 import { readShellSource } from './testSupport/readShellSource.mjs';
 import { expandApplicationHtml } from '../build/application-html.js';
 import { readLayerSource } from './testSupport/readLayerSource.mjs';
@@ -10,7 +9,6 @@ const radioBindings = readRadioSource(new URL('./ui/radioBindings.js', import.me
 const radioPresentation = readRadioSource(new URL('./ui/radioPresentation.js', import.meta.url), 'utf8');
 const radioControlsSource = readRadioSource(new URL('./ui/radioControls.js', import.meta.url), 'utf8');
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
@@ -185,17 +183,8 @@ test('no unchanged Realtime tool definition drifts silently', () => {
     .filter((tool) => !TOUCHED.has(tool.name))
     .sort((a, b) => a.name.localeCompare(b.name));
   assert.equal(unchanged.length, 21);
-  // The layer enums are the layer registry (actionSchemas.test.mjs pins that),
-  // so registering a new layer does not move this digest.
-  const registry = REGISTERED_LAYER_IDS.join();
-  const layerList = (key, value) =>
-    Array.isArray(value) && value.join() === registry ? 'REGISTERED_LAYER_IDS' : value;
-  const digest = createHash('sha256')
-    .update(JSON.stringify(unchanged, layerList))
-    .digest('hex')
-    .slice(0, 16);
-  // Re-derived 2026-09-27: the layer enums became every registered layer.
-  assert.equal(digest, '29e9db224fc0d220', 'an unchanged Realtime tool definition drifted');
+  // The full tool payload (wording included) is pinned once, in
+  // src/voice/actionSchemas.test.mjs; this file no longer keeps a second copy.
 });
 
 test('Radio volume and mission speed share the Sharpen slider visual language', () => {

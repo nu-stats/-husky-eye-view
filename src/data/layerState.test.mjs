@@ -194,8 +194,8 @@ function encode(state) {
 
 test('production registry is exact, canonical, and rejects incomplete contracts', async () => {
   assert.equal(validateLayerStateRegistry(), true);
-  assert.equal(REGISTERED_LAYER_IDS.length, 49);
-  assert.equal(new Set(REGISTERED_LAYER_IDS).size, 49);
+  assert.equal(REGISTERED_LAYER_IDS.length, 50);
+  assert.equal(new Set(REGISTERED_LAYER_IDS).size, 50);
   assert.ok(REGISTERED_LAYER_IDS.includes('transit'));
   assert.deepEqual(REGISTERED_LAYER_IDS, [...REGISTERED_LAYER_IDS].sort());
   assert.throws(
@@ -326,6 +326,7 @@ test('unknown and forbidden option fields are ignored while missing options use 
     models3dMode: 'all',
     selectedFlightsTrackingId: null,
     selectedMilitaryTrackingId: null,
+    selectedLowFlyerTrackingId: null,
   });
   assert.deepEqual(decoded.options.radio, { filter: 'news', volume: 0.35 });
 
@@ -1297,6 +1298,7 @@ test('later explicit params during init replace options without cancelling visib
     models3dMode: 'proximity',
     selectedFlightsTrackingId: null,
     selectedMilitaryTrackingId: null,
+    selectedLowFlyerTrackingId: null,
   });
   assert.equal(
     results.find((result) => result.layerId === 'flights').succeeded,
@@ -1697,6 +1699,12 @@ test('share tracking policies pin each owner, key, label, and acquisition deadli
       optionKey: 'selectedMilitaryTrackingId',
       expiryWindowMs: 45_000,
       label: 'military flight',
+    },
+    lowflyers: {
+      optionOwner: 'flights',
+      optionKey: 'selectedLowFlyerTrackingId',
+      expiryWindowMs: 45_000,
+      label: 'helicopter or low flyer',
     },
     satellites: {
       optionOwner: 'satellites',

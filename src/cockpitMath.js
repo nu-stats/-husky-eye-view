@@ -340,17 +340,20 @@ export function relativeBearing(bearing, heading) {
  * @param {object} [options] Candidate descriptors and the tracked identity.
  * @param {object|null} [options.civilian] `flightsLayer.getTrackedInfo()` result.
  * @param {object|null} [options.military] `militaryFlightsLayer.getTrackedInfo()` result.
+ * @param {object|null} [options.lowflyers] `lowFlyersLayer.getTrackedInfo()` result.
  * @param {string} [options.trackedId] Normalized `<layerId>:<icao24>` tracked identity.
  * @returns {object|null} The owning layer's info stamped with its `layerId`.
  */
 export function resolveTrackedAircraftInfo({
   civilian = null,
   military = null,
+  lowflyers = null,
   trackedId = '',
 } = {}) {
   const candidates = [];
   if (civilian) candidates.push({ ...civilian, layerId: 'flights' });
   if (military) candidates.push({ ...military, layerId: 'military' });
+  if (lowflyers) candidates.push({ ...lowflyers, layerId: 'lowflyers' });
   if (!candidates.length) return null;
   const trackedKey = String(trackedId || '')
     .trim()

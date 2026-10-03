@@ -706,6 +706,11 @@ export function createTracking({
 
   function _militaryLayerSuppresses(icao24) {
     if (!isMilitaryLayerActive()) return false;
+    return _duplicateSuppressible(icao24);
+  }
+
+  /** A duplicate may be dropped unless it is tracked or awaiting a restore. */
+  function _duplicateSuppressible(icao24) {
     if (icao24 === flightState._trackedIcao) return false;
     if (icao24 === flightState._pendingTrackingRestore?.id) return false;
     return true;
@@ -1081,10 +1086,25 @@ export function createTracking({
    */
 
   function _onMilitaryActiveChange(active) {
+    _sweepDuplicates(active, (icao24) => isMilitaryIcao(icao24));
+  }
+
+  /**
+   * Same sweep for the Helicopters & Low Flyers layer: fired when it turns on
+   * or off and after each of its polls (its drawn set changes as aircraft
+   * climb or descend through 3,000 ft).
+   * @param {boolean} active - Whether the low-flyer layer is enabled.
+   */
+  function _onLowFlyerChange(active) {
+    const registry = services.lowFlyerRegistry;
+    _sweepDuplicates(active, (icao24) => Boolean(registry?.shows(icao24)));
+  }
+
+  function _sweepDuplicates(active, ownedElsewhere) {
     if (!flightState._viewer || !flightState._billboardCollection) return;
     if (active) {
       for (const [icao24, bb] of flightState._billboards) {
-        if (!isMilitaryIcao(icao24) || icao24 === flightState._trackedIcao)
+        if (!ownedElsewhere(icao24) || icao24 === flightState._trackedIcao)
           continue;
         flightState._billboardCollection.remove(bb);
         flightState._billboards.delete(icao24);
@@ -1250,6 +1270,7 @@ export function createTracking({
     _destroyTrail,
     _clearTracking,
     _militaryLayerSuppresses,
+    _duplicateSuppressible,
     _applyPendingTrackingRestore,
     _cancelPendingTrackingRestore,
     _trackedLabelText,
@@ -1260,6 +1281,7 @@ export function createTracking({
     _routeIsPlausible,
     _trackFlight,
     _onMilitaryActiveChange,
+    _onLowFlyerChange,
     _onKeyDown,
     _installClickHandler,
   };

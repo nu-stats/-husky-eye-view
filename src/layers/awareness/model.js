@@ -235,6 +235,7 @@ export function createModel({ state: layerState, services, parts, source }) {
   function releaseAircraftTracking() {
     flightsLayer.stopTracking?.();
     militaryFlightsLayer.stopTracking?.();
+    services.lowflyers?.stopTracking?.();
   }
   return {
     contextTargetFlyToAllowed,

@@ -42,7 +42,7 @@ function walk(node, out = []) {
   return out;
 }
 
-function setup() {
+function setup({ holcIndex } = {}) {
   const originalDocument = globalThis.document;
   const originalWindow = globalThis.window;
   const handlers = {};
@@ -53,7 +53,11 @@ function setup() {
   };
   const container = fakeElement('div');
   const lifetime = new UiLifetime();
-  const card = new LocalSelectionCard({ container, lifetime });
+  const card = new LocalSelectionCard({
+    container,
+    lifetime,
+    ...(holcIndex ? { holcIndex } : {}),
+  });
   return {
     container,
     select: (detail) => handlers['gev:entity-selected']({ detail }),
@@ -232,6 +236,66 @@ test('the card closes on selection clear and on its close button', () => {
     env.select(RECORD);
     const close = env.nodes().find((n) => n.tagName === 'BUTTON');
     close.listeners.click();
+    assert.equal(env.container.children.length, 0);
+  } finally {
+    env.cleanup();
+  }
+});
+
+test('a HOLC area card links to its 1930s area description', async () => {
+  const asked = [];
+  const env = setup({
+    holcIndex: {
+      async urlFor(id) {
+        asked.push(id);
+        return 'https://dsl.richmond.edu/panorama/redlining/map/MA/Boston/area_descriptions/D7';
+      },
+    },
+  });
+  try {
+    env.select({
+      id: 'local-holc-redlining:holc-30-1234-25025070700',
+      layerId: 'local-holc-redlining',
+      label: 'D7 · South End',
+      properties: {
+        name: 'D7 · South End',
+        holc_id: 'D7',
+        summary: 'Graded D ("Hazardous") on the 1930s HOLC map of Boston, MA.',
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(asked, ['local-holc-redlining:holc-30-1234-25025070700']);
+    const link = env.nodes().find((n) => n.tagName === 'A');
+    assert.equal(link.textContent, 'Original 1930s area description ↗');
+    assert.equal(
+      link.href,
+      'https://dsl.richmond.edu/panorama/redlining/map/MA/Boston/area_descriptions/D7',
+    );
+    assert.equal(link.target, '_blank');
+    assert.equal(link.rel, 'noopener noreferrer');
+  } finally {
+    env.cleanup();
+  }
+});
+
+test('a HOLC link that answers after the card closed is dropped', async () => {
+  let release;
+  const env = setup({
+    holcIndex: {
+      urlFor: () => new Promise((resolve) => (release = resolve)),
+    },
+  });
+  try {
+    env.select({
+      id: 'local-holc-redlining:holc-30-1234-25025070700',
+      layerId: 'local-holc-redlining',
+      properties: { name: 'D7', summary: 'Graded D.' },
+    });
+    env.clear();
+    release(
+      'https://dsl.richmond.edu/panorama/redlining/map/MA/Boston/area_descriptions/D7',
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
     assert.equal(env.container.children.length, 0);
   } finally {
     env.cleanup();

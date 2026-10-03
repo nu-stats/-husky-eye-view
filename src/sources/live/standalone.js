@@ -165,6 +165,50 @@ export function createAdsbLolSource({
   };
 }
 
+/**
+ * Helicopters and low flyers around the view (adsb.lol, filtered server-side
+ * by /api/adsblol/low). Same readsb shape and track route as the military
+ * source; the snapshot is scoped to the camera like OpenSky's.
+ */
+export function createAdsbLolLowFlyerSource({
+  fetchImpl = defaultFetch,
+  now = () => Date.now(),
+} = {}) {
+  const military = createAdsbLolSource({ fetchImpl, now });
+  return {
+    label: 'adsb.lol',
+    async getSnapshot(query = {}, { signal } = {}) {
+      if (!Number.isFinite(query.latitude) || !Number.isFinite(query.longitude))
+        throw new LiveSourceError(
+          'unsupported',
+          'Low flyers need a view position',
+        );
+      const params = new URLSearchParams({
+        lat: query.latitude.toFixed(4),
+        lon: query.longitude.toFixed(4),
+      });
+      const { response, payload } = await readResponse(
+        fetchImpl,
+        `/api/adsblol/low?${params}`,
+        { signal },
+        'adsb.lol',
+      );
+      if (!response.ok) throw httpError(response, 'adsb.lol');
+      const age = finite(header(response, 'x-ads-b-cache-age-ms'));
+      return {
+        ...readsbSnapshot(payload, {
+          observedAtMs: now() - (age != null && age > 0 ? age : 0),
+          coverage: 'helicopters and aircraft below 3,000 ft near the view',
+          now: now(),
+          stale: header(response, 'x-ads-b-cache') === 'STALE',
+        }),
+        status: response.status,
+      };
+    },
+    getTrack: military.getTrack,
+  };
+}
+
 export function createAisStreamSource({
   fetchImpl = defaultFetch,
   apiUrl = '/api/ais-live',

@@ -1,6 +1,7 @@
 import {
   createOpenSkySource,
   createAdsbLolSource,
+  createAdsbLolLowFlyerSource,
   createAisStreamSource,
 } from '../sources/live/standalone.js';
 import { createCctvSource } from '../layers/cctv/source.js';
@@ -22,6 +23,7 @@ export function createStandaloneLayerSources() {
     ...createReferenceSources(),
     flights: createOpenSkySource(),
     military: createAdsbLolSource(),
+    lowflyers: createAdsbLolLowFlyerSource(),
     vessels: createAisStreamSource({
       apiUrl: import.meta.env?.VITE_AIS_LIVE_API_URL || '/api/ais-live',
     }),

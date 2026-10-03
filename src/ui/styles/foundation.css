@@ -647,7 +647,10 @@ body:has(.data-toggle-row[data-layer-id='alpr-cameras'] .data-toggle-btn.active)
 }
 
 /* ── Style Indicator ──────────────────────────── */
+/* Hidden: the "ACTIVE STYLE / NORMAL" badge read as surveillance-UI dressing.
+   The shell still writes the style name here; Visual Presets shows it. */
 #style-indicator {
+  display: none;
   position: fixed;
   top: 32px;
   right: 36px;

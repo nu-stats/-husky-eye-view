@@ -75,7 +75,7 @@ export function createLifecycle({
         layerState.lastSubjectRefreshMs = now;
         if (
           layerState.subject &&
-          ['flights', 'military', 'ais-live-vessels'].includes(
+          ['flights', 'military', 'lowflyers', 'ais-live-vessels'].includes(
             layerState.subject.layerId,
           )
         ) {

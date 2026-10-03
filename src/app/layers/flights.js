@@ -17,6 +17,7 @@ export function createApplicationFlights({
   surface,
   source,
   militaryRegistry,
+  lowFlyerRegistry = null,
   resolveAsset = (url) =>
     `${import.meta.env?.BASE_URL || '/'}${url.replace(/^\//, '')}`,
 }) {
@@ -31,6 +32,7 @@ export function createApplicationFlights({
       aircraftPresentation,
       camera,
       militaryRegistry,
+      lowFlyerRegistry,
       labels,
       groundFloor,
       meshFloor,

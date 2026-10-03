@@ -190,6 +190,7 @@ const COCKPIT_ACTION_ALIASES = new Map([
 const COCKPIT_TARGET_LAYERS = new Set([
   'flights',
   'military',
+  'lowflyers',
   'ais-live-vessels',
   'military-installations',
 ]);
@@ -247,6 +248,7 @@ const STACK_ALIASES = new Map([
 const TRACKABLE_FAMILIES = [
   { layerId: 'flights', kind: 'aircraft' },
   { layerId: 'military', kind: 'aircraft' },
+  { layerId: 'lowflyers', kind: 'aircraft' },
   { layerId: 'ais-live-vessels', kind: 'vessel' },
   { layerId: 'satellites', kind: 'satellite' },
 ];
@@ -466,12 +468,12 @@ export function createGevActionRunner({
 
     if (name === 'select_nearest_aircraft') {
       const layerId = normalizeLayerId(args.layerId || 'flights');
-      if (!['flights', 'military'].includes(layerId)) {
+      if (!['flights', 'military', 'lowflyers'].includes(layerId)) {
         return {
           ok: false,
           action: 'select_nearest_aircraft',
           error:
-            'Nearest-aircraft selection supports Flights or Military Flights only',
+            'Nearest-aircraft selection supports Flights, Military Flights or Helicopters & Low Flyers only',
         };
       }
       const hasLocationId = Boolean(String(args.locationId || '').trim());
@@ -1116,7 +1118,10 @@ export function createGevActionRunner({
 
 function selectedCockpitTarget(dataManager) {
   const selected = getSelectedEntityContext({ dataManager });
-  if (!selected || !['flights', 'military'].includes(selected.layerId))
+  if (
+    !selected ||
+    !['flights', 'military', 'lowflyers'].includes(selected.layerId)
+  )
     return null;
   const module = dataManager?.layers?.get(selected.layerId)?.module;
   if (!module?.trackById || typeof module.trackById !== 'function') return null;
@@ -2687,7 +2692,9 @@ function normalizeCockpitNavigationHints(rawAction) {
         ? 'military-installations'
         : raw.includes('military')
           ? 'military'
-          : null;
+          : raw.includes('low fl') || raw.includes('low-fl')
+            ? 'lowflyers'
+            : null;
 
   const aircraftClass =
     raw.includes('helicopter') ||

@@ -29,9 +29,9 @@ test('the complete Realtime tool payload retains its pre-extraction contract and
     .digest('hex');
   assert.equal(
     digest,
-    // Updated 2026-09-30: control_cockpit gained the zoom and look actions and the
-    // `zoom` magnification argument.
-    'd35f5aee4e361c905794b3e2a0dbeafa953d19627f1114a534ba4cdae3263f5c',
+    // Updated 2026-10-02: select_nearest_aircraft and control_cockpit accept the
+    // Helicopters & Low Flyers layer ('lowflyers').
+    '8ad5c396041b45691fd6d9dd72d3c3b1be0da2bbb4fc7564cf80a84206ab752c',
   );
 });
 

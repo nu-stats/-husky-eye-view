@@ -12,6 +12,7 @@ export function createFlightSnapshotRenderer({
   flightState,
   records,
   militaryRegistry,
+  lowFlyerRegistry = null,
   groundFloor,
   meshFloor,
   rendering,
@@ -21,6 +22,7 @@ export function createFlightSnapshotRenderer({
   queries,
 }) {
   const { refreshMilitaryRegistryIfStale, isMilitaryIcao } = militaryRegistry;
+  const lowFlyerShows = (icao24) => Boolean(lowFlyerRegistry?.shows(icao24));
   const { warmGroundFloor } = groundFloor;
   const { sampleMeshFloorCells } = meshFloor;
   return function applySnapshot(snapshot, viewer) {
@@ -49,8 +51,13 @@ export function createFlightSnapshotRenderer({
       // (icon + track + click) while it is enabled — suppress the
       // OpenSky duplicate entirely (except a currently tracked one,
       // which hands off on untrack).
+      // Helicopters and low flyers likewise belong to their own layer while
+      // it is enabled and drawing them.
       const isMil = isMilitaryIcao(icao24);
-      if (isMil && tracking._militaryLayerSuppresses(icao24)) {
+      if (
+        (isMil && tracking._militaryLayerSuppresses(icao24)) ||
+        (lowFlyerShows(icao24) && tracking._duplicateSuppressible(icao24))
+      ) {
         const dupe = flightState._billboards.get(icao24);
         if (dupe) {
           flightState._billboardCollection.remove(dupe);

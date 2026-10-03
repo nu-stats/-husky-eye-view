@@ -29,6 +29,11 @@ export function createBrowserViteConfig({
       fs: {
         deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/ENVIRONMENT'],
       },
+      // Build inputs under data/ are never served; watching a large file
+      // while it is being written crashed the dev server (EBUSY on Windows).
+      watch: {
+        ignored: ['**/data/source/**', '**/data/restricted/**'],
+      },
       // These headers protect the document containing Provider Settings.
       headers: {
         'X-Frame-Options': 'DENY',

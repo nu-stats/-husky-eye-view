@@ -271,6 +271,22 @@ export const LAYER_MANIFEST = Object.freeze(
       aliases: ['military', 'military flights'],
     },
     {
+      id: 'lowflyers',
+      token: 'lf',
+      disposition: 'enabled+mirrored-options',
+      optionOwner: 'flights',
+      group: 'Live Feeds',
+      label: 'Helicopters & Low Flyers',
+      aliases: [
+        'helicopters',
+        'helicopter',
+        'choppers',
+        'low flyers',
+        'low fliers',
+        'low flying aircraft',
+      ],
+    },
+    {
       id: 'ais-live-vessels',
       token: 'a',
       group: 'Live Feeds',

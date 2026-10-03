@@ -18,6 +18,12 @@ const CONTEXT_COMPANIONS = new Set(['radio']);
 const LIVE_LOCAL_LAYERS = new Set(
   LAYER_MANIFEST.filter((entry) => entry.live).map((entry) => entry.id),
 );
+/**
+ * Live layers Contacts keeps on when the viewer turned them on, without
+ * requiring them: Helicopters & Low Flyers ride along into the cockpit, and
+ * turning them off inside Contacts does not end the mode.
+ */
+const CONTACTS_OPTIONAL_LAYERS = new Set(['lowflyers']);
 
 /**
  * This project's own map-data layers (life expectancy, HOLC, Boston, TLR,
@@ -35,8 +41,8 @@ export function contextKeepsLayer(mode, layerId) {
   return (
     mode === 'flights' &&
     typeof layerId === 'string' &&
-    layerId.startsWith('local-') &&
-    !LIVE_LOCAL_LAYERS.has(layerId)
+    ((layerId.startsWith('local-') && !LIVE_LOCAL_LAYERS.has(layerId)) ||
+      CONTACTS_OPTIONAL_LAYERS.has(layerId))
   );
 }
 /** Return whether an origin represents a direct user choice on this route. */

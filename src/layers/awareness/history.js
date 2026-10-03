@@ -183,7 +183,11 @@ export function createHistory({ state: layerState, services, parts, source }) {
     );
     if (fromSweep) return fromSweep;
     const layer =
-      subject.layerId === 'military' ? militaryFlightsLayer : flightsLayer;
+      subject.layerId === 'military'
+        ? militaryFlightsLayer
+        : subject.layerId === 'lowflyers' && services.lowflyers
+          ? services.lowflyers
+          : flightsLayer;
     return (
       layer
         .getNearby(subject.position, 1000, 25, { includeHidden: true })

@@ -15,6 +15,14 @@ export function createSubject({ state: layerState, services, parts, source }) {
   const militaryInstallationsLayer = services.installations;
   const flightsLayer = services.flights;
   const militaryFlightsLayer = services.military;
+  const lowFlyersLayer = services.lowflyers || null;
+  /** The aircraft layer that owns a flight subject. */
+  const aircraftLayerFor = (layerId) =>
+    layerId === 'flights'
+      ? flightsLayer
+      : layerId === 'lowflyers' && lowFlyersLayer
+        ? lowFlyersLayer
+        : militaryFlightsLayer;
 
   /**
    * Decide whether a source-scoped context clear belongs to the current subject.
@@ -38,10 +46,9 @@ export function createSubject({ state: layerState, services, parts, source }) {
     const vesselsState = sourceStates['ais-live-vessels'];
     const installationsState = sourceStates['military-installations'];
     // Same engine the voice analyst calls — see collectAircraftProximityWindow.
-    const { flights, military } = parts.queries.collectAircraftProximityWindow(
-      position,
-      { subject },
-    );
+    const { flights, military, lowflyers } =
+      parts.queries.collectAircraftProximityWindow(position, { subject });
+    const lowFlyersState = sourceStates.lowflyers;
     const vessels = aisLiveVesselsLayer
       .getNearby(position, AWARENESS_RADIUS_M, AWARENESS_QUERY_LIMIT)
       .filter(
@@ -77,6 +84,20 @@ export function createSubject({ state: layerState, services, parts, source }) {
             militaryState,
           ),
         },
+        // Shown only while the viewer has Helicopters & Low Flyers on.
+        ...(lowFlyersState?.available
+          ? [
+              {
+                id: 'lowflyers',
+                label: 'Helicopters & low flyers',
+                source: lowFlyersState.stats.source || SOURCE_LABEL.lowflyers,
+                summary: parts.navigation.summarizeAwarenessCohortForNavigation(
+                  lowflyers,
+                  lowFlyersState,
+                ),
+              },
+            ]
+          : []),
         {
           id: 'ais-live-vessels',
           label: 'AIS vessels',
@@ -133,6 +154,7 @@ export function createSubject({ state: layerState, services, parts, source }) {
     const subjects = [
       flightsLayer.getTrackedSubject?.(),
       militaryFlightsLayer.getTrackedSubject?.(),
+      lowFlyersLayer?.getTrackedSubject?.(),
     ];
     return (
       subjects.find(
@@ -194,7 +216,7 @@ export function createSubject({ state: layerState, services, parts, source }) {
     { allowCollectionMaterialization = true } = {},
   ) {
     if (!subject?.position) return null;
-    if (subject.layerId === 'flights' || subject.layerId === 'military') {
+    if (parts.navigation.isFlightLayer(subject.layerId)) {
       const trackedPosition =
         layerState.viewer?.trackedEntity?.gevDisplayPosition?.();
       if (trackedPosition) {
@@ -218,8 +240,7 @@ export function createSubject({ state: layerState, services, parts, source }) {
           presence: SUBJECT_PRESENCE.UNCHECKED,
         };
       }
-      const layer =
-        subject.layerId === 'flights' ? flightsLayer : militaryFlightsLayer;
+      const layer = aircraftLayerFor(subject.layerId);
       return collectionSubjectPosition(
         subject,
         layer.getAllPositions(1000),
@@ -303,9 +324,7 @@ export function createSubject({ state: layerState, services, parts, source }) {
   function resolveSubjectLabel(subject) {
     if (!parts.navigation.isFlightLayer(subject?.layerId))
       return subject?.label;
-    const layer =
-      subject.layerId === 'flights' ? flightsLayer : militaryFlightsLayer;
-    const tracked = layer.getTrackedSubject?.();
+    const tracked = aircraftLayerFor(subject.layerId).getTrackedSubject?.();
     if (tracked?.label && String(tracked.id) === String(subject.id))
       return tracked.label;
     return subject.label;

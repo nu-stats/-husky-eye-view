@@ -106,6 +106,7 @@ const LAYER_WEIGHTS = Object.freeze({
   traffic: 1.15,
   cctv: 1.1,
   flights: 1,
+  lowflyers: 1.2,
   satellites: 1,
   bikeshare: 0.9,
   'ais-live-vessels': 1,
@@ -775,7 +776,7 @@ function _collectDetectableObjects() {
     const layer = _layers[i];
     if (typeof layer.getDetectableObjects !== 'function') continue;
     try {
-      const maxCount = ['flights', 'military'].includes(layer.id)
+      const maxCount = ['flights', 'military', 'lowflyers'].includes(layer.id)
         ? Number.POSITIVE_INFINITY
         : LAYER_CANDIDATE_CAP;
       const items = layer.getDetectableObjects({

@@ -312,6 +312,56 @@
 .radio-links a:focus-visible {
   color: #fff;
 }
+/* Boston Police scanner preset: shown only within 15 miles of Boston
+   (bostonScannerPreset.js). It opens the department's official feed. */
+.boston-scanner-preset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid rgba(200, 16, 46, 0.55);
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(200, 16, 46, 0.22),
+    rgba(200, 16, 46, 0.08)
+  );
+  color: #fff;
+  text-decoration: none;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.boston-scanner-preset[hidden] {
+  display: none;
+}
+.boston-scanner-preset:hover,
+.boston-scanner-preset:focus-visible {
+  border-color: #ff5a6e;
+  background: rgba(200, 16, 46, 0.32);
+}
+.boston-scanner-preset:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+.boston-scanner-preset .material-symbols-outlined {
+  font-size: 18px;
+  color: #ff8a98;
+}
+.boston-scanner-label {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.boston-scanner-label strong {
+  font: 700 10px/1.1 var(--font-mono);
+  letter-spacing: 0.14em;
+}
+.boston-scanner-label small {
+  color: rgba(255, 255, 255, 0.72);
+  font: 8px/1.2 var(--font-mono);
+  letter-spacing: 0.06em;
+}
 .radio-privacy {
   margin: 0;
   color: rgba(190, 230, 230, 0.7);

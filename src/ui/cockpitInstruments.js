@@ -133,7 +133,15 @@ export function updateHud(
         : info.stale
           ? 'STALE FEED'
           : 'LIVE TRACK';
-    this.aircraftMeta.textContent = `${info.layerId === 'military' ? 'MILITARY' : 'COMMERCIAL'} · ${feedState} · COURSE ALIGNED`;
+    const family =
+      info.layerId === 'military'
+        ? 'MILITARY'
+        : info.layerId === 'lowflyers'
+          ? info.klass === 'helicopter' || info.aircraftClass === 'helicopter'
+            ? 'HELICOPTER · LOW FLYER'
+            : 'LOW FLYER'
+          : 'COMMERCIAL';
+    this.aircraftMeta.textContent = `${family} · ${feedState} · COURSE ALIGNED`;
   }
   this.updateRoute(info);
   if (

@@ -95,6 +95,7 @@ export function createControls({ state: layerState, services, parts, source }) {
       try {
         flightsLayer.stopTracking?.({ origin });
         militaryFlightsLayer.stopTracking?.({ origin });
+        services.lowflyers?.stopTracking?.({ origin });
         if (!preserveVesselSelection) aisLiveVesselsLayer.clearSelection?.();
       } finally {
         if (layerState.pendingSelectionKey === preservedSelectionKey) {

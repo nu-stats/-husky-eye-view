@@ -233,6 +233,8 @@ export function createFlightState({ source, services }) {
   /** @type {(() => void)|null} militaryRegistry active-transition unsubscribe (M2 handoff sweep) */
 
   flightState._milActiveChangeUnsub = null;
+  /** @type {(() => void)|null} lowFlyerRegistry change unsubscribe (same sweep) */
+  flightState._lowFlyerChangeUnsub = null;
 
   // ---------------------------------------------------------------------------
   // Scratch (reusable) variables — avoid per-frame heap allocation

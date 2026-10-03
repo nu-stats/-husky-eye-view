@@ -11,8 +11,17 @@ export function readAircraftInfo() {
   return resolveTrackedAircraftInfo({
     civilian: this.services.flightsLayer.getTrackedInfo?.() || null,
     military: this.services.militaryFlightsLayer.getTrackedInfo?.() || null,
+    lowflyers: this.services.lowFlyersLayer?.getTrackedInfo?.() || null,
     trackedId: trackedEntity?.gevTrackedId || '',
   });
+}
+
+/** The layer that owns a tracked aircraft, by its `layerId`. */
+function aircraftLayerFor(services, layerId) {
+  if (layerId === 'military') return services.militaryFlightsLayer;
+  if (layerId === 'lowflyers' && services.lowFlyersLayer)
+    return services.lowFlyersLayer;
+  return services.flightsLayer;
 }
 
 export function dispatchCockpitModeChanged(active, info = null) {
@@ -22,7 +31,7 @@ export function dispatchCockpitModeChanged(active, info = null) {
         .toLowerCase() || null
     : null;
   const layerId =
-    active && ['flights', 'military'].includes(info?.layerId)
+    active && ['flights', 'military', 'lowflyers'].includes(info?.layerId)
       ? info.layerId
       : null;
   window.dispatchEvent(
@@ -38,11 +47,7 @@ export function toggleTrackedTr3b() {
   const icao24 = String(info?.icao24 || '').trim();
   if (!icao24) return false;
   this.services.toggleTr3b(icao24);
-  const layer =
-    info.layerId === 'military'
-      ? this.services.militaryFlightsLayer
-      : this.services.flightsLayer;
-  layer.refreshTr3b?.(icao24);
+  aircraftLayerFor(this.services, info.layerId).refreshTr3b?.(icao24);
   this._tr3bSignature = null; // force the chip to repaint on the next sync
   this.syncTr3bToggle(info);
   return true;

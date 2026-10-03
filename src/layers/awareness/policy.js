@@ -10,6 +10,15 @@ export const DEPENDENCIES = [
   ...DEFERRED_DEPENDENCIES,
 ];
 
+/**
+ * Sources Contacts reads when they are on but never turns on itself:
+ * Helicopters & Low Flyers is the viewer's choice.
+ */
+export const OPTIONAL_SOURCES = ['lowflyers'];
+
+/** Every source Contacts reads state from. */
+export const SOURCE_LAYERS = [...DEPENDENCIES, ...OPTIONAL_SOURCES];
+
 export const AWARENESS_REFRESH_MS = 750;
 
 /** @constant {number} Refresh cadence while the camera pose is CHANGING.
@@ -52,6 +61,7 @@ export const VESSEL_FOCUS_RADIUS_M = 3000;
 export const SOURCE_LABEL = {
   flights: 'OpenSky',
   military: 'adsb.lol',
+  lowflyers: 'adsb.lol',
   'ais-live-vessels': 'AISStream',
   'military-installations': 'OpenStreetMap',
 };

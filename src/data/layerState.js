@@ -235,6 +235,7 @@ const OPTION_GROUPS = Object.freeze({
     }),
     trackingIdOption('selectedFlightsTrackingId', 't', null),
     trackingIdOption('selectedMilitaryTrackingId', 'u', null),
+    trackingIdOption('selectedLowFlyerTrackingId', 'l', null),
   ]),
   satellites: Object.freeze([
     enumOption('catalog', 'c', 'core', ['core', 'dense'], {
@@ -276,6 +277,7 @@ const OPTION_GROUPS = Object.freeze({
 const TRACKING_OPTION_KEY_BY_LAYER = Object.freeze({
   flights: 'selectedFlightsTrackingId',
   military: 'selectedMilitaryTrackingId',
+  lowflyers: 'selectedLowFlyerTrackingId',
   satellites: 'selectedSatTrackingId',
 });
 
@@ -291,6 +293,12 @@ export const SHARE_TRACKING_RESTORE_POLICIES = Object.freeze({
     optionKey: 'selectedMilitaryTrackingId',
     expiryWindowMs: 45_000,
     label: 'military flight',
+  }),
+  lowflyers: Object.freeze({
+    optionOwner: 'flights',
+    optionKey: 'selectedLowFlyerTrackingId',
+    expiryWindowMs: 45_000,
+    label: 'helicopter or low flyer',
   }),
   satellites: Object.freeze({
     optionOwner: 'satellites',
@@ -431,6 +439,8 @@ export function normalizeLayerState(candidate) {
   if (!enabled.has('flights')) options.flights.selectedFlightsTrackingId = null;
   if (!enabled.has('military'))
     options.flights.selectedMilitaryTrackingId = null;
+  if (!enabled.has('lowflyers'))
+    options.flights.selectedLowFlyerTrackingId = null;
   if (!enabled.has('satellites'))
     options.satellites.selectedSatTrackingId = null;
   // The codec has no cross-family recency field, so multiple tracking IDs are
@@ -439,11 +449,13 @@ export function normalizeLayerState(candidate) {
   const trackingSelectionCount = [
     options.flights.selectedFlightsTrackingId,
     options.flights.selectedMilitaryTrackingId,
+    options.flights.selectedLowFlyerTrackingId,
     options.satellites.selectedSatTrackingId,
   ].filter((value) => value !== null).length;
   if (trackingSelectionCount > 1) {
     options.flights.selectedFlightsTrackingId = null;
     options.flights.selectedMilitaryTrackingId = null;
+    options.flights.selectedLowFlyerTrackingId = null;
     options.satellites.selectedSatTrackingId = null;
   }
   return {

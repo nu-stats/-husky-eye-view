@@ -60,6 +60,9 @@
 #cockpit-hud[data-layer='military'] {
   --cockpit-accent: #ffb800;
 }
+#cockpit-hud[data-layer='lowflyers'] {
+  --cockpit-accent: #3ee6c1;
+}
 .cockpit-visor-shell {
   position: absolute;
   inset: clamp(62px, 9vh, 90px) clamp(18px, 3vw, 48px) clamp(38px, 5vh, 56px);

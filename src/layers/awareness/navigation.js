@@ -18,6 +18,17 @@ export function createNavigation({
 }) {
   const flightsLayer = services.flights;
   const militaryFlightsLayer = services.military;
+  const lowFlyersLayer = services.lowflyers || null;
+  // [layerId, layer, nearby cap] for every aircraft layer Contacts can step to.
+  const AIRCRAFT_SOURCES = [
+    ['flights', flightsLayer, 25000],
+    ['military', militaryFlightsLayer, 5000],
+    ...(lowFlyersLayer ? [['lowflyers', lowFlyersLayer, 5000]] : []),
+  ];
+  const aircraftSources = (targetLayer) =>
+    AIRCRAFT_SOURCES.filter(
+      ([layerId]) => !targetLayer || layerId === targetLayer,
+    );
 
   function summarizeAwarenessCohortForNavigation(
     items,
@@ -46,7 +57,9 @@ export function createNavigation({
   }
 
   function isFlightLayer(layerId) {
-    return layerId === 'flights' || layerId === 'military';
+    return (
+      layerId === 'flights' || layerId === 'military' || layerId === 'lowflyers'
+    );
   }
 
   function normalizeAircraftClass(value) {
@@ -109,40 +122,25 @@ export function createNavigation({
       return false;
     if (targetLayer && !isFlightLayer(targetLayer)) return false;
 
-    const flights =
-      targetLayer === 'military'
-        ? []
-        : flightsLayer
-            .getNearby(
-              layerState.subject.position,
-              AWARENESS_MAX_FLIGHT_SEARCH_RADIUS_M,
-              2,
-              { includeHidden: true },
-            )
-            .filter((item) => aircraftClassMatchesFilter(item, aircraftClass));
-
-    const military =
-      targetLayer === 'flights'
-        ? []
-        : militaryFlightsLayer
-            .getNearby(
-              layerState.subject.position,
-              AWARENESS_MAX_FLIGHT_SEARCH_RADIUS_M,
-              2,
-              { includeHidden: true },
-            )
-            .filter((item) => aircraftClassMatchesFilter(item, aircraftClass));
-
-    return [
-      ['flights', flights],
-      ['military', military],
-    ].some(([layerId, items]) =>
-      items.some(
-        (item) =>
-          `${layerId}:${item.icao24 || item.id}` !==
-          parts.subject.subjectKey(layerState.subject),
-      ),
-    );
+    return aircraftSources(targetLayer)
+      .map(([layerId, layer]) => [
+        layerId,
+        layer
+          .getNearby(
+            layerState.subject.position,
+            AWARENESS_MAX_FLIGHT_SEARCH_RADIUS_M,
+            2,
+            { includeHidden: true },
+          )
+          .filter((item) => aircraftClassMatchesFilter(item, aircraftClass)),
+      ])
+      .some(([layerId, items]) =>
+        items.some(
+          (item) =>
+            `${layerId}:${item.icao24 || item.id}` !==
+            parts.subject.subjectKey(layerState.subject),
+        ),
+      );
   }
 
   function closestFlightWithinRadius(
@@ -154,36 +152,20 @@ export function createNavigation({
     if (!layerState.subject?.position) return null;
     const visited = new Set(visitedKeys);
     if (targetLayer && !isFlightLayer(targetLayer)) return null;
-    const candidates = [
-      ...(targetLayer === 'military'
-        ? []
-        : flightsLayer
-            .getNearby(layerState.subject.position, radiusM, 25000, {
-              includeHidden: true,
-            })
-            .filter((item) => aircraftClassMatchesFilter(item, aircraftClass))
-            .map((item) => ({
-              layerId: 'flights',
-              id: String(item.icao24),
-              item,
-            }))),
-      ...(targetLayer === 'flights'
-        ? []
-        : militaryFlightsLayer
-            .getNearby(layerState.subject.position, radiusM, 5000, {
-              includeHidden: true,
-            })
-            .filter((item) => aircraftClassMatchesFilter(item, aircraftClass))
-            .map((item) => ({
-              layerId: 'military',
-              id: String(item.icao24),
-              item,
-            }))),
-    ].filter((target) => {
-      const key = `${target.layerId}:${target.id}`;
-      if (key === parts.subject.subjectKey(layerState.subject)) return false;
-      return !excludeVisited || !visited.has(key);
-    });
+    const candidates = aircraftSources(targetLayer)
+      .flatMap(([layerId, layer, cap]) =>
+        layer
+          .getNearby(layerState.subject.position, radiusM, cap, {
+            includeHidden: true,
+          })
+          .filter((item) => aircraftClassMatchesFilter(item, aircraftClass))
+          .map((item) => ({ layerId, id: String(item.icao24), item })),
+      )
+      .filter((target) => {
+        const key = `${target.layerId}:${target.id}`;
+        if (key === parts.subject.subjectKey(layerState.subject)) return false;
+        return !excludeVisited || !visited.has(key);
+      });
     candidates.sort(
       (a, b) =>
         (a.item.distanceM ?? a.item.distance ?? Infinity) -

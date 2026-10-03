@@ -15,6 +15,7 @@ import { CockpitCoordinator } from './cockpitCoordinator.js';
 import { ContextControls } from './context.js';
 import { CctvControls } from './cctv.js';
 import { RadioControls } from './radio.js';
+import { installBostonScannerPreset } from './bostonScannerPreset.js';
 import { LocationNavigation } from './locationNavigation.js';
 import { LocalSelectionCard } from './localSelectionCard.js';
 import { MapLabelControls } from './mapLabelControls.js';
@@ -73,6 +74,7 @@ export class StyleManager extends ShellFacade {
       trafficLayer,
       flightsLayer,
       militaryFlightsLayer,
+      lowFlyersLayer,
       satellitesLayer,
       cctvLayer,
       bikeshareLayer,
@@ -335,6 +337,7 @@ export class StyleManager extends ShellFacade {
       services: {
         flightsLayer: services.flightsLayer,
         militaryFlightsLayer: services.militaryFlightsLayer,
+        lowFlyersLayer: services.lowFlyersLayer,
         isTr3b: services.isTr3b,
         toggleTr3b: services.toggleTr3b,
         militaryAwarenessLayer: services.militaryAwarenessLayer,
@@ -449,12 +452,13 @@ export class StyleManager extends ShellFacade {
         trafficLayer,
         flightsLayer,
         militaryFlightsLayer,
+        lowFlyersLayer,
         satellitesLayer,
         cctvLayer,
         bikeshareLayer,
         transitLayer,
         aisLiveVesselsLayer,
-      ],
+      ].filter(Boolean),
       (modeLabel) => {
         this._updateDetectionButton(modeLabel);
       },
@@ -873,6 +877,8 @@ export class StyleManager extends ShellFacade {
         scheduleLayout: () => this._scheduleRightPanelLayout(),
       },
     });
+    this._bostonScanner?.destroy();
+    this._bostonScanner = installBostonScannerPreset({ viewer: this.viewer });
   }
 
   /**
@@ -1487,6 +1493,7 @@ export class StyleManager extends ShellFacade {
     this._clearLayersControl?.destroy();
     this._cctvControls?.destroy();
     this._radioControls?.destroy();
+    this._bostonScanner?.destroy();
     this._cockpitCoordinator.stop();
     this._visualSettings.stop();
     this.shareLinkManager?.destroy();

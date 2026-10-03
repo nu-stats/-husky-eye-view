@@ -1,9 +1,10 @@
 import { AWARENESS_RADIUS_M } from '../../data/militaryAwarenessEngine.js';
-import { DEPENDENCIES, AWARENESS_QUERY_LIMIT } from './policy.js';
+import { SOURCE_LAYERS, AWARENESS_QUERY_LIMIT } from './policy.js';
 
 export function createQueries({ state: layerState, services, parts, source }) {
   const flightsLayer = services.flights;
   const militaryFlightsLayer = services.military;
+  const lowFlyersLayer = services.lowflyers || null;
 
   function sourceState(layerId) {
     const lifecycle =
@@ -58,12 +59,12 @@ export function createQueries({ state: layerState, services, parts, source }) {
 
   function collectSourceStates() {
     return Object.fromEntries(
-      DEPENDENCIES.map((layerId) => [layerId, sourceState(layerId)]),
+      SOURCE_LAYERS.map((layerId) => [layerId, sourceState(layerId)]),
     );
   }
 
   function sourceRevision(sourceStates) {
-    return DEPENDENCIES.map((layerId) => {
+    return SOURCE_LAYERS.map((layerId) => {
       const source = sourceStates[layerId];
       const stats = source?.stats || {};
       return [
@@ -151,7 +152,19 @@ export function createQueries({ state: layerState, services, parts, source }) {
       .filter(
         (item) => !subject || !isSame(subject, item, 'military', 'icao24'),
       );
-    return { flights, military, aircraft: flights.length + military.length };
+    const lowflyers = (
+      lowFlyersLayer?.getNearby?.(position, radiusM, AWARENESS_QUERY_LIMIT, {
+        includeHidden: true,
+      }) || []
+    ).filter(
+      (item) => !subject || !isSame(subject, item, 'lowflyers', 'icao24'),
+    );
+    return {
+      flights,
+      military,
+      lowflyers,
+      aircraft: flights.length + military.length + lowflyers.length,
+    };
   }
   return {
     sourceState,

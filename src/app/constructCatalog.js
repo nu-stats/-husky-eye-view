@@ -1,8 +1,10 @@
 import { createLayerCatalog } from './catalog.js';
 import { LAYER_STATE_REGISTRY } from '../data/layerState.js';
 import { createMilitaryRegistry } from '../layers/aircraft/classification.js';
+import { createLowFlyerRegistry } from '../layers/aircraft/lowFlyerRegistry.js';
 import { createApplicationFlights } from './layers/flights.js';
 import { createApplicationMilitary } from './layers/militaryFlights.js';
+import { createApplicationLowFlyers } from './layers/lowFlyers.js';
 import { createApplicationVessels } from './layers/aisLiveVessels.js';
 import { createApplicationCctv } from './layers/cctv.js';
 import { createApplicationRadio } from './layers/radio.js';
@@ -27,6 +29,7 @@ import { createBhoteKoshiLocatorLayer } from '../data/bhoteKoshiLocator.js';
 const SOURCE_METHODS = Object.freeze({
   flights: ['getSnapshot'],
   military: ['getSnapshot'],
+  lowflyers: ['getSnapshot'],
   vessels: ['getSnapshot'],
   cctv: ['getCatalog', 'getHealth', 'getFrameUrl', 'getMediaUrl'],
   radio: ['getDirectory', 'recordClick'],
@@ -73,9 +76,11 @@ export function createApplicationCatalog({
       throw new TypeError(`Invalid catalog source: ${name}`);
   }
   const militaryRegistry = createMilitaryRegistry();
+  const lowFlyerRegistry = createLowFlyerRegistry();
   const dispose = () => {
     signal.removeEventListener('abort', dispose);
     militaryRegistry.dispose();
+    lowFlyerRegistry.dispose();
   };
   signal.addEventListener('abort', dispose, { once: true });
   try {
@@ -84,12 +89,20 @@ export function createApplicationCatalog({
       surface,
       source: sources.flights,
       militaryRegistry,
+      lowFlyerRegistry,
       resolveAsset,
     });
     const military = createApplicationMilitary({
       surface,
       source: sources.military,
       militaryRegistry,
+      resolveAsset,
+    });
+    const lowflyers = createApplicationLowFlyers({
+      surface,
+      source: sources.lowflyers,
+      militaryRegistry,
+      lowFlyerRegistry,
       resolveAsset,
     });
     const vessels = createApplicationVessels({
@@ -111,6 +124,7 @@ export function createApplicationCatalog({
         }),
         flights,
         military,
+        lowflyers,
         createApplicationEarthquakes({ source: sources.earthquakes }),
         createApplicationAlpr({ surface, source: sources.alpr }),
         satellites,
@@ -126,6 +140,7 @@ export function createApplicationCatalog({
         createApplicationAwareness({
           flights,
           military,
+          lowflyers,
           vessels,
           installations,
         }),
@@ -143,7 +158,12 @@ export function createApplicationCatalog({
       ],
       metadata,
     );
-    return Object.freeze({ ...catalog, militaryRegistry, surface });
+    return Object.freeze({
+      ...catalog,
+      militaryRegistry,
+      lowFlyerRegistry,
+      surface,
+    });
   } catch (error) {
     dispose();
     throw error;

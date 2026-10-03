@@ -34,6 +34,7 @@ export function createCivilFlightLayer({
     flightState,
     records: flightState.records,
     militaryRegistry: services.militaryRegistry,
+    lowFlyerRegistry: services.lowFlyerRegistry,
     groundFloor: services.groundFloor,
     meshFloor: services.meshFloor,
     rendering: parts.rendering,

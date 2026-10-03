@@ -3,8 +3,13 @@
  * (`video_summary` / `video_url`, e.g. Chicago Events). The world-overlay card
  * only fits two short lines and cannot hold a link, so this small DOM card
  * shows the full caption-derived summary and a link to the video timestamp.
- * Features without notes never open it.
+ * Features without notes never open it. HOLC redlining areas also get a link
+ * to their 1930s area description (transcription and scanned form).
  */
+import {
+  HOLC_LAYER_ID,
+  createHolcAreaDescriptionIndex,
+} from '../data/holcAreaDescriptions.js';
 
 /** Accept only absolute https URLs; anything else renders no link. */
 function safeHttpsUrl(value) {
@@ -29,9 +34,14 @@ export class LocalSelectionCard {
    * @param {HTMLElement} options.container Element the card is appended to.
    * @param {import('./uiLifetime.js').UiLifetime} options.lifetime Listener owner.
    */
-  constructor({ container, lifetime }) {
+  constructor({
+    container,
+    lifetime,
+    holcIndex = createHolcAreaDescriptionIndex(),
+  }) {
     this._container = container;
     this._card = null;
+    this._holcIndex = holcIndex;
     lifetime.listen(window, 'gev:entity-selected', (event) =>
       this._show(event.detail),
     );
@@ -102,6 +112,11 @@ export class LocalSelectionCard {
       if (text) {
         card.append(line(text, { marginTop: '6px', whiteSpace: 'pre-wrap' }));
       }
+    }
+    if (record.layerId === HOLC_LAYER_ID) {
+      const slot = document.createElement('div');
+      card.append(slot);
+      void this._fillHolcDescriptionLink(card, slot, record.id);
     }
     if (props.nearest_trauma_center) {
       card.append(
@@ -185,6 +200,30 @@ export class LocalSelectionCard {
     }
     this._container.append(card);
     this._card = card;
+  }
+
+  /** Add the area-description link once the lookup answers (if the card is still open). */
+  async _fillHolcDescriptionLink(card, slot, id) {
+    const href = safeHttpsUrl(await this._holcIndex.urlFor(id));
+    if (!href || this._card !== card) return;
+    const link = document.createElement('a');
+    link.textContent = 'Original 1930s area description ↗';
+    link.href = href;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    Object.assign(link.style, {
+      display: 'block',
+      marginTop: '8px',
+      color: '#ff8a98',
+      fontWeight: 'bold',
+    });
+    slot.append(
+      link,
+      line(
+        'The HOLC appraiser’s own words and the scanned form (press SCAN), at Mapping Inequality.',
+        { fontSize: '11px', opacity: '0.7' },
+      ),
+    );
   }
 
   hide() {

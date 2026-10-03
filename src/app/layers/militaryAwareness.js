@@ -6,6 +6,7 @@ import * as render from '../../renderGovernor.js';
 export function createApplicationAwareness({
   flights,
   military,
+  lowflyers = null,
   vessels,
   installations,
 }) {
@@ -13,6 +14,7 @@ export function createApplicationAwareness({
     services: {
       flights,
       military,
+      lowflyers,
       vessels,
       installations,
       navigation,

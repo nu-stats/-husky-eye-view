@@ -34,6 +34,7 @@ export class CockpitCoordinator {
     const {
       flightsLayer,
       militaryFlightsLayer,
+      lowFlyersLayer = null,
       isTr3b,
       toggleTr3b,
       militaryAwarenessLayer,
@@ -55,6 +56,7 @@ export class CockpitCoordinator {
       services: {
         flightsLayer,
         militaryFlightsLayer,
+        lowFlyersLayer,
         isTr3b,
         toggleTr3b,
         militaryAwarenessLayer,
@@ -98,6 +100,8 @@ export class CockpitCoordinator {
           return flightsLayer.refocusTrackedById?.(trackedId) === true;
         if (layerId === 'military')
           return militaryFlightsLayer.refocusTrackedById?.(trackedId) === true;
+        if (layerId === 'lowflyers')
+          return lowFlyersLayer?.refocusTrackedById?.(trackedId) === true;
         return false;
       },
     });
@@ -202,7 +206,7 @@ export class CockpitCoordinator {
     selectedTarget,
   }) {
     const { militaryAwarenessLayer } = this.services;
-    if (!['flights', 'military'].includes(targetLayer)) {
+    if (!['flights', 'military', 'lowflyers'].includes(targetLayer)) {
       return {
         ok: false,
         error: `Cockpit flies aircraft only — ${targetLayer} contacts cannot be entered`,
@@ -224,7 +228,12 @@ export class CockpitCoordinator {
     // A filter that matched nothing still enters, as long as the layer is
     // already right — the operator asked for that layer and is on it.
     if (alreadyOnLayer) return { ok: true, retargeted: false };
-    const label = targetLayer === 'military' ? 'military' : 'civilian';
+    const label =
+      targetLayer === 'military'
+        ? 'military'
+        : targetLayer === 'lowflyers'
+          ? 'helicopter or low-flying'
+          : 'civilian';
     const filtered = aircraftClass ? `${aircraftClass} ` : '';
     return {
       ok: false,
@@ -243,7 +252,16 @@ export class CockpitCoordinator {
       zoom = null,
     } = {},
   ) {
-    const { flightsLayer, militaryFlightsLayer } = this.services;
+    const { flightsLayer, militaryFlightsLayer, lowFlyersLayer } =
+      this.services;
+    const aircraftLayer = (layerId) =>
+      layerId === 'military'
+        ? militaryFlightsLayer
+        : layerId === 'flights'
+          ? flightsLayer
+          : layerId === 'lowflyers'
+            ? lowFlyersLayer || null
+            : null;
     const normalized = String(action || '').toLowerCase();
     if (!this.cockpitView) {
       return {
@@ -277,12 +295,7 @@ export class CockpitCoordinator {
         };
       }
       let currentTarget = this.getAircraftTrackingTarget();
-      const layerForTarget = (target) =>
-        target?.layerId === 'military'
-          ? militaryFlightsLayer
-          : target?.layerId === 'flights'
-            ? flightsLayer
-            : null;
+      const layerForTarget = (target) => aircraftLayer(target?.layerId);
       // A requested layer retargets BEFORE entry, through the same filtered
       // navigation NEXT uses. Ignoring it entered on whatever was already
       // tracked and reported success, so "cockpit in that military helicopter"
@@ -311,12 +324,7 @@ export class CockpitCoordinator {
           currentTarget = this.getAircraftTrackingTarget();
         }
       }
-      const selectedLayer =
-        selectedTarget?.layerId === 'military'
-          ? militaryFlightsLayer
-          : selectedTarget?.layerId === 'flights'
-            ? flightsLayer
-            : null;
+      const selectedLayer = aircraftLayer(selectedTarget?.layerId);
       const entry = enterCockpitWithTracking({
         cockpitView: this.cockpitView,
         selectedLayer,

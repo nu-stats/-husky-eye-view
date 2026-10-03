@@ -24,6 +24,12 @@ export function createFocus({ state: layerState, services, parts, source }) {
         militaryFlightsLayer.trackById(id, { origin })
       );
     }
+    if (layerId === 'lowflyers' && services.lowflyers) {
+      return (
+        services.lowflyers.refocusTrackedById?.(id, { origin }) ||
+        services.lowflyers.trackById(id, { origin })
+      );
+    }
     if (layerId === 'military-installations') {
       if (!parts.model.contextTargetFlyToAllowed(layerId))
         return selectKnownContextTarget(layerId, id);

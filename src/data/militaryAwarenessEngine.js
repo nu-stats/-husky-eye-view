@@ -131,6 +131,7 @@ export function getAwarenessNavigationTargets(
       ![
         'flights',
         'military',
+        'lowflyers',
         'ais-live-vessels',
         'military-installations',
       ].includes(layerId)

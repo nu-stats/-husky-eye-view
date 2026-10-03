@@ -63,7 +63,7 @@ const schemas = [
       properties: {
         layerId: {
           type: 'string',
-          enum: ['flights', 'military'],
+          enum: ['flights', 'military', 'lowflyers'],
         },
         locationId: {
           type: 'string',
@@ -228,6 +228,7 @@ const schemas = [
           enum: [
             'flights',
             'military',
+            'lowflyers',
             'ais-live-vessels',
             'military-installations',
           ],

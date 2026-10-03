@@ -124,6 +124,11 @@ export function createLifecycle({
           parts.tracking._onMilitaryActiveChange,
         );
       }
+      if (!flightState._lowFlyerChangeUnsub && services.lowFlyerRegistry) {
+        flightState._lowFlyerChangeUnsub = services.lowFlyerRegistry.onChange(
+          parts.tracking._onLowFlyerChange,
+        );
+      }
 
       restoreSpriteOrder(viewer);
 
@@ -260,6 +265,10 @@ export function createLifecycle({
       if (flightState._milActiveChangeUnsub) {
         flightState._milActiveChangeUnsub();
         flightState._milActiveChangeUnsub = null;
+      }
+      if (flightState._lowFlyerChangeUnsub) {
+        flightState._lowFlyerChangeUnsub();
+        flightState._lowFlyerChangeUnsub = null;
       }
       document.removeEventListener('keydown', parts.tracking._onKeyDown);
       if (flightState._cockpitModeListener) {

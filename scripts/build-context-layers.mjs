@@ -1,6 +1,7 @@
 // Build the nationwide context layers from the source files in data/source/
 // (streamed line by line; the tract files are ~2 GB each):
-//   - holc_nation.geojson              -> HOLC "redlining" areas, every city
+//   - mappinginequality.json           -> HOLC "redlining" areas, every city
+//                                         (holc_nation.geojson adds names)
 //   - nation_tracts_le.geojson         -> census tracts with life expectancy
 //                                         at birth (life_exp_8, USALEEP)
 //   - nation_county_le.geojson         -> county life expectancy 2000-2019,
@@ -9,7 +10,7 @@
 //                                         life expectancy (2015)
 //   - nation_tracts_le_cluster.geojson -> Local Moran's I clusters of tract
 //                                         life expectancy (life_exp_8)
-// Output is chunked (tracts and HOLC by county, counties by state) so the app
+// Output is chunked (tracts by county, HOLC by city, counties by state) so the app
 // loads only the chunks in view:
 //   public/context/<layer>/index.json        [{ id, bbox:[w,s,e,n], count }]
 //   public/context/<layer>/<chunk>.geojsonl  one Feature per line
@@ -21,12 +22,19 @@
 // Usage: node scripts/build-context-layers.mjs [layer ...]
 //   layers: holc, tract-le, county-le, county-clusters, tract-clusters
 //   (default: all)
-import { createReadStream, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  createReadStream,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createInterface } from 'node:readline';
 
 // Raw nationwide sources live outside public/ so a production build does not
 // copy gigabytes into the output; only the chunks below are served.
 const HOLC_INPUT = 'data/source/holc_nation.geojson';
+const HOLC_FULL_INPUT = 'data/source/mappinginequality.json';
 const TRACTS_INPUT = 'data/source/nation_tracts_le.geojson';
 const COUNTY_INPUT = 'data/source/nation_county_le.geojson';
 const COUNTY_CLUSTER_INPUT = 'data/source/nation_county_le_cluster.geojson';
@@ -282,44 +290,132 @@ function createChunkWriter(layerDir) {
 }
 
 // ---- HOLC redlining, nationwide ----------------------------------------------
+// Source: Mapping Inequality's complete spatial file (every HOLC area, 314
+// cities; https://dsl.richmond.edu/panorama/redlining/data). The earlier
+// tract-split file (holc_nation.geojson) was missing whole metros, Boston
+// among them; it is now read only for the neighborhood names it carries.
+// Area ids match the area-description data, so after this step re-run
+// scripts/build-holc-area-descriptions.mjs (finish() clears the folder).
+/** City key that survives naming differences ("Los Angeles (central)", "LA"). */
+const holcCityKey = (city, state) =>
+  `${String(city || '')
+    .replace(/\s*\(.*\)\s*/g, '')
+    .replace(/[^A-Za-z]/g, '')
+    .toLowerCase()}|${state}`;
+
+/**
+ * Read the old tract-split file for (a) neighborhood names by area id and
+ * (b) its features grouped by city, kept only for areas the full file lacks.
+ */
+async function readOldHolc(fullIds) {
+  const names = new Map();
+  const orphansByCity = new Map();
+  try {
+    for await (const f of features(HOLC_INPUT)) {
+      const p = f.properties;
+      const id = p.polygon_id != null ? String(p.polygon_id) : null;
+      if (id && p.name && !names.has(id)) names.set(id, p.name);
+      if (!id || fullIds.has(id)) continue;
+      const key = holcCityKey(p.st_name, p.state);
+      if (!orphansByCity.has(key)) orphansByCity.set(key, []);
+      orphansByCity.get(key).push(f);
+    }
+  } catch {
+    // Optional: without the old file, areas are titled by label only.
+  }
+  return { names, orphansByCity };
+}
+
+/** Chunk ids by city: "MA-Boston", "CA-LosAngeles". */
+const holcChunkId = (state, city) =>
+  `${String(state || 'XX').trim()}-${String(city || 'unknown').replace(/[^A-Za-z0-9]/g, '')}`;
+
 async function buildHolc() {
   const writer = createChunkWriter('holc');
+  const source = JSON.parse(readFileSync(HOLC_FULL_INPUT, 'utf8'));
+  const fullIds = new Set(
+    source.features.map((f) => String(f.properties.area_id)),
+  );
+  const { names, orphansByCity } = await readOldHolc(fullIds);
+  // A city the full file renumbered keeps whichever version has more areas
+  // (Waco: 22 areas in the old survey, 5 in the new file).
+  const fullCount = new Map();
+  for (const f of source.features) {
+    const key = holcCityKey(f.properties.city, f.properties.state);
+    fullCount.set(key, (fullCount.get(key) || 0) + 1);
+  }
+  const useOld = new Set();
+  for (const [key, list] of orphansByCity) {
+    const areas = new Set(list.map((f) => String(f.properties.polygon_id)))
+      .size;
+    if (areas > (fullCount.get(key) || 0)) useOld.add(key);
+  }
+  if (useOld.size)
+    console.log(
+      `  holc: older, more detailed survey kept for ${[...useOld].join(', ')}`,
+    );
   let dropped = 0;
-  for await (const f of features(HOLC_INPUT)) {
+  for (const key of useOld) {
+    for (const f of orphansByCity.get(key)) {
+      const p = f.properties;
+      const geometry = cleanGeometry(f.geometry);
+      if (!geometry) continue;
+      const grade = String(p.holc_grade || '').toUpperCase();
+      const label = HOLC_GRADE_LABELS[grade];
+      const city = `${p.st_name}, ${p.state}`;
+      writer.add(holcChunkId(p.state, p.st_name), {
+        type: 'Feature',
+        id: `holc-${p.id}-${p.polygon_id}-${p.geoid ?? 'na'}`,
+        properties: {
+          name: `${p.holc_id} · ${p.name || city}`,
+          holc_id: p.holc_id,
+          holc_grade: label ? grade : '',
+          city,
+          summary: label
+            ? `Graded ${grade} ("${label}") on the 1930s Home Owners' Loan Corporation map of ${city}.`
+            : `Ungraded area on the 1930s HOLC map of ${city}.`,
+          source_note: 'Mapping Inequality (University of Richmond).',
+        },
+        geometry,
+      });
+    }
+  }
+  for (const f of source.features) {
     const p = f.properties;
+    if (useOld.has(holcCityKey(p.city, p.state))) continue;
     const geometry = cleanGeometry(f.geometry);
-    if (!geometry) {
+    if (!geometry || p.area_id == null) {
       dropped += 1;
       continue;
     }
-    const grade = String(p.holc_grade || '').toUpperCase();
+    const grade = String(p.grade || '')
+      .trim()
+      .toUpperCase();
     const label = HOLC_GRADE_LABELS[grade];
-    const city = p.st_name ? `${p.st_name}, ${p.state}` : p.state || '';
-    // Chunk by county; pieces without a county fall back to their HOLC map.
-    const chunkId =
-      p.state_code && p.county_cod
-        ? `${p.state_code}${p.county_cod}`
-        : `map-${p.map_id ?? 'unknown'}`;
-    writer.add(chunkId, {
+    const holcId = String(p.label || '').trim() || null;
+    const city = p.city ? `${p.city}, ${p.state}` : p.state || '';
+    const name = names.get(String(p.area_id));
+    writer.add(holcChunkId(p.state, p.city), {
       type: 'Feature',
-      id: `holc-${p.id}-${p.polygon_id}-${p.geoid ?? 'na'}`,
+      id: `holc-mi-${p.area_id}`,
       properties: {
-        name: p.name ? `${p.holc_id} · ${p.name}` : `HOLC area ${p.holc_id}`,
-        holc_id: p.holc_id,
-        holc_grade: grade,
+        name: holcId
+          ? `${holcId} · ${name || city}`
+          : `HOLC area · ${name || city}`,
+        holc_id: holcId,
+        holc_grade: label ? grade : '',
         city,
         summary: label
           ? `Graded ${grade} ("${label}") on the 1930s Home Owners' Loan Corporation map of ${city}.`
           : `Ungraded area on the 1930s HOLC map of ${city}.`,
-        source_note:
-          'Mapping Inequality (University of Richmond); HOLC areas split by 2010 census tract.',
+        source_note: 'Mapping Inequality (University of Richmond).',
       },
       geometry,
     });
   }
   writer.finish();
   if (dropped)
-    console.log(`  holc: dropped ${dropped} slivers with no drawable area`);
+    console.log(`  holc: dropped ${dropped} areas with no drawable outline`);
 }
 
 // ---- Life expectancy and its clusters, every census tract --------------------

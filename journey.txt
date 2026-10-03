@@ -759,10 +759,35 @@ Done:
     and the ACTIVE STYLE badge are gone; logo and top buttons unchanged.
   - The dev server no longer watches data/source/ (a big download crashed it).
 Known gap: the HOLC source (data/source/holc_nation.geojson) has no Boston or Greater
-          Boston areas, so the HOLC layer is empty over Boston.
+          Boston areas, so the HOLC layer is empty over Boston. (Fixed in Step 48.)
 Code:     server/providers/aircraft/adsb-lol-low.js, src/layers/lowflyers/,
           src/layers/aircraft/lowFlyerRegistry.js, src/ui/bostonScannerPreset.js,
           src/data/bostonScannerZone.js, src/data/holcAreaDescriptions.js, src/hud.js.
+Media:    The overview video (4:24, captions) and the user guide PDF are attached to the
+          v0.1.5 release on GitHub. Their source files and scripts live outside the repo
+          in Documents\HuskyEyeView-Media\.
+
+
+-------------------------------------------------------------------------------
+STEP 48: HOLC rebuilt from Mapping Inequality's complete data (v0.1.6)
+-------------------------------------------------------------------------------
+Done:
+  - The HOLC layer is now built from Mapping Inequality's full file
+    (data/source/mappinginequality.json, not in git): 314 cities and 10,217 areas,
+    up from 173 cities and 8,432 areas. Massachusetts went from 3 cities to 37,
+    including Boston, Cambridge, Somerville, Quincy, Newton and Worcester.
+  - Files are now one per city (public/context/holc/MA-Boston.geojsonl, ...) instead
+    of one per county.
+  - Coverage check: every old area is still there. 74 old ids in Houston, Providence
+    and New Britain have no exact match because Mapping Inequality renumbered those
+    cities, and each now has more areas (47 vs 40, 28 vs 25, 18 vs 9). Waco, TX is
+    the one city where the older survey had more areas (22), so the build keeps it.
+  - Checked in the app: Roxbury area D9 draws, and its card links to
+    Mapping Inequality's Boston D9 description.
+Rebuild:  node scripts/build-context-layers.mjs holc
+          node scripts/build-holc-area-descriptions.mjs   (always run second; the HOLC
+                                                           build clears the folder)
+Code:     scripts/build-context-layers.mjs.
 
 
 ===============================================================================
@@ -778,6 +803,9 @@ Not back:   Only the speed rewrite from Step 6 (batched drawing). Large pin laye
             zoomed-out tract views may feel heavier.
 Cockpit:    Zoom 0.5x-8x, look-around, clickable pins, Data Layers menu works inside.
 Live feeds: US-focused (Step 39).
+HOLC:       314 cities from Mapping Inequality, Boston included (Step 48); every card
+            links to its 1930s area description.
+Media:      Overview video and guide PDF attached to the v0.1.5 GitHub release.
 Tests:      All 4,294 unit tests pass. Format, import-direction and package-boundary
             checks are clean.
 
@@ -794,7 +822,8 @@ Data exports:
             mkdb_incidents_geocoded.csv
 
 Git history on main (newest first):
-            (release)  Helicopters & Low Flyers, BPD scanner, HOLC descriptions (tagged v0.1.5)
+            (release)  HOLC rebuilt from Mapping Inequality, Boston included (tagged v0.1.6)
+            371edc14  Helicopters & Low Flyers, BPD scanner, HOLC descriptions (tagged v0.1.5)
             58080c34  Cockpit LAYERS slider, one layer manifest, faster area layers (tagged v0.1.4)
             ec8639eb  Air quality, green space, research-first app, smaller data (tagged v0.1.3)
             136c8e3b  Cockpit zoom, look-around, clickable pins; US-focused feeds

@@ -1,0 +1,61 @@
+name: Release media
+
+# Keeps exactly one public copy of the overview video, its captions and the user
+# guide: on the latest release. When a new release is published, the files move
+# to it from the release that had them, and every other release loses them.
+# To ship a new video or guide, upload it to the latest release; older copies
+# elsewhere are then removed.
+
+on:
+  release:
+    types: [published, released]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-media
+  cancel-in-progress: false
+
+jobs:
+  move:
+    name: Move media to the latest release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      MEDIA: Husky_Eye_View_Overview.mp4 Husky_Eye_View_Overview.srt Husky_Eye_View_Guide.pdf
+    steps:
+      - name: Move media
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name)
+          echo "Latest release: $latest"
+          releases=$(gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.draft == false) | .tag_name')
+          has() { gh release view "$1" --json assets --jq '.assets[].name' | grep -xF "$2" > /dev/null; }
+          mkdir -p media
+          for name in $MEDIA; do
+            if ! has "$latest" "$name"; then
+              source=""
+              for tag in $releases; do
+                if [ "$tag" != "$latest" ] && has "$tag" "$name"; then source=$tag; break; fi
+              done
+              if [ -z "$source" ]; then
+                echo "::warning::$name is not on any release"
+                continue
+              fi
+              echo "Copying $name from $source to $latest"
+              gh release download "$source" --pattern "$name" --dir media --clobber
+              gh release upload "$latest" "media/$name" --clobber
+            fi
+            has "$latest" "$name" || { echo "::error::$name did not reach $latest"; exit 1; }
+            for tag in $releases; do
+              if [ "$tag" != "$latest" ] && has "$tag" "$name"; then
+                echo "Removing $name from $tag"
+                gh release delete-asset "$tag" "$name" --yes
+              fi
+            done
+          done

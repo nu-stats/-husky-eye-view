@@ -763,9 +763,9 @@ Known gap: the HOLC source (data/source/holc_nation.geojson) has no Boston or Gr
 Code:     server/providers/aircraft/adsb-lol-low.js, src/layers/lowflyers/,
           src/layers/aircraft/lowFlyerRegistry.js, src/ui/bostonScannerPreset.js,
           src/data/bostonScannerZone.js, src/data/holcAreaDescriptions.js, src/hud.js.
-Media:    The overview video (4:24, captions) and the user guide PDF are attached to the
-          v0.1.5 release on GitHub. Their source files and scripts live outside the repo
-          in Documents\HuskyEyeView-Media\.
+Media:    The overview video (4:24, captions) and the user guide PDF go on the newest
+          GitHub release only (see Step 48). Their source files and scripts live outside
+          the repo in Documents\HuskyEyeView-Media\.
 
 
 -------------------------------------------------------------------------------
@@ -788,6 +788,12 @@ Rebuild:  node scripts/build-context-layers.mjs holc
           node scripts/build-holc-area-descriptions.mjs   (always run second; the HOLC
                                                            build clears the folder)
 Code:     scripts/build-context-layers.mjs.
+Media:    Only the latest release carries the video, captions and guide PDF. The
+          .github/workflows/release-media.yml workflow runs whenever a release is
+          published: it moves the three files to the latest release and removes them from
+          every older one (it can also be run by hand from the Actions tab). To ship a
+          new video or guide, upload it to the latest release with the same file name.
+          The README links (releases/latest/download/...) always point at the newest copy.
 
 
 ===============================================================================
@@ -805,7 +811,8 @@ Cockpit:    Zoom 0.5x-8x, look-around, clickable pins, Data Layers menu works in
 Live feeds: US-focused (Step 39).
 HOLC:       314 cities from Mapping Inequality, Boston included (Step 48); every card
             links to its 1930s area description.
-Media:      Overview video and guide PDF attached to the v0.1.5 GitHub release.
+Media:      Overview video and guide PDF on the latest GitHub release only (v0.1.6);
+            the release-media workflow moves them to each new release.
 Tests:      All 4,294 unit tests pass. Format, import-direction and package-boundary
             checks are clean.
 

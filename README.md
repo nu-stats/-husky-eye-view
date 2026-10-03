@@ -6,6 +6,8 @@
 
 _Husky Eye View is a fork of [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) by Bilawal Sidhu, maintained by Northeastern University researchers at [nu-stats/husky-eye-view](https://github.com/nu-stats/husky-eye-view)._
 
+📺 **[Overview video](https://github.com/nu-stats/husky-eye-view/releases/latest/download/Husky_Eye_View_Overview.mp4)** ([captions](https://github.com/nu-stats/husky-eye-view/releases/latest/download/Husky_Eye_View_Overview.srt)) · 📘 **[User guide (PDF)](https://github.com/nu-stats/husky-eye-view/releases/latest/download/Husky_Eye_View_Guide.pdf)**: always the newest version, from the [latest release](https://github.com/nu-stats/husky-eye-view/releases/latest).
+
 ### A spy-satellite simulator in your browser — then you realize the sources are public and the data is real.
 
 Photorealistic 3D globe. Live aircraft, ships, satellites, earthquakes, traffic, and public cameras. Hands-free voice control powered by a realtime AI agent.
